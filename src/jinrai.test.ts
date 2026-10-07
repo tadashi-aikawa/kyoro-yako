@@ -108,7 +108,8 @@ it('夜桜の舞は3色の小判定花びらを散らし、Normalで80〜150発�
   }
   expect(colors).toEqual(new Set([3, 4, 5]));
   expect(sways.size).toBeGreaterThan(20);
-});
+  // 59秒分の全弾を検証するため、CIの実行速度に余裕を持たせる。
+}, 20_000);
 
 it('夜桜の舞の突風は予告後90フレーム流し、風下の花びらを渦巻かせる', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
