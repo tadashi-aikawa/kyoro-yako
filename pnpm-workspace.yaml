@@ -1,3 +1,8 @@
 allowBuilds:
-  esbuild: true
+  esbuild@0.28.2: true
+strictDepBuilds: true
+savePrefix: ''
+verifyDepsBeforeRun: error
+overrides:
+  source-map-js: 1.2.2
 confirmModulesPurge: false

@@ -53,6 +53,17 @@ pnpm exec vite preview --base=/kyoro-yako/ --host 127.0.0.1 --port 5198
 - [ViteのGitHub Pages公開手順](https://v7.vite.dev/guide/static-deploy#github-pages)
 - [GitHub Pagesのカスタムワークフロー](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
 
+## 依存と公開処理の更新
+
+- 直接依存はexactバージョン、間接依存はコミット済みのロックファイルで固定します。
+- CIでは `pnpm install --frozen-lockfile` を使います。
+- インストール時のスクリプト実行は `esbuild@0.28.2` だけを許可します。
+    - 条件: 未確認のスクリプトが追加された場合はインストールを失敗させます。
+- pnpmとCIのNode、Actionsの参照も固定します。
+    - Actions: 公式リリースのフルコミットSHAを使い、コメントにバージョンを記載します。
+- 更新時は差分をレビューし、`pnpm audit`・`pnpm check`・`pnpm build:pages` を実行します。
+    - 限界: 固定と監査は、パッケージ自体の悪意や未公開の脆弱性を保証しません。
+
 ## ステージ
 
 | Stage | 中ボス | ボス |
