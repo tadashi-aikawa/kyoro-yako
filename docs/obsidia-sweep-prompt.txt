@@ -1,0 +1,5 @@
+Tool: built-in imagegen
+Edit target: public/assets/sprites/obsidia.webp
+Output: public/assets/sprites/obsidia-sweep.png
+
+Use case: identity-preserve. Asset type: transparent chibi 2D boss game sprite, charging a powerful sweeping spell. Preserve exact identity, face, purple eyes, long dark hair fading into violet, purple jewel hairpin, earrings, high-neck black gothic dress, black stockings and shoes, existing polished chibi style and proportions. Change only pose and expression: tuck the purple book firmly under her left arm, close her eyes with a composed aristocratic expression, place her right hand elegantly over her heart with fingers together, as she concentrates magic before extending her hand to command a decisive sweep. Stable standing stance. Full body, entire head/hair/shoes in frame, centered square with similar padding. Actual transparent background, clean alpha edges. No baked-in aura, glow, particles, magic circle, backdrop, ground shadow, text or checkerboard. Readable silhouette at 64px.

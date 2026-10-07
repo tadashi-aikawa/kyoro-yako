@@ -1,0 +1,6 @@
+Use case: identity-preserve
+Asset type: transparent chibi boss sprite for a bullet hell game.
+Input image: edit target; existing Jinrai sprite. Preserve the same character identity, face, hair ornaments, long dark hair with golden streaks, black-and-gold kunoichi costume, boots, proportions, illustration style and full-body square framing.
+Primary request: create a sibling ninjutsu hand-seal pose. Remove the kunai and bring both hands together in front of her chest, clearly forming a ninja hand seal with two fingers held vertically and the other hand supporting them. Focused determined eyes, stable centered stance, entire head, feet and hair visible.
+Scene/backdrop: genuinely transparent background.
+Constraints: preserve character and outfit; change only pose, hands and expression. Clean readable silhouette at 64-pixel game size. No lightning, smoke or glow baked into the image; those are animated in game code. No text, watermark, frame or background.

@@ -1,0 +1,5 @@
+:root { background: #070713; color: #fff; font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif; }
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body { display: grid; place-items: center; }
+canvas { display: block; box-shadow: 0 0 48px #423a8c66; }
