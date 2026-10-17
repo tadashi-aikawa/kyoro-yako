@@ -24,7 +24,7 @@ export interface DawnOwl { x: number; y: number; targetX: number; targetY: numbe
 export interface Shot { active: boolean; x: number; y: number; vx: number; vy: number; damage: number; radius: number; homing: boolean; }
 export type WaveKind = 'arc' | 'ring' | 'cross' | 'threeWay' | 'return' | 'sweep' | 'pincer' | 'serpent' | 'orbit' | 'chevron';
 export interface Enemy { active: boolean; x: number; y: number; vx: number; vy: number; hp: number; age: number; hitFrames: number; color: number; kind: WaveKind; originX: number; originY: number; side: number; slot: number; }
-export interface Item { active: boolean; x: number; y: number; vx: number; vy: number; kind: ItemKind; auto: boolean; }
+export interface Item { active: boolean; x: number; y: number; vx: number; vy: number; kind: ItemKind; auto: boolean; manual: boolean; }
 export interface Particle { active: boolean; x: number; y: number; vx: number; vy: number; age: number; life: number; color: string; size: number; }
 export interface Clone { active: boolean; x: number; y: number; vx: number; vy: number; age: number; }
 
@@ -35,7 +35,7 @@ export const SAKURA_GUST = 90;
 export const SAKURA_SWIRL = 24;
 const makeShot = (): Shot => ({ active: false, x: 0, y: 0, vx: 0, vy: -9, damage: 1, radius: 2, homing: false });
 const makeEnemy = (): Enemy => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, hp: 5, age: 0, hitFrames: 0, color: 0, kind: 'return', originX: 0, originY: 0, side: 1, slot: 0 });
-const makeItem = (): Item => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, kind: 'point', auto: false });
+const makeItem = (): Item => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, kind: 'point', auto: false, manual: false });
 const makeParticle = (): Particle => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, age: 0, life: 30, color: '#fff', size: 2 });
 const makeClone = (): Clone => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, age: 0 });
 export const PLAYERS: PlayerId[] = ['mimiko'];
@@ -51,6 +51,7 @@ export class Game {
   stageFrame = 0;
   sceneryDistance = 0;
   midbossElapsedFrames = 0;
+  collectionFrames = 0;
   frame = 0;
   menu = 0;
   optionVolume = 50;
@@ -228,7 +229,7 @@ export class Game {
     else if (this.scene === 'ending' || this.scene === 'credits') cue = 'ending';
     else if (['title', 'difficulty', 'player', 'practice', 'option', 'help', 'notebook'].includes(this.scene)) cue = 'title';
     else if (this.scene === 'dialogue' && (this.afterDialogue === 'boss' || this.afterDialogue === 'clear')) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
-    else if (this.phase && !this.midboss) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
+    else if ((this.phase || this.collectionFrames > 0) && !this.midboss) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else cue = STAGES[this.stage - 1].bgm;
     this.bgm.sync(cue, false);
   }
@@ -298,6 +299,7 @@ export class Game {
     this.stageFrame = 0;
     this.sceneryDistance = 0;
     this.midbossElapsedFrames = 0;
+    this.collectionFrames = 0;
     this.scene = 'stage';
     this.boss = undefined;
     this.midboss = false;
@@ -318,7 +320,8 @@ export class Game {
     if (this.just('Escape')) { this.resumeScene = 'stage'; this.scene = 'pause'; this.menu = 0; return; }
     // 中ボスで道中の時計が止まっても、世界のスクロールは続ける。
     this.sceneryDistance += this.phase ? 0.65 : 1.8;
-    if (!this.phase) this.stageFrame++;
+    const collecting = this.collectionFrames > 0;
+    if (!this.phase && !collecting) this.stageFrame++;
     if (this.invulnFrames > 0) this.invulnFrames--;
     if (this.bombFrames > 0) this.bombFrames--;
     this.updatePlayer();
@@ -329,8 +332,10 @@ export class Game {
         if (this.phase) this.phaseHp -= 2.5;
       }
     }
-    if (this.phase) this.updateBoss();
-    else this.updateWaves();
+    if (!collecting) {
+      if (this.phase) this.updateBoss();
+      else this.updateWaves();
+    }
     this.updateShots();
     this.updateClones();
     this.updateBullets();
@@ -341,6 +346,7 @@ export class Game {
       this.pendingHit++;
       if (this.pendingHit >= 8) this.commitHit();
     }
+    if (collecting && this.scene === 'stage' && --this.collectionFrames === 0) this.leaveBossFight();
   }
 
   private updatePlayer(): void {
@@ -402,12 +408,9 @@ export class Game {
     this.hitDuringSpell = true;
     this.audio.play('hit');
     this.flash = 10;
-    // 失ったPowerは回収で取り戻せる。即座に吸われない上方へ落とし、無敵中に取りに行く余地を残す。
-    const recoveryCount = lostPower === 1 ? 1 : Math.floor((lostPower + 1e-9) / 0.05);
-    for (let i = 0; i < recoveryCount; i++) {
-      const item = this.spawnItem(Math.max(9, Math.min(FIELD.w - 9, this.px + (Math.random() - 0.5) * 60)), Math.max(12, this.py - 96), lostPower === 1 ? 'large' : 'small', false);
-      if (item) item.vy = -2.4;
-    }
+    // 大Pで一度に取り戻せないよう、小Pを画面全体へ分散する。拾いに行く範囲をプレイヤーが選ぶ。
+    const recoveryCount = Math.floor((lostPower + 1e-9) / 0.05);
+    for (let i = 0; i < recoveryCount; i++) this.scatterItem('small', i, recoveryCount);
     for (let i = 0; i < 3; i++) this.spawnItem(this.px + (Math.random() - 0.5) * 60, this.py - 15, 'point', false);
     if (this.lives < 0) { this.scene = 'gameover'; this.menu = 0; }
   }
@@ -501,6 +504,7 @@ export class Game {
 
   startBoss(mid: boolean, index: number): void {
     this.scene = 'stage';
+    this.collectionFrames = 0;
     this.midboss = mid;
     this.boss = mid ? STAGES[this.stage - 1].mid : STAGES[this.stage - 1].boss;
     this.phaseIndex = mid ? 0 : Math.max(0, Math.min(index, STAGES[this.stage - 1].phases.length - 1));
@@ -558,8 +562,23 @@ export class Game {
     this.bullets.forEach((b) => { this.spawnItem(b.x, b.y, 'point', true); });
     this.bullets.clear(); this.clones.clear();
     this.flash = 8;
-    if (this.midboss) {
+    const next = this.midboss ? undefined : STAGES[this.stage - 1].phases[this.phaseIndex + 1];
+    if (next) { this.phaseIndex++; this.beginPhase(next); }
+    else {
+      if (!this.midboss) this.phaseIndex++;
+      // 会話へ進む前に手で拾う時間を残す。近づいて拾うまで補充を直接加算しない。
       this.phase = undefined;
+      this.collectionFrames = 180;
+      this.jinraiLasers.length = 0;
+      this.jinraiMarks.length = 0;
+      this.enemies.clear(); this.shots.clear();
+      this.message = '補充品を回収しよう';
+      this.messageFrames = 180;
+    }
+  }
+
+  private leaveBossFight(): void {
+    if (this.midboss) {
       if (this.boss === 'chappy') this.startConversation('chappy', 'after', 'stage');
       else if (this.boss === 'neo' && this.stage === 5) {
         this.lines = [
@@ -572,26 +591,28 @@ export class Game {
       } else { this.boss = undefined; this.scene = 'stage'; }
       return;
     }
-    this.phaseIndex++;
-    const next = STAGES[this.stage - 1].phases[this.phaseIndex];
-    if (next) this.beginPhase(next);
-    else {
-      this.phase = undefined;
-      this.startConversation(STAGES[this.stage - 1].boss, 'after', 'clear');
-    }
+    this.startConversation(STAGES[this.stage - 1].boss, 'after', 'clear');
   }
 
   private supplyPhaseItems(): void {
     const kinds: ItemKind[] = ['large'];
     // ボムは2フェーズに1個。時間切れでも補充し、低Powerで倒せない状態からも立て直せるようにする。
     if (this.midboss || this.phaseIndex % 2 === 1) kinds.push('bomb');
-    const leavingFight = this.midboss || this.phaseIndex === STAGES[this.stage - 1].phases.length - 1;
-    const [x, y] = this.bossPosition();
-    kinds.forEach((kind, index) => {
-      // 会話ではアイテムが止まるため、戦闘の最後だけは直接加算して次の面へ持ち越す。
-      if (leavingFight) this.collectItem({ kind, y });
-      else this.spawnItem(x + (index === 0 ? -14 : 14), y, kind, true);
-    });
+    kinds.forEach((kind, index) => { this.scatterItem(kind, index, kinds.length); });
+  }
+
+  private scatterItem(kind: ItemKind, index: number, count: number): void {
+    // 横5列・縦4段へ分けてから乱数でずらし、乱数が偏っても被弾Pが一か所に固まらないようにする。
+    const columns = Math.min(count, 5);
+    const rows = Math.ceil(count / columns);
+    const x = 24 + ((index % columns + 0.2 + Math.random() * 0.6) / columns) * (FIELD.w - 48);
+    const y = 64 + ((Math.floor(index / columns) + 0.2 + Math.random() * 0.6) / rows) * 240;
+    const item = this.spawnItem(x, y, kind, false);
+    if (item) {
+      item.manual = true;
+      item.vx = (Math.random() - 0.5) * 0.6;
+      item.vy = -0.6;
+    }
   }
 
   private updateBoss(): void {
@@ -1002,7 +1023,7 @@ export class Game {
 
   private spawnItem(x: number, y: number, kind: ItemKind, auto: boolean): Item | undefined {
     const item = this.items.acquire(); if (!item) return;
-    Object.assign(item, { x, y, vx: (Math.random() - 0.5) * 1.2, vy: -1.2, kind, auto });
+    Object.assign(item, { x, y, vx: (Math.random() - 0.5) * 1.2, vy: -1.2, kind, auto, manual: false });
     return item;
   }
 
@@ -1010,7 +1031,7 @@ export class Game {
     const focused = this.held('ShiftLeft') || this.held('ShiftRight');
     this.items.forEach((item) => {
       const dist = Math.hypot(item.x - this.px, item.y - this.py);
-      const seeking = item.auto || autoCollect(this.py) || dist < (focused ? 84 : 37);
+      const seeking = item.auto || (!item.manual && autoCollect(this.py)) || dist < (focused ? 84 : 37);
       if (seeking) {
         const rate = item.auto ? 0.22 : 0.16;
         item.vx += (this.px - item.x) * rate / 10;
@@ -1018,6 +1039,10 @@ export class Game {
         item.vx *= 0.92; item.vy *= 0.92;
       } else item.vy = Math.min(2.2, item.vy + 0.035);
       item.x += item.vx; item.y += item.vy;
+      if (item.manual && (item.x < 12 || item.x > FIELD.w - 12)) {
+        item.x = Math.max(12, Math.min(FIELD.w - 12, item.x));
+        item.vx *= -1;
+      }
       if (dist < 11) { this.collectItem(item); item.active = false; }
       if (item.y > FIELD.h + 20) item.active = false;
     });

@@ -1,11 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { Game } from './game';
+import { Game, type Item } from './game';
 import { STAGES } from './stages';
 
 const listeners: Record<string, (event: { code: string; repeat: boolean; preventDefault: () => void }) => void> = {};
-
 beforeEach(() => {
-  // 回収操作を決定的に検証し、散布の確率評価をCIへ持ち込まない。
   vi.spyOn(Math, 'random').mockReturnValue(0.5);
   vi.stubGlobal('location', { search: '' });
   vi.stubGlobal('window', { addEventListener: (kind: string, listener: typeof listeners[string]) => { listeners[kind] = listener; } });
@@ -20,53 +18,48 @@ function start(stage = 1, phase = 0, mid = false): Game {
   game.startBoss(mid, phase);
   return game;
 }
+function run(game: Game, frames: number): void { for (let i = 0; i < frames; i++) game.update(); }
+function supplies(game: Game): Item[] { return game.items.objects.filter((item) => item.active && item.manual); }
+function hit(game: Game, power: number): void { game.power = power; game.pendingHit = 7; game.update(); }
 
-function collectDuringOpening(game: Game): void {
-  for (let i = 0; i < 104; i++) game.update();
-}
-
-function recoverDroppedPower(game: Game): void {
-  game.keys.add('ShiftLeft');
-  for (let i = 0; i < 170; i++) {
-    const target = game.items.objects.filter((item) => item.active && (item.kind === 'large' || item.kind === 'small'))
-      .sort((a, b) => Math.hypot(a.x - game.px, a.y - game.py) - Math.hypot(b.x - game.px, b.y - game.py))[0];
-    if (!target) break;
-    for (const [key, held] of [
-      ['ArrowLeft', target.x < game.px - 1], ['ArrowRight', target.x > game.px + 1],
-      ['ArrowUp', target.y < game.py - 1], ['ArrowDown', target.y > game.py + 1],
-    ] as const) {
-      if (held) game.keys.add(key); else game.keys.delete(key);
-    }
-    game.update();
-  }
-}
-
-it('被弾後の無敵時間内に失ったPowerを回収でき、所持ボムは減らない', () => {
+it('被弾で失った1.00を20個の小Pに分け、画面へ広く分散する', () => {
   const game = start();
-  game.power = 4;
   game.bombs = 6;
-  game.pendingHit = 7;
-  game.update();
+  hit(game, 4);
+  const drops = supplies(game);
   expect(game.power).toBe(3);
   expect(game.bombs).toBe(6);
   expect(game.lives).toBe(1);
-  expect(game.items.objects.filter((item) => item.active && item.kind === 'large').every((item) => Math.hypot(item.x - game.px, item.y - game.py) > 84)).toBe(true);
-  recoverDroppedPower(game);
-  expect(game.power).toBe(4);
-  expect(game.invulnFrames).toBeGreaterThan(0);
-  expect(game.lives).toBe(1);
+  expect(drops).toHaveLength(20);
+  expect(drops.every((item) => item.kind === 'small' && !item.auto)).toBe(true);
+  expect(Math.max(...drops.map((i) => i.x)) - Math.min(...drops.map((i) => i.x))).toBeGreaterThan(250);
+  expect(Math.max(...drops.map((i) => i.y)) - Math.min(...drops.map((i) => i.y))).toBeGreaterThan(150);
+  run(game, 170);
+  expect(game.power).toBeLessThan(4);
 });
 
-it.each([0, 0.05, 0.35, 0.95])('Power %sでの被弾から元の量だけ回収できる', (power) => {
+it.each([0, 0.05, 0.35, 0.95])('Power %sでの被弾は失った量を超えるPを出さない', (power) => {
   const game = start();
-  game.power = power;
   game.bombs = 0;
-  game.pendingHit = 7;
-  game.update();
+  hit(game, power);
   expect(game.power).toBe(0);
   expect(game.bombs).toBe(3);
-  recoverDroppedPower(game);
-  expect(game.power).toBeCloseTo(power);
+  expect(supplies(game)).toHaveLength(Math.round(power / 0.05));
+});
+
+it('上部へ移動しても散ったPは一括回収されず、近づいた分だけ回収する', () => {
+  const game = start();
+  hit(game, 4);
+  game.py = 15;
+  game.keys.add('ShiftLeft');
+  run(game, 60);
+  expect(game.power).toBeLessThan(4);
+  const target = supplies(game).find((item) => item.y > 150)!;
+  const before = game.power;
+  game.px = target.x;
+  game.py = target.y;
+  game.update();
+  expect(game.power).toBeGreaterThan(before);
 });
 
 it('喰らいボムではPowerを失わず、被弾時の回収品も出ない', () => {
@@ -78,88 +71,137 @@ it('喰らいボムではPowerを失わず、被弾時の回収品も出ない',
   expect(game.power).toBe(4);
   expect(game.lives).toBe(2);
   expect(game.bombs).toBe(2);
-  expect(game.items.count).toBe(0);
+  expect(supplies(game)).toHaveLength(0);
 });
 
-it('通常攻撃後にPower、2フェーズ終了後にPowerとボムを攻撃再開前に回収する', () => {
-  const game = start();
+it('フェーズ補充は直接加算せず、2フェーズ目のPとボムを離して出す', () => {
+  const game = start(1, 1);
   game.bombs = 0;
   game.phaseHp = 0;
   game.update();
-  expect(game.items.objects.some((item) => item.active && item.kind === 'large' && item.auto)).toBe(true);
-  collectDuringOpening(game);
-  expect(game.power).toBe(1);
+  const drops = supplies(game);
+  expect(drops.map((item) => item.kind)).toEqual(['large', 'bomb']);
+  expect(drops.every((item) => !item.auto)).toBe(true);
+  expect(Math.abs(drops[0].x - drops[1].x)).toBeGreaterThan(100);
+  run(game, 104);
+  expect(game.power).toBe(0);
   expect(game.bombs).toBe(0);
-  game.phaseHp = 0;
+  game.px = drops[1].x; game.py = drops[1].y;
   game.update();
-  collectDuringOpening(game);
-  expect(game.power).toBe(2);
   expect(game.bombs).toBe(1);
 });
 
-it('撃破できず時間切れになったフェーズでも補充を受けられる', () => {
+it.each([0.05, 0.5, 0.95])('補充位置は乱数%sで変わり、フィールド内に留まる', (random) => {
+  vi.mocked(Math.random).mockReturnValue(random);
+  const game = start(1, 1);
+  game.skipPhase();
+  const drops = supplies(game);
+  expect(drops[0].x).toBeCloseTo(24 + ((0.2 + random * 0.6) / 2) * 336);
+  game.px = 12; game.py = 439;
+  run(game, 104);
+  expect(supplies(game).every((item) => item.x >= 12 && item.x <= 372)).toBe(true);
+});
+
+it('時間切れでも手動回収の補充品を出す', () => {
   const game = start(1, 1);
   game.bombs = 0;
   game.phaseFrame = game.phase!.duration * 60 - 1;
   game.update();
   expect(game.phaseIndex).toBe(2);
-  collectDuringOpening(game);
-  expect(game.power).toBe(1);
-  expect(game.bombs).toBe(1);
-  expect(game.message).not.toBe('技の記録ボーナス！');
+  expect(supplies(game).map((item) => item.kind)).toEqual(['large', 'bomb']);
+  expect(game.power).toBe(0);
+  expect(game.bombs).toBe(0);
 });
 
 it('弾消しで点アイテムがプールを埋めても補充品を優先する', () => {
   const game = start(1, 1);
-  game.bombs = 0;
   for (let i = 0; i < 2600; i++) game.spawnBullet(192, 120, 0, 0, 0, 'orb');
   game.phaseHp = 0;
   game.update();
-  collectDuringOpening(game);
-  expect(game.power).toBe(1);
-  expect(game.bombs).toBe(1);
+  expect(supplies(game).map((item) => item.kind)).toEqual(['large', 'bomb']);
 });
 
-it('全ステージの中ボスと最終フェーズで会話や次の面に補充を取り残さない', () => {
+it('全ステージの戦闘最後に回収時間を設け、拾わなければ補充しない', () => {
   for (let stage = 1; stage <= STAGES.length; stage++) {
     for (const mid of [true, false]) {
-      const index = mid ? 0 : STAGES[stage - 1].phases.length - 1;
-      const game = start(stage, index, mid);
+      const game = start(stage, mid ? 0 : STAGES[stage - 1].phases.length - 1, mid);
       game.bombs = 0;
       game.power = 3;
+      game.px = 12; game.py = 439;
       game.skipPhase();
       expect(game.phase).toBeUndefined();
-      expect(game.power).toBe(4);
-      expect(game.bombs).toBe(mid || index % 2 === 1 ? 1 : 0);
+      expect(game.scene).toBe('stage');
+      expect(game.collectionFrames).toBe(180);
+      const stageFrame = game.stageFrame;
+      run(game, 179);
+      expect(game.scene).toBe('stage');
+      expect(game.stageFrame).toBe(stageFrame);
+      game.update();
+      expect(game.collectionFrames).toBe(0);
+      expect(game.power).toBe(3);
+      expect(game.bombs).toBe(0);
+      expect(game.scene).toBe(mid && stage !== 3 && stage !== 5 ? 'stage' : 'dialogue');
     }
   }
 });
 
-it('5面中ボスの時間延長はフェーズ終了まで補充を増やさない', () => {
+it('回収時間中は移動でき、ポーズで時計が止まり、再開後に回収して会話へ進む', () => {
+  const game = start(3, 0, true);
+  game.bombs = 0;
+  game.skipPhase();
+  listeners.keydown({ code: 'Escape', repeat: false, preventDefault: () => {} });
+  game.update();
+  expect(game.scene).toBe('pause');
+  run(game, 30);
+  expect(game.collectionFrames).toBe(180);
+  game.keys.delete('Escape');
+  listeners.keydown({ code: 'Escape', repeat: false, preventDefault: () => {} });
+  game.update();
+  game.keys.delete('Escape');
+  for (const target of supplies(game)) {
+    game.px = target.x; game.py = target.y; game.update();
+  }
+  expect(game.power).toBe(1);
+  expect(game.bombs).toBe(1);
+  run(game, game.collectionFrames);
+  expect(game.scene).toBe('dialogue');
+  game.startStage(4);
+  expect(game.collectionFrames).toBe(0);
+});
+
+it('本ボスの回収時間中もボスBGMを維持する', () => {
+  const game = start(4, STAGES[3].phases.length - 1);
+  game.update();
+  expect(game.bgm.cue).toBe('boss-jinrai');
+  game.skipPhase();
+  game.update();
+  expect(game.bgm.cue).toBe('boss-jinrai');
+  run(game, 179);
+  expect(game.scene).toBe('dialogue');
+  expect(game.bgm.cue).toBe('boss-jinrai');
+});
+
+it('5面中ボスの時間延長は戦闘終了まで補充を増やさない', () => {
   const game = start(5, 0, true);
   game.invincible = true;
-  game.bombs = 0;
   for (let i = 0; i < 3; i++) {
     game.phaseFrame = game.phase!.duration * 60 - 1;
     game.update();
-    expect(game.power).toBe(0);
-    expect(game.bombs).toBe(0);
+    expect(supplies(game)).toHaveLength(0);
   }
   game.phaseFrame = game.phase!.duration * 60 - 1;
   game.update();
-  expect(game.power).toBe(1);
-  expect(game.bombs).toBe(1);
+  expect(supplies(game)).toHaveLength(2);
+  expect(game.collectionFrames).toBe(180);
 });
 
-it('補充はPower4・ボム8の上限を超えず、被弾でも備蓄を失わない', () => {
+it('拾ってもPower4・ボム8を超えず、被弾でもボム備蓄を失わない', () => {
   const game = start(3, 0, true);
-  game.power = 4;
-  game.bombs = 8;
+  game.power = 4; game.bombs = 8;
   game.skipPhase();
-  expect(game.power).toBe(4);
-  expect(game.bombs).toBe(8);
+  for (const target of supplies(game)) { game.px = target.x; game.py = target.y; game.update(); }
+  expect(game.power).toBe(4); expect(game.bombs).toBe(8);
   game.startBoss(false, 1);
-  game.pendingHit = 7;
-  game.update();
+  hit(game, 4);
   expect(game.bombs).toBe(8);
 });

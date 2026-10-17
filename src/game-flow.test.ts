@@ -29,6 +29,7 @@ it('道中と中ボスの間も背景が進み、ポーズと会話では止ま�
   for (let i = 0; i < 60; i++) game.update();
   expect(game.sceneryDistance).toBe(pausedDistance);
   press(game, 'Escape'); game.skipPhase();
+  while (game.collectionFrames > 0) game.update();
   expect(game.scene).toBe('dialogue'); const dialogueDistance = game.sceneryDistance;
   for (let i = 0; i < 60; i++) game.update();
   expect(game.sceneryDistance).toBe(dialogueDistance);
@@ -80,6 +81,7 @@ it('5面のネオは最大3回だけ時間を延長し、体力を削れば先�
   }
   game.phaseFrame = game.phase!.duration * 60 - 1;
   game.update();
+  while (game.collectionFrames > 0) game.update();
   expect(game.scene).toBe('dialogue');
   expect(game.encoreCount).toBe(3);
   for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
@@ -94,6 +96,7 @@ it('5面のネオは最大3回だけ時間を延長し、体力を削れば先�
   early.startStage(5); early.startBoss(true, 0);
   early.phaseHp = 0;
   early.update();
+  while (early.collectionFrames > 0) early.update();
   expect(early.scene).toBe('dialogue');
   expect(early.encoreCount).toBe(0);
 });
@@ -103,6 +106,7 @@ it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ�
   game.startStage(4);
   game.startBoss(false, 9);
   game.skipPhase();
+  while (game.collectionFrames > 0) game.update();
   for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
   expect(game.scene).toBe('clear');
   expect(game.unlockedStages).toBe(5);
@@ -114,6 +118,7 @@ it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ�
   game.update();
   expect(game.phase?.pattern).toBe('owlDawn');
   game.skipPhase();
+  while (game.collectionFrames > 0) game.update();
   expect(game.scene).toBe('dialogue');
   for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
   expect(game.scene).toBe('clear');
