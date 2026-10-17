@@ -12,7 +12,7 @@ import { emitNeo, inBog } from './patterns/neo';
 import { emitNeoEncore, encoreBogTime } from './patterns/neo-encore';
 import { emitObsidia, sweepPosition, tags } from './patterns/obsidia';
 import { Pool } from './pool';
-import { autoCollect, bulletContact, bulletSpeed, circlesHit, type Difficulty, deathbomb, density, FIELD, type ItemKind, newExtends, type PlayerId, pointValue, safeLoad, safeSave } from './rules';
+import { autoCollect, bulletContact, bulletSpeed, circlesHit, type Difficulty, deathbomb, density, FIELD, type ItemKind, MAX_BOMBS, newExtends, type PlayerId, pointValue, safeLoad, safeSave } from './rules';
 import { type BossId, MID_PHASE, NAMES, type Phase, STAGES } from './stages';
 import { readRecords } from './story';
 
@@ -193,7 +193,7 @@ export class Game {
     }
     this.power = this.queryNumber('power', 0, 4, this.power);
     this.lives = Math.floor(this.queryNumber('lives', 0, 8, this.lives));
-    this.bombs = Math.floor(this.queryNumber('bombs', 0, 8, this.bombs));
+    this.bombs = Math.floor(this.queryNumber('bombs', 0, MAX_BOMBS, this.bombs));
   }
 
   private queryNumber(key: string, min: number, max: number, fallback: number): number {
@@ -395,13 +395,20 @@ export class Game {
     this.pendingHit = -1;
     if (this.invincible) return;
     this.lives--;
-    this.bombs = 3;
+    this.bombs = Math.max(3, this.bombs);
+    const lostPower = Math.min(1, this.power);
     this.power = Math.max(0, this.power - 1);
     this.invulnFrames = 180;
     this.hitDuringSpell = true;
     this.audio.play('hit');
     this.flash = 10;
-    for (let i = 0; i < 10; i++) this.spawnItem(this.px + (Math.random() - 0.5) * 60, this.py - 15, i < 7 ? 'small' : 'point', false);
+    // 失ったPowerは回収で取り戻せる。即座に吸われない上方へ落とし、無敵中に取りに行く余地を残す。
+    const recoveryCount = lostPower === 1 ? 1 : Math.floor((lostPower + 1e-9) / 0.05);
+    for (let i = 0; i < recoveryCount; i++) {
+      const item = this.spawnItem(Math.max(9, Math.min(FIELD.w - 9, this.px + (Math.random() - 0.5) * 60)), Math.max(12, this.py - 96), lostPower === 1 ? 'large' : 'small', false);
+      if (item) item.vy = -2.4;
+    }
+    for (let i = 0; i < 3; i++) this.spawnItem(this.px + (Math.random() - 0.5) * 60, this.py - 15, 'point', false);
     if (this.lives < 0) { this.scene = 'gameover'; this.menu = 0; }
   }
 
@@ -547,6 +554,7 @@ export class Game {
       this.messageFrames = 170;
       this.audio.play('capture');
     }
+    this.supplyPhaseItems();
     this.bullets.forEach((b) => { this.spawnItem(b.x, b.y, 'point', true); });
     this.bullets.clear(); this.clones.clear();
     this.flash = 8;
@@ -571,6 +579,19 @@ export class Game {
       this.phase = undefined;
       this.startConversation(STAGES[this.stage - 1].boss, 'after', 'clear');
     }
+  }
+
+  private supplyPhaseItems(): void {
+    const kinds: ItemKind[] = ['large'];
+    // ボムは2フェーズに1個。時間切れでも補充し、低Powerで倒せない状態からも立て直せるようにする。
+    if (this.midboss || this.phaseIndex % 2 === 1) kinds.push('bomb');
+    const leavingFight = this.midboss || this.phaseIndex === STAGES[this.stage - 1].phases.length - 1;
+    const [x, y] = this.bossPosition();
+    kinds.forEach((kind, index) => {
+      // 会話ではアイテムが止まるため、戦闘の最後だけは直接加算して次の面へ持ち越す。
+      if (leavingFight) this.collectItem({ kind, y });
+      else this.spawnItem(x + (index === 0 ? -14 : 14), y, kind, true);
+    });
   }
 
   private updateBoss(): void {
@@ -979,9 +1000,10 @@ export class Game {
     }
   }
 
-  private spawnItem(x: number, y: number, kind: ItemKind, auto: boolean): void {
+  private spawnItem(x: number, y: number, kind: ItemKind, auto: boolean): Item | undefined {
     const item = this.items.acquire(); if (!item) return;
     Object.assign(item, { x, y, vx: (Math.random() - 0.5) * 1.2, vy: -1.2, kind, auto });
+    return item;
   }
 
   private updateItems(): void {
@@ -1001,13 +1023,13 @@ export class Game {
     });
   }
 
-  private collectItem(item: Item): void {
+  private collectItem(item: Pick<Item, 'kind' | 'y'>): void {
     this.audio.play('item');
     switch (item.kind) {
       case 'small': this.power = Math.min(4, Math.round((this.power + 0.05) * 100) / 100); this.addScore(100); break;
       case 'large': this.power = Math.min(4, this.power + 1); break;
       case 'point': this.addScore(pointValue(item.y, this.point)); break;
-      case 'bomb': this.bombs++; break;
+      case 'bomb': this.bombs = Math.min(MAX_BOMBS, this.bombs + 1); break;
       case 'life': this.lives++; this.audio.play('extend'); break;
     }
   }
@@ -1043,7 +1065,7 @@ export class Game {
   }
 
   get debugState(): Record<string, string | number | null> {
-    return { scene: this.scene, stage: this.stage, boss: this.boss ? NAMES[this.boss] : null, bossRole: this.boss ? this.midboss ? 'midboss' : 'boss' : null, phase: this.phase ? this.phaseIndex : -1, spell: this.phase?.spell ? this.phase.name : null, phaseRemainingSeconds: this.phase ? Math.max(0, (this.phase.duration * 60 - this.phaseFrame) / 60) : null, phaseHpRatio: this.phase ? Math.max(0, this.phaseHp / this.phaseMaxHp) : null, bullets: this.bullets.count, dawnOwls: this.dawnOwls.length, score: this.score, lives: this.lives, bombs: this.bombs, fps: this.fps, bgm: this.bgm.cue };
+    return { scene: this.scene, stage: this.stage, boss: this.boss ? NAMES[this.boss] : null, bossRole: this.boss ? this.midboss ? 'midboss' : 'boss' : null, phase: this.phase ? this.phaseIndex : -1, spell: this.phase?.spell ? this.phase.name : null, phaseRemainingSeconds: this.phase ? Math.max(0, (this.phase.duration * 60 - this.phaseFrame) / 60) : null, phaseHpRatio: this.phase ? Math.max(0, this.phaseHp / this.phaseMaxHp) : null, bullets: this.bullets.count, dawnOwls: this.dawnOwls.length, score: this.score, power: this.power, lives: this.lives, bombs: this.bombs, fps: this.fps, bgm: this.bgm.cue };
   }
 
   get endingLines(): string[] { return ENDINGS[this.player]; }

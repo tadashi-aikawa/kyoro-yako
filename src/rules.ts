@@ -5,6 +5,7 @@ export type ItemKind = 'small' | 'large' | 'point' | 'bomb' | 'life';
 export const FIELD = { x: 32, y: 16, w: 384, h: 448 } as const;
 export const DIFFICULTY: Record<Difficulty, number> = { easy: 0.6, normal: 1, hard: 1.4, lunatic: 1.8 };
 export const EXTENDS = [10_000_000, 20_000_000, 40_000_000, 60_000_000];
+export const MAX_BOMBS = 8;
 
 export function circlesHit(ax: number, ay: number, ar: number, bx: number, by: number, br: number): boolean {
   const dx = ax - bx;
