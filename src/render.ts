@@ -714,7 +714,7 @@ export class Renderer {
         const size = b.radius / 3;
         c.save(); c.translate(b.x, b.y); c.rotate(b.rotation);
         c.drawImage(sprite, -14 * size, -14 * size, 28 * size, 28 * size); c.restore();
-      } else if (b.motion === 'jinraiSakura' || b.motion === 'farewellRose' || b.motion === 'farewellLance') {
+      } else if (b.motion === 'jinraiSakura' || b.motion === 'farewellRose' || b.motion === 'farewellLance' || b.kind === 'needle' && b.rotation !== 0) {
         c.save(); c.translate(b.x, b.y); c.rotate(b.rotation);
         c.drawImage(sprite, -14, -14, 28, 28); c.restore();
       } else c.drawImage(sprite, b.x - 14, b.y - 14, 28, 28);

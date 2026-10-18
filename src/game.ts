@@ -8,6 +8,7 @@ import { obsidiaPosition } from './obsidia-movement';
 import { emitBossNormal } from './patterns/boss-normal';
 import { emitChappy } from './patterns/chappy';
 import { claudineScene, complementBoundary, emitClaudine, whiteSpaceCircle } from './patterns/claudine';
+import { reflectEnterShot } from './patterns/enter-reflect';
 import { emitEtokichi, emitGalaxyFlash, type GalaxyFlash, updateGalaxyFlash } from './patterns/etokichi';
 import { burstPosition, burstVisibility, dashBurstStep, dashPosition, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
 import { jinraiCloneScene } from './patterns/jinrai-clone';
@@ -939,6 +940,8 @@ export class Game {
   }
 
   private updateShots(): void {
+    const letters = this.phase?.pattern === 'enter' && this.bombFrames <= 0
+      ? this.bullets.objects.filter((b) => b.active && b.motion === 'enterLine' && b.delay <= 0) : undefined;
     this.shots.forEach((s) => {
       if (s.homing && !this.held('ShiftLeft') && !this.held('ShiftRight')) {
         let target: [number, number] | undefined;
@@ -949,6 +952,7 @@ export class Game {
       }
       const fromX = s.x; const fromY = s.y;
       s.x += s.vx; s.y += s.vy;
+      if (letters && reflectEnterShot(this, s, fromX, fromY, letters)) return;
       if (this.interviewRings.some((ring) => interviewRingBlocksShot(ring, fromX, fromY, s.x, s.y, s.radius))) {
         s.active = false; this.spark(s.x, s.y, '#c7ddff', 1); return;
       }

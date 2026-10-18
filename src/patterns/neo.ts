@@ -1,3 +1,4 @@
+import { enterBossX } from '../boss-movement';
 import type { Bullet, Game } from '../game';
 
 const levelOf = (game: Game) => ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
@@ -85,7 +86,8 @@ export function enterScene(t: number, level: number) {
   const wave = Math.floor(Math.max(0, t) / period);
   const spacing = [20, 18, 16, 14][level];
   const offset = Math.sin(wave * 2.4) * spacing * 0.45;
-  const gapX = [88, 192, 296, 192][wave % 4] + Math.sin(wave * 1.7) * 12;
+  // 文字が画面を下る間のネオへ抜け道を寄せ、反射中も狙って攻撃できるようにする。
+  const gapX = enterBossX(wave * period + period - 56 + 100);
   return { wave, period, step: Math.max(0, t) % period, spacing, offset, gapX, gap: [78, 68, 60, 52][level], release: period - 56, y: 112 + wave % 3 * 30 };
 }
 export function bogs(t: number): [number, number, number][] {
@@ -128,6 +130,6 @@ export function emitNeo(game: Game, pattern: string, t: number): void {
     const bx = Math.max(7, Math.min(377, 8 + i * spacing + offset));
     if (Math.abs(bx - gapX) < gap / 2) return;
     const b = game.spawnBullet(bx, y, 0, [1.2, 1.4, 1.6, 1.8][level], 1, 'glyph');
-    if (b) { b.motion = 'enterLine'; b.delay = release - step; b.radius = 4; }
+    if (b) { b.motion = 'enterLine'; b.delay = release - step; b.radius = 4; b.gridColumn = i; }
   }
 }

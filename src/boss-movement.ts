@@ -74,6 +74,8 @@ const MOVEMENTS: Record<string, Movement> = {
   citation: patrol([[112, -12], [192, 12], [272, -12]], 108, 120),
 };
 
+export function enterBossX(time: number): number { return MOVEMENTS.enter(time)[0]; }
+
 function finale(time: number): Point {
   const finaleStart = FINALE_START - 105;
   if (time >= finaleStart) return CENTER;
