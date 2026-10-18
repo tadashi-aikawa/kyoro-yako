@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { safeLanesAtY } from './bullet-lanes.test-support';
 import { Game } from './game';
 import { dawnPrayerStep, emitMinerva, eyeX, hypothesisBrightness, INTERVIEW_PERIOD, INTERVIEW_SPEED, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE, PRAYER_PERIOD } from './patterns/minerva';
-import { circlesHit } from './rules';
+import { interviewRingDistance, updateInterviewRings } from './patterns/minerva-ring';
 import { STAGES } from './stages';
 
 beforeEach(() => {
@@ -89,24 +88,26 @@ it('追うボスは急に自機が近づいても間合いを保つ', () => {
   }
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sでも密な輪に穴が1か所だけあり、次の穴へ低速移動で間に合う', (difficulty) => {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sでも連続した輪に穴が1か所だけあり、次の穴へ低速移動で間に合う', (difficulty) => {
   const game = phase(11, difficulty);
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
   const centers: number[] = [];
   for (let wave = 0; wave < 8; wave++) {
-    game.bullets.clear(); game.phaseFrame = 105 + wave * INTERVIEW_PERIOD[level];
+    game.interviewRings.length = 0; game.phaseFrame = 105 + wave * INTERVIEW_PERIOD[level];
     emitMinerva(game, 'interview');
-    const ring = game.bullets.objects.filter((b) => b.active);
-    const angles = ring.map((b) => (Math.atan2(b.vy, b.vx) + Math.PI * 2) % (Math.PI * 2)).sort((a, b) => a - b);
-    const gaps = angles.map((a, i) => (angles[(i + 1) % angles.length] - a + Math.PI * 2) % (Math.PI * 2));
-    expect(gaps.filter((a) => a > 0.1)).toHaveLength(1);
-    // 最遠の隅でも通常弾間の通路は自機直径の1/3未満。
-    expect(Math.max(...gaps.filter((a) => a < 0.1)) * 580 - 2 * (ring[0].radius + 2.5)).toBeLessThan(5 / 3);
-    for (const b of ring) expect(Math.hypot(b.vx, b.vy)).toBeCloseTo(INTERVIEW_SPEED[level]);
+    expect(game.bullets.count).toBe(0);
+    expect(game.interviewRings).toHaveLength(1);
+    const ring = game.interviewRings[0];
+    expect(ring.speed).toBeCloseTo(INTERVIEW_SPEED[level]);
     expect(INTERVIEW_SPEED[level]).toBeLessThan(1.65 / 2);
-    const lanes = safeLanesAtY(ring, 398).filter(([from, to]) => to - from > 20);
-    expect(lanes).toHaveLength(1);
-    centers.push((lanes[0][0] + lanes[0][1]) / 2);
+    centers.push(ring.x + (398 - ring.y) / Math.tan(ring.gap));
+    for (let step = 0; step < 360; step++) {
+      const angle = ring.gap + step * Math.PI / 180;
+      ring.radius = 580;
+      const distance = interviewRingDistance(ring, ring.x + Math.cos(angle) * 580, ring.y + Math.sin(angle) * 580);
+      if (step === 0) expect(distance).toBeGreaterThan(40);
+      else if (step * Math.PI / 180 > ring.opening / 2 && step * Math.PI / 180 < Math.PI * 2 - ring.opening / 2) expect(distance).toBeLessThan(0.001);
+    }
   }
   expect(Math.max(...centers) - Math.min(...centers)).toBeGreaterThan(120);
   for (let i = 1; i < centers.length; i++) {
@@ -114,25 +115,52 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで
   }
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで下側の定位置を脅かし、60秒間弾のプールを溢れさせない', (difficulty) => {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで下側の定位置を脅かし、60秒間少数の輪だけで動く', (difficulty) => {
   const game = phase(11, difficulty);
   const probes = [24, 108, 192, 276, 360].map((x) => [x, 398]);
   const hits = probes.map(() => false);
-  const spawn = game.spawnBullet.bind(game);
-  let dropped = 0;
-  vi.spyOn(game, 'spawnBullet').mockImplementation((...args) => {
-    const bullet = spawn(...args);
-    if (!bullet) dropped++;
-    return bullet;
-  });
+  let maxRings = 0;
   for (let frame = 0; frame < 3599; frame++) {
     game.update();
-    for (const b of game.bullets.objects) if (b.active && b.delay === 0) {
-      probes.forEach(([x, y], i) => { if (circlesHit(x, y, 2.5, b.x, b.y, b.radius)) hits[i] = true; });
+    maxRings = Math.max(maxRings, game.interviewRings.length);
+    expect(game.bullets.count).toBe(0);
+    for (const ring of game.interviewRings) if (ring.launched) {
+      probes.forEach(([x, y], i) => { if (interviewRingDistance(ring, x, y) <= 5.5) hits[i] = true; });
     }
   }
   expect(hits).toEqual(probes.map(() => true));
-  expect(dropped).toBe(0);
+  expect(maxRings).toBeLessThanOrEqual(6);
+});
+
+it('連続した輪は予告中に当たらず、円弧の端まで判定し、穴と無敵中は当たらない', () => {
+  const game = phase(11); game.invincible = false; game.invulnFrames = 0;
+  game.px = 192; game.py = 398;
+  // 発射フレームに合わせる。
+  game.phaseFrame = 105; emitMinerva(game, 'interview');
+  const ring = game.interviewRings[0];
+  Object.assign(ring, { x: 192, y: 223, radius: 175, speed: 0, gap: 0, delay: 1 });
+  updateInterviewRings(game); expect(game.pendingHit).toBe(-1);
+  ring.gap = Math.PI / 2;
+  updateInterviewRings(game); expect(game.pendingHit).toBe(-1);
+  const endpoint = ring.gap + ring.opening / 2;
+  game.px = ring.x + Math.cos(endpoint) * ring.radius;
+  game.py = ring.y + Math.sin(endpoint) * ring.radius;
+  game.invincible = true; updateInterviewRings(game); expect(game.pendingHit).toBe(-1);
+  game.invincible = false; updateInterviewRings(game); expect(game.pendingHit).toBe(0);
+  expect(game.hitDuringSpell).toBe(true);
+});
+
+it('輪のかすりは1本につき1回だけ加点し、技の切り替えとステージ開始で輪を消す', () => {
+  const game = phase(11); game.invincible = false; game.invulnFrames = 0;
+  game.px = 192; game.py = 398; game.phaseFrame = 105;
+  emitMinerva(game, 'interview');
+  Object.assign(game.interviewRings[0], { x: 192, y: 223, radius: 165, speed: 0, gap: 0, delay: 0 });
+  updateInterviewRings(game); updateInterviewRings(game);
+  expect(game.graze).toBe(1); expect(game.score).toBe(100); expect(game.pendingHit).toBe(-1);
+  game.skipPhase(); expect(game.interviewRings).toHaveLength(0);
+  game.startBoss(false, 11); game.phaseFrame = 105; emitMinerva(game, 'interview');
+  expect(game.interviewRings).toHaveLength(1);
+  game.startStage(1); expect(game.interviewRings).toHaveLength(0);
 });
 
 it('終符の時間切れ直前も編隊が画面内に残る', () => {
@@ -276,7 +304,14 @@ it('全スペルが自機のいる下半分へ届き、下端が常設の安全�
     let bottomFrames = 0;
     for (let frame = 0; frame < 1500; frame++) {
       game.update();
-      const active = game.bullets.objects.filter((b) => b.active && b.delay === 0 && b.x >= 9 && b.x <= 375);
+      const active = game.bullets.objects.filter((b) => b.active && b.delay === 0 && b.x >= 9 && b.x <= 375).map(({ x, y }) => ({ x, y }));
+      for (const ring of game.interviewRings) if (ring.launched) {
+        for (let a = ring.gap + ring.opening / 2; a <= ring.gap + Math.PI * 2 - ring.opening / 2; a += Math.PI / 90) {
+          const x = ring.x + Math.cos(a) * ring.radius;
+          const y = ring.y + Math.sin(a) * ring.radius;
+          if (x >= 9 && x <= 375) active.push({ x, y });
+        }
+      }
       if (active.some((b) => b.y >= 280 && b.y <= 439)) lowerFrames++;
       if (active.some((b) => b.y >= 390 && b.y <= 439)) bottomFrames++;
     }

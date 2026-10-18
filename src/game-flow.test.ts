@@ -17,6 +17,19 @@ function press(game: Game, code: string): void {
   listeners.keyup({ code, repeat: false, preventDefault: () => {} });
 }
 
+it('問いの回廊の輪もボムで消え、ポーズ中には広がらない', () => {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true;
+  game.startStage(5); game.startBoss(false, 11);
+  game.phaseFrame = 104; game.update();
+  const ring = game.interviewRings[0];
+  expect(ring).toBeDefined();
+  press(game, 'Escape'); const radius = ring.radius; const delay = ring.delay;
+  for (let i = 0; i < 120; i++) game.update();
+  expect(ring.radius).toBe(radius); expect(ring.delay).toBe(delay);
+  press(game, 'Escape'); press(game, 'KeyX');
+  expect(game.interviewRings).toHaveLength(0); expect(game.bombFrames).toBeGreaterThan(0);
+});
+
 it('道中と中ボスの間も背景が進み、ポーズと会話では止まり、次の面で戻る', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true; game.startStage(3);
   game.update(); const roadDistance = game.sceneryDistance;

@@ -12,6 +12,7 @@ import { emitEtokichi } from './patterns/etokichi';
 import { burstPosition, burstVisibility, dashBurstStep, dashPosition, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
 import { jinraiCloneScene } from './patterns/jinrai-clone';
 import { dawnPosition, emitMinerva, eyeX, updateDawnOwls } from './patterns/minerva';
+import { type InterviewRing, updateInterviewRings } from './patterns/minerva-ring';
 import { emitNeo, inBog } from './patterns/neo';
 import { emitNeoEncore, encoreBogTime } from './patterns/neo-encore';
 import { emitObsidia, sweepPosition, tags } from './patterns/obsidia';
@@ -21,7 +22,7 @@ import { type BossId, MID_PHASE, NAMES, type Phase, STAGES } from './stages';
 import { readRecords } from './story';
 
 export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'stage' | 'dialogue' | 'clear' | 'pause' | 'gameover' | 'ending' | 'credits';
-export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'glyph' | 'keycap'; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'question' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'citation' | 'interviewRing' | 'jinraiBounce' | 'jinraiHold' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'keyDrop' | 'keyCircle' | 'enterLine' | 'bookshelf' | 'vanish' | 'linkNode' | 'linkBeam' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellFlower'; targetX: number; targetY: number; gridColumn: number; gridRow: number; bounced: boolean; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
+export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'glyph' | 'keycap'; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'question' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'citation' | 'jinraiBounce' | 'jinraiHold' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'keyDrop' | 'keyCircle' | 'enterLine' | 'bookshelf' | 'vanish' | 'linkNode' | 'linkBeam' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellFlower'; targetX: number; targetY: number; gridColumn: number; gridRow: number; bounced: boolean; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
 export interface JinraiLaser { x: number; y: number; angle: number; age: number; warning: number; life: number; speed: number; }
 export interface JinraiMark { x: number; y: number; age: number; warning: number; }
 export interface DawnOwl { x: number; y: number; targetX: number; targetY: number; age: number; warning: number; color: number; }
@@ -107,6 +108,7 @@ export class Game {
   readonly jinraiLasers: JinraiLaser[] = [];
   readonly jinraiMarks: JinraiMark[] = [];
   readonly dawnOwls: DawnOwl[] = [];
+  readonly interviewRings: InterviewRing[] = [];
   jinraiDashTick = -1;
   jinraiDashDouble = false;
   jinraiDashCrossing = -1;
@@ -318,7 +320,7 @@ export class Game {
     this.py = FIELD.h - 50;
     this.pendingHit = -1;
     this.invulnFrames = 120;
-    this.bullets.clear(); this.shots.clear(); this.enemies.clear(); this.items.clear(); this.particles.clear(); this.clones.clear();
+    this.clearBullets(); this.shots.clear(); this.enemies.clear(); this.items.clear(); this.particles.clear(); this.clones.clear();
     this.highScore = safeLoad(`owlery-high-${this.difficulty}`, 0, (s) => Number(s) || 0);
     this.message = `STAGE ${stage}   ${STAGES[stage - 1].title}`;
     this.messageFrames = 180;
@@ -334,7 +336,7 @@ export class Game {
     if (this.bombFrames > 0) this.bombFrames--;
     this.updatePlayer();
     if (this.bombFrames > 0) {
-      this.bullets.clear();
+      this.clearBullets();
       if (this.frame % 10 === 0) {
         this.enemies.forEach((enemy) => { enemy.hp -= 2; enemy.hitFrames = 8; });
         if (this.phase) this.phaseHp -= 2.5;
@@ -347,6 +349,7 @@ export class Game {
     this.updateShots();
     this.updateClones();
     this.updateBullets();
+    updateInterviewRings(this);
     this.updateEnemies();
     this.updateItems();
     this.particles.forEach((particle) => { particle.x += particle.vx; particle.y += particle.vy; particle.age++; if (particle.age >= particle.life) particle.active = false; });
@@ -398,7 +401,7 @@ export class Game {
     this.bombUsed = true;
     this.flash = 14;
     this.audio.play('bomb');
-    this.bullets.clear();
+    this.clearBullets();
     this.enemies.forEach((enemy) => { enemy.hp -= 24; enemy.hitFrames = 8; });
     if (this.phase) this.phaseHp -= 36;
     this.message = '書いて残す七重の頁';
@@ -474,7 +477,7 @@ export class Game {
   }
 
   private startConversation(boss: BossId, moment: 'before' | 'after', next: 'boss' | 'mid' | 'stage' | 'clear'): void {
-    this.bullets.clear(); this.enemies.clear(); this.shots.clear(); this.clones.clear();
+    this.clearBullets(); this.enemies.clear(); this.shots.clear(); this.clones.clear();
     this.boss = boss;
     if (next === 'boss') this.midboss = false;
     this.lines = dialogue(this.player, boss, moment);
@@ -501,7 +504,7 @@ export class Game {
 
   private startMidboss(): void {
     const mid = STAGES[this.stage - 1].mid;
-    this.bullets.clear(); this.enemies.clear(); this.shots.clear(); this.clones.clear();
+    this.clearBullets(); this.enemies.clear(); this.shots.clear(); this.clones.clear();
     this.boss = mid;
     this.midboss = true;
     this.lines = midDialogue(this.player, mid);
@@ -544,7 +547,7 @@ export class Game {
     this.jinraiWindDirection = 0;
     this.bombUsed = false;
     this.hitDuringSpell = false;
-    this.bullets.clear(); this.shots.clear(); this.clones.clear();
+    this.clearBullets(); this.shots.clear(); this.clones.clear();
     if (phase.spell) {
       this.spellBonus = 1_000_000 + this.stage * 500_000;
       this.cutin = 100;
@@ -567,7 +570,7 @@ export class Game {
     }
     this.supplyPhaseItems();
     this.bullets.forEach((b) => { this.spawnItem(b.x, b.y, 'point', true); });
-    this.bullets.clear(); this.clones.clear();
+    this.clearBullets(); this.clones.clear();
     this.flash = 8;
     const next = this.midboss ? undefined : STAGES[this.stage - 1].phases[this.phaseIndex + 1];
     if (next) { this.phaseIndex++; this.beginPhase(next); }
@@ -639,7 +642,7 @@ export class Game {
       if (phase.pattern === 'neoEncore' && this.encoreCount < 3) {
         this.encoreCount++;
         this.phaseFrame = 104;
-        this.bullets.clear();
+        this.clearBullets();
         this.message = '最後にもう一つだけ！';
         this.messageFrames = 100;
       } else this.finishPhase(phase.pattern === 'final' || phase.pattern === 'owlDawn');
@@ -720,6 +723,16 @@ export class Game {
     const b = this.bullets.acquire(); if (!b) return undefined;
     Object.assign(b, { x, y, vx, vy, color, kind, radius: kind === 'star' ? 5 : kind === 'needle' ? 3 : 4, grazed: false, age: 0, split: false, delay: 0, fadeAt: 0, motion: 'normal', targetX: 0, targetY: 0, gridColumn: -1, gridRow: -1, bounced: false, dashWave: -1, dashOrder: -1, releaseAt: 0, sway: 0, swayRate: 0, swayPhase: 0, rotation: 0, spin: 0, launchSoundPending: !!(this.phase && this.boss) });
     return b;
+  }
+
+  private clearBullets(): void {
+    this.bullets.clear();
+    this.interviewRings.length = 0;
+  }
+
+  grazeAt(x: number, y: number): void {
+    this.graze++; this.point += 10; this.addScore(100);
+    this.audio.play('graze'); this.spark(x, y, '#fff6a3', 3);
   }
 
   private updateBullets(): void {
@@ -899,7 +912,7 @@ export class Game {
         ? (b.targetX > 0 ? this.px <= b.x + 9 : this.px >= b.x - 9) && Math.abs(this.py - b.y) < 11 ? 'hit' : 'none'
         : bulletContact(this.px, this.py, b.x, b.y, b.radius, b.grazed);
       if (result === 'hit') { this.pendingHit = 0; this.hitDuringSpell = true; }
-      if (result === 'graze') { b.grazed = true; this.graze++; this.point += 10; this.addScore(100); this.audio.play('graze'); this.spark(b.x, b.y, '#fff6a3', 3); }
+      if (result === 'graze') { b.grazed = true; this.grazeAt(b.x, b.y); }
     });
   }
 

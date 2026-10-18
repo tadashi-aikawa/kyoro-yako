@@ -8,6 +8,7 @@ import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, GRID_REPLAY_PER
 import { BURST_MOVE, BURST_RETURN, BURST_SHOTS, burstVisibility, dashBurstStep } from './patterns/jinrai';
 import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
 import { DAWN_PERIOD, dawnLane, dawnPrayerStep, eyeX, HYPOTHESIS_COLUMNS, HYPOTHESIS_PERIOD, hypothesisBrightness, hypothesisSide, hypothesisX, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE } from './patterns/minerva';
+import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-ring';
 import { bogs } from './patterns/neo';
 import { encoreBogTime } from './patterns/neo-encore';
 import { SWEEP_CHARGE, SWEEP_MOVE, SWEEP_PERIOD, SWEEP_SHOTS, sweepStep, sweepTarget, tags } from './patterns/obsidia';
@@ -371,6 +372,7 @@ export class Renderer {
       c.restore();
     }
     game.bullets.forEach((b) => { this.bullet(b); });
+    for (const ring of game.interviewRings) this.interviewRing(ring);
     game.shots.forEach((shot) => { c.fillStyle = '#a9f7ff'; c.shadowColor = c.fillStyle; c.shadowBlur = 6; c.fillRect(shot.x - shot.radius, shot.y - 6, shot.radius * 2, 12); c.shadowBlur = 0; });
     game.particles.forEach((p) => { c.globalAlpha = 1 - p.age / p.life; c.fillStyle = p.color; c.fillRect(p.x, p.y, p.size, p.size); c.globalAlpha = 1; });
     this.player(game);
@@ -584,6 +586,18 @@ export class Renderer {
     c.restore();
   }
 
+  private interviewRing(ring: InterviewRing): void {
+    const c = this.ctx;
+    c.save(); c.lineCap = 'round';
+    c.beginPath(); c.arc(ring.x, ring.y, ring.radius, ring.gap + ring.opening / 2, ring.gap + Math.PI * 2 - ring.opening / 2);
+    // 大きい輪にshadowBlurをかけず、太さと透明度の違う3本の線で光を描く。
+    const alpha = ring.delay > 0 ? 0.36 : 1;
+    c.strokeStyle = PALETTE[ring.color]; c.lineWidth = INTERVIEW_RING_WIDTH + 6; c.globalAlpha = alpha * 0.18; c.stroke();
+    c.lineWidth = INTERVIEW_RING_WIDTH; c.globalAlpha = alpha; c.stroke();
+    c.strokeStyle = '#fff5ec'; c.lineWidth = 1.5; c.globalAlpha = alpha * 0.9; c.stroke();
+    c.restore();
+  }
+
   private bullet(b: Bullet): void {
     if (b.motion === 'bookshelf') {
       const c = this.ctx;
@@ -614,7 +628,6 @@ export class Renderer {
     if (sprite) {
       const c = this.ctx;
       if (b.delay > 0) c.globalAlpha = 0.36;
-      else if (b.motion === 'interviewRing' && b.gridRow === 0) c.globalAlpha = 0.55;
       if (b.motion === 'typographyRain') {
         const size = b.radius / 3;
         c.save(); c.translate(b.x, b.y); c.rotate(b.rotation);
@@ -623,7 +636,7 @@ export class Renderer {
         c.save(); c.translate(b.x, b.y); c.rotate(b.rotation);
         c.drawImage(sprite, -14, -14, 28, 28); c.restore();
       } else c.drawImage(sprite, b.x - 14, b.y - 14, 28, 28);
-      if (b.delay > 0 || b.motion === 'interviewRing') c.globalAlpha = 1;
+      if (b.delay > 0) c.globalAlpha = 1;
       if (b.motion === 'vanish') this.text('×', b.x, b.y + 1, 13, '#fff2b8', 'center');
     }
   }

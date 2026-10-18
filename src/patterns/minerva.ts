@@ -12,7 +12,6 @@ export const PRAYER_CHARGE = 72;
 export const PRAYER_FIRE = 180;
 export const INTERVIEW_PERIOD = [330, 300, 270, 240] as const;
 export const INTERVIEW_SPEED = [0.38, 0.46, 0.54, 0.62] as const;
-const INTERVIEW_BULLETS = [300, 324, 348, 372] as const;
 const INTERVIEW_GAP = [0.62, 0.54, 0.46, 0.4] as const;
 export function dawnPrayerStep(frame: number): number { return frame < 1800 ? -1 : (frame - 1800) % PRAYER_PERIOD; }
 export function dawnPosition(frame: number): [number, number] {
@@ -159,19 +158,11 @@ export function emitMinerva(game: Game, pattern: string): void {
   }
   if (pattern === 'interview' && t % INTERVIEW_PERIOD[level] === 0) {
     const wave = Math.floor(t / INTERVIEW_PERIOD[level]);
-    const n = INTERVIEW_BULLETS[level];
     // 下側の画面内へ穴を向ける。輪ごとに左右を変え、下端での撃ち続けを通さない。
     const gap = Math.atan2(420 - y, 192 + Math.sin(wave * 1.05 + 0.6) * 135 - x);
-    const speed = INTERVIEW_SPEED[level];
-    // 最遠の隅でも通常の弾間は約12px以下。近距離だけ密にすると遠方で抜けられる。
-    // 低速化に合わせて発射周期も延ばし、次の穴へ移る余白とプール容量を確保する。
-    for (let i = 0; i < n; i++) {
-      const angle = i * Math.PI * 2 / n;
-      if (Math.abs(Math.atan2(Math.sin(angle - gap), Math.cos(angle - gap))) < INTERVIEW_GAP[level] / 2) continue;
-      const b = game.spawnBullet(x + Math.cos(angle) * 45, y + Math.sin(angle) * 45,
-        Math.cos(angle) * speed, Math.sin(angle) * speed, wave % 4, 'orb');
-      if (b) { b.motion = 'interviewRing'; b.delay = warning; b.radius = 3; }
-    }
+    // 数百発を重ねず、描画・更新・当たり判定を輪1本で扱う。
+    game.interviewRings.push({ x, y, radius: 45, speed: INTERVIEW_SPEED[level], gap,
+      opening: INTERVIEW_GAP[level], color: wave % 4, delay: warning, launched: false, grazed: false });
   }
   if (pattern === 'owlDawn') {
     // 残り45秒から、背後の上半面へ継続的に撃つ。上端での待機を許さない。

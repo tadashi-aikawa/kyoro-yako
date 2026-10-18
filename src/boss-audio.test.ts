@@ -59,14 +59,14 @@ it('発射SEは予告中に鳴らず、インタビューの輪が動き始め�
   const game = new Game(); game.invincible = true; game.startStage(5); game.startBoss(false, 11);
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
   game.phaseFrame = 104; game.update();
-  const bullets = game.bullets.objects.filter((b) => b.active);
+  const ring = game.interviewRings[0];
   expect(play).not.toHaveBeenCalledWith('enemyShot');
-  const start = bullets.map((b) => [b.x, b.y]);
+  const start = ring.radius;
   for (let i = 0; i < 69; i++) game.update();
   expect(play).not.toHaveBeenCalledWith('enemyShot');
   game.update();
   expect(play.mock.calls.filter(([sound]) => sound === 'enemyShot')).toHaveLength(1);
-  expect(bullets.some((b, i) => b.x !== start[i][0] || b.y !== start[i][1])).toBe(true);
+  expect(ring.radius).toBeGreaterThan(start);
 });
 
 it('レーザーと雷は予告中に鳴らさず、危険になるフレームで鳴らす', () => {
