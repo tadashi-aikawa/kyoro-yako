@@ -1,4 +1,5 @@
 import { FINALE_START } from './patterns/claudine-finale';
+import { thunderPosition } from './patterns/jinrai-thunder';
 import type { Phase } from './stages';
 
 type Point = readonly [number, number];
@@ -61,7 +62,7 @@ const MOVEMENTS: Record<string, Movement> = {
   jinraiKiss: curve(90, 16, 480, 'arc'),
   // レーザーの寿命260フレームは静止し、次の発射までの40フレームだけ位置を替える。
   jinraiLaser: patrol([[148, -12], [236, -12]], 40, 260, true),
-  jinraiThunder: curve(90, 20, 600, 'eight'),
+  jinraiThunder: (time) => { const [x, y] = thunderPosition(time + 105, 'normal'); return [x, y - 132]; },
   // 強風で左右へ流す花びらは本体を広く振ると画面外へ早く抜ける。中央寄りの弧で弾量を保つ。
   jinraiSakura: curve(52, 8, 780, 'arc'),
   jinraiPetal: curve(54, 22, 840, 'arc'),

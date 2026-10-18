@@ -62,7 +62,7 @@ export const STAGES: Stage[] = [
       phase(4, '通常攻撃・夜風', 'normal', 'jinraiRapidRings'),
       phase(4, '夜桜の簪', 'spell', 'jinraiLaser'),
       phase(4, '通常攻撃・雷待ち', 'normal', 'jinraiRapidFan'),
-      phase(4, '稲妻の予告線', 'spell', 'jinraiThunder'),
+      phase(4, '雷遁・天雷招来', 'spell', 'jinraiThunder'),
       phase(4, '通常攻撃・影走り', 'normal', 'jinraiRapidRings'),
       phase(4, '夜桜の舞', 'spell', 'jinraiSakura'),
       phase(4, '花影', 'spell', 'jinraiClone'),

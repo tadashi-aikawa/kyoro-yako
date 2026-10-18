@@ -169,13 +169,12 @@ it('簪のレーザーは予告中に無害で、その後に回転する', () =
   expect(laser.angle).toBeGreaterThan(angle);
 });
 
-it('落雷は3本の予告後に発生し、着弾点から小弾を出さない', () => {
+it('天雷招来は印の詠唱後に上端から雷を伸ばし、小弾を出さない', () => {
   const game = phase(5);
-  const mark = game.jinraiMarks[0];
-  expect(mark).toBeDefined();
-  expect(game.jinraiMarks).toHaveLength(3);
-  mark.age = mark.warning - 1;
-  game.update();
+  expect(game.jinraiBolts).toHaveLength(0);
+  for (let i = 0; i < 84; i++) game.update();
+  expect(game.jinraiBolts).toHaveLength(1);
+  expect(game.jinraiBolts[0].age).toBe(1);
   expect(game.bullets.count).toBe(0);
 });
 

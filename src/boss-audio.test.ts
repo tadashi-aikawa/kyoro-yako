@@ -69,15 +69,13 @@ it('発射SEは予告中に鳴らず、インタビューの輪が動き始め�
   expect(ring.radius).toBeGreaterThan(start);
 });
 
-it('レーザーと雷は予告中に鳴らさず、危険になるフレームで鳴らす', () => {
+it('レーザーは予告中に鳴らさず、危険になるフレームで鳴らす', () => {
   const game = new Game(); game.invincible = true; game.startStage(4); game.startBoss(false, 3);
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
   game.jinraiLasers.push({ x: 192, y: 80, age: 58, warning: 60, life: 260, angle: 1, speed: 0.003 });
-  game.jinraiMarks.push({ x: 192, y: 300, age: 58, warning: 60 });
   updateJinraiHazards(game);
   expect(play).not.toHaveBeenCalled();
   updateJinraiHazards(game);
-  expect(play).toHaveBeenCalledWith('thunder');
   expect(play).not.toHaveBeenCalledWith('laser');
   updateJinraiHazards(game);
   expect(play).toHaveBeenCalledWith('laser');

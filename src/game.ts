@@ -13,6 +13,7 @@ import { emitEtokichi, emitGalaxyFlash, type GalaxyFlash, updateGalaxyFlash } fr
 import { burstPosition, burstVisibility, dashBurstStep, dashPosition, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
 import { jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_FADE, updateJinraiHeart } from './patterns/jinrai-kiss';
+import { type Thunderbolt, type Thunderstorm, thunderPosition } from './patterns/jinrai-thunder';
 import { dawnPosition, emitMinerva, eyeX, interviewPosition, updateDawnOwls } from './patterns/minerva';
 import { type InterviewRing, interviewRingBlocksShot, updateInterviewRings } from './patterns/minerva-ring';
 import { emitNeo, inBog, updateVimBullet, type VimAttack } from './patterns/neo';
@@ -26,7 +27,6 @@ import { readRecords } from './story';
 export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'stage' | 'dialogue' | 'clear' | 'pause' | 'gameover' | 'ending' | 'credits';
 export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'question' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'citation' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'linkNode' | 'linkBeam' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'chappyBloom' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
 export interface JinraiLaser { x: number; y: number; angle: number; age: number; warning: number; life: number; speed: number; }
-export interface JinraiMark { x: number; y: number; age: number; warning: number; }
 export interface DawnOwl { x: number; y: number; targetX: number; targetY: number; age: number; warning: number; color: number; }
 export interface Shot { active: boolean; x: number; y: number; vx: number; vy: number; damage: number; radius: number; homing: boolean; }
 export type WaveKind = 'arc' | 'ring' | 'cross' | 'threeWay' | 'return' | 'sweep' | 'pincer' | 'serpent' | 'orbit' | 'chevron';
@@ -109,7 +109,8 @@ export class Game {
   readonly particles = new Pool(makeParticle, 500);
   readonly clones = new Pool(makeClone, 70);
   readonly jinraiLasers: JinraiLaser[] = [];
-  readonly jinraiMarks: JinraiMark[] = [];
+  readonly jinraiBolts: Thunderbolt[] = [];
+  jinraiThunderstorm?: Thunderstorm;
   readonly dawnOwls: DawnOwl[] = [];
   readonly interviewRings: InterviewRing[] = [];
   galaxyFlash?: GalaxyFlash;
@@ -554,7 +555,7 @@ export class Game {
     this.phaseHp = phase.hp;
     this.phaseMaxHp = phase.hp;
     this.jinraiLasers.length = 0;
-    this.jinraiMarks.length = 0;
+    this.jinraiBolts.length = 0; this.jinraiThunderstorm = undefined;
     this.dawnOwls.length = 0;
     this.jinraiDashTick = -1;
     this.jinraiDashDouble = false;
@@ -606,7 +607,7 @@ export class Game {
       this.phase = undefined;
       this.collectionFrames = 180;
       this.jinraiLasers.length = 0;
-      this.jinraiMarks.length = 0;
+      this.jinraiBolts.length = 0; this.jinraiThunderstorm = undefined;
       this.enemies.clear(); this.shots.clear();
       this.message = '補充品を回収しよう';
       this.messageFrames = 180;
@@ -678,6 +679,7 @@ export class Game {
   }
 
   bossPosition(): [number, number] {
+    if (this.phase?.pattern === 'jinraiThunder' && this.phaseFrame >= 105) return thunderPosition(this.phaseFrame, this.difficulty);
     if (this.phase?.pattern === 'sweep') return sweepPosition(this.phaseFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty));
     if (this.stage === 2 && this.phase) return obsidiaPosition(this.phase.pattern, this.phaseFrame, this.bossEntry);
     if (this.phase?.pattern === 'owlDawn') return dawnPosition(this.phaseFrame);
@@ -739,7 +741,7 @@ export class Game {
 
   private clearBullets(): void {
     this.bullets.clear();
-    if (this.phase?.pattern === 'jinraiThunder') this.jinraiMarks.length = 0;
+    this.jinraiBolts.length = 0; this.jinraiThunderstorm = undefined;
     this.vimAttack = undefined;
     this.interviewRings.length = 0;
     this.galaxyFlash = undefined;

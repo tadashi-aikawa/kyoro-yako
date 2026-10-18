@@ -9,6 +9,7 @@ import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, GRID_REPLAY_PER
 import { BURST_MOVE, BURST_RETURN, BURST_SHOTS, burstVisibility, dashBurstStep } from './patterns/jinrai';
 import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_CHARGE, KISS_FADE, KISS_ORIGIN, KISS_POSE_END, kissEdgeWarning, kissStep } from './patterns/jinrai-kiss';
+import { THUNDER_FADE, THUNDER_HOLD, thunderGround, thunderPath, thunderScene } from './patterns/jinrai-thunder';
 import { DAWN_PERIOD, dawnLane, dawnPrayerStep, eyeX, HYPOTHESIS_COLUMNS, HYPOTHESIS_PERIOD, hypothesisBrightness, hypothesisSide, hypothesisX, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE } from './patterns/minerva';
 import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-ring';
 import { bogs, enterScene, KEY_ROWS, keyPosition, vimScene } from './patterns/neo';
@@ -279,6 +280,7 @@ export class Renderer {
     }
     this.claudineFinaleBackdrop(game);
     if (game.phase && game.boss) {
+      const thunder = thunderScene(game);
       const [x, y] = game.bossXY;
       const burst = game.phase.pattern === 'jinraiDash' ? dashBurstStep(game.phaseFrame) : -1;
       const seal = burst >= BURST_MOVE && burst < BURST_RETURN;
@@ -355,7 +357,7 @@ export class Renderer {
         const rose = finaleTime(game);
         const kiss = game.phase.pattern === 'jinraiKiss' ? kissStep(game.phaseFrame - 105, game.difficulty) : -1;
         const kissing = kiss >= 0 && kiss < KISS_POSE_END;
-        const tilt = channeling || seal || sweepCharging || kissing || rose >= 0 ? 0 : Math.cos(game.phaseFrame * 0.012) * 0.045;
+        const tilt = channeling || seal || thunder?.charging || sweepCharging || kissing || rose >= 0 ? 0 : Math.cos(game.phaseFrame * 0.012) * 0.045;
         const pose = updateBossMotion(this.bossMotion, `${game.boss}:${game.phase.name}`, game.frame, x);
         const casting = !!game.galaxyFlash || isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
         const spriteId = rose >= FINALE_CHARGE ? 'claudine-finale' : kissing ? 'jinrai-kiss' : bossSpriteId(game.boss, rose >= 0 || casting ? 'cast' : pose, game.frame);
@@ -363,7 +365,7 @@ export class Renderer {
         c.save();
         if (seal) { c.shadowColor = '#ffe591'; c.shadowBlur = 8 + Math.min(20, (burst - BURST_MOVE) * 0.6); }
         const roseSize = rose < 0 ? 64 : 74 + (rose >= FINALE_CHARGE ? rosePulse(rose, ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty)) * 3 : 0);
-        this.fieldCharacter(game, channeling ? 'minerva-prayer' : seal ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || sweepCharging || kissing || rose >= 0 ? 0 : Math.sin(game.frame * 0.045) * 2), roseSize, tilt, burstVisibility(burst));
+        this.fieldCharacter(game, channeling ? 'minerva-prayer' : seal || thunder?.charging ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || thunder?.charging || sweepCharging || kissing || rose >= 0 ? 0 : Math.sin(game.frame * 0.045) * 2), roseSize, tilt, burstVisibility(burst));
         c.restore();
       }
       c.fillStyle = '#140c27aa'; c.fillRect(15, 6, 350, 13);
@@ -395,6 +397,12 @@ export class Renderer {
     });
     game.particles.forEach((p) => { c.globalAlpha = 1 - p.age / p.life; c.fillStyle = p.color; c.fillRect(p.x, p.y, p.size, p.size); c.globalAlpha = 1; });
     this.player(game);
+    const thunder = thunderScene(game);
+    if (thunder) {
+      c.fillStyle = `rgba(2,4,16,${thunder.darkness})`; c.fillRect(0, 0, FIELD.w, FIELD.h);
+      if (thunder.flash > 0) { c.fillStyle = `rgba(241,245,255,${thunder.flash})`; c.fillRect(0, 0, FIELD.w, FIELD.h); }
+    }
+    this.jinraiThunderbolts(game);
     if (game.bombFrames > 0) this.bombEffect(game);
     if (game.cutin > 0 && game.boss) this.cutin(game);
     if (game.phase?.spell && game.cutin <= 20) {
@@ -566,20 +574,19 @@ export class Renderer {
       c.shadowBlur = 0;
       if (!warning) { c.strokeStyle = '#fff0f8'; c.lineWidth = 2; c.stroke(); }
     }
-    for (const mark of game.jinraiMarks) {
-      if (mark.age < mark.warning) {
-        this.magic(mark.x, mark.y, game.frame, '#ffe66c', 24 + 9 * mark.age / mark.warning, 0.8);
-        c.fillStyle = '#ffe66c18'; c.fillRect(mark.x - 6, 0, 12, mark.y + 8);
-        c.strokeStyle = mark.age >= mark.warning - 18 ? '#fff0a5cc' : '#ffe66c88'; c.lineWidth = 1;
-        c.beginPath(); c.moveTo(mark.x, 0); c.lineTo(mark.x, mark.y); c.stroke();
-      } else {
-        c.strokeStyle = '#ffe577'; c.lineWidth = 8; c.shadowColor = '#ffe565'; c.shadowBlur = 12;
-        c.beginPath(); c.moveTo(mark.x, 0);
-        for (let y = 24, i = 0; y < mark.y; y += 24, i++) c.lineTo(mark.x + (i % 2 ? -2 : 2), y);
-        c.lineTo(mark.x, mark.y + 8); c.stroke();
-        c.strokeStyle = '#fffdec'; c.lineWidth = 2; c.stroke();
-        c.shadowBlur = 0;
-      }
+  }
+
+  private jinraiThunderbolts(game: Game): void {
+    const c = this.ctx;
+    for (const bolt of game.jinraiBolts) {
+      const path = thunderPath(bolt), head = path[path.length - 1];
+      const fade = Math.max(0, bolt.age - thunderGround(bolt) - THUNDER_HOLD) / THUNDER_FADE;
+      c.save(); c.globalAlpha = 1 - fade; c.lineJoin = 'miter'; c.lineCap = 'butt';
+      c.strokeStyle = '#b9b8ff'; c.shadowColor = '#c4caff'; c.shadowBlur = 14; c.lineWidth = bolt.width;
+      c.beginPath(); path.forEach(([x, y], i) => { if (i === 0) c.moveTo(x, y); else c.lineTo(x, y); }); c.stroke();
+      c.shadowBlur = 0; c.strokeStyle = '#fffbea'; c.lineWidth = 2; c.stroke();
+      c.strokeStyle = '#fffbea'; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(head[0] - 3, head[1] - 7); c.lineTo(head[0], head[1]); c.lineTo(head[0] + 2, head[1] - 4); c.stroke(); c.restore();
     }
   }
 
