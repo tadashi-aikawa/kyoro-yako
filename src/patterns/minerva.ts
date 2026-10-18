@@ -10,6 +10,10 @@ export const DAWN_PERIOD = [60, 48, 40, 34] as const;
 export const PRAYER_PERIOD = 360;
 export const PRAYER_CHARGE = 72;
 export const PRAYER_FIRE = 180;
+export const INTERVIEW_PERIOD = [330, 300, 270, 240] as const;
+export const INTERVIEW_SPEED = [0.38, 0.46, 0.54, 0.62] as const;
+const INTERVIEW_BULLETS = [300, 324, 348, 372] as const;
+const INTERVIEW_GAP = [0.62, 0.54, 0.46, 0.4] as const;
 export function dawnPrayerStep(frame: number): number { return frame < 1800 ? -1 : (frame - 1800) % PRAYER_PERIOD; }
 export function dawnPosition(frame: number): [number, number] {
   const usual: [number, number] = [192 + Math.sin(frame * 0.012) * 42, 132 + Math.sin(frame * 0.018) * 4];
@@ -153,16 +157,20 @@ export function emitMinerva(game: Game, pattern: string): void {
       if (b) { b.motion = 'citation'; b.gridRow = 0; b.releaseAt = warning; b.radius = 6; }
     }
   }
-  if (pattern === 'interview' && t % [120, 92, 76, 64][level] === 0) {
-    const distance = Math.hypot(game.px - x, game.py - y);
-    const n = distance < 195 ? [16, 24, 30, 36][level] : [12, 18, 24, 30][level];
-    const gap = Math.floor(t / [120, 92, 76, 64][level]) * 3 % n;
+  if (pattern === 'interview' && t % INTERVIEW_PERIOD[level] === 0) {
+    const wave = Math.floor(t / INTERVIEW_PERIOD[level]);
+    const n = INTERVIEW_BULLETS[level];
+    // 下側の画面内へ穴を向ける。輪ごとに左右を変え、下端での撃ち続けを通さない。
+    const gap = Math.atan2(420 - y, 192 + Math.sin(wave * 1.05 + 0.6) * 135 - x);
+    const speed = INTERVIEW_SPEED[level];
+    // 最遠の隅でも通常の弾間は約12px以下。近距離だけ密にすると遠方で抜けられる。
+    // 低速化に合わせて発射周期も延ばし、次の穴へ移る余白とプール容量を確保する。
     for (let i = 0; i < n; i++) {
-      if ((i - gap + n) % n < 3) continue;
       const angle = i * Math.PI * 2 / n;
+      if (Math.abs(Math.atan2(Math.sin(angle - gap), Math.cos(angle - gap))) < INTERVIEW_GAP[level] / 2) continue;
       const b = game.spawnBullet(x + Math.cos(angle) * 45, y + Math.sin(angle) * 45,
-        Math.cos(angle) * [1.0, 1.35, 1.6, 1.85][level], Math.sin(angle) * [1.0, 1.35, 1.6, 1.85][level], i % 4, 'petal');
-      if (b) { b.motion = 'interviewRing'; b.gridRow = distance < 195 ? 1 : 0; b.delay = warning; b.radius = 3; }
+        Math.cos(angle) * speed, Math.sin(angle) * speed, wave % 4, 'orb');
+      if (b) { b.motion = 'interviewRing'; b.delay = warning; b.radius = 3; }
     }
   }
   if (pattern === 'owlDawn') {

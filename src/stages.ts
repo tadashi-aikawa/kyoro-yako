@@ -84,7 +84,7 @@ export const STAGES: Stage[] = [
       phase(5, '通常攻撃・引用の星列', 'normal', 'minervaStarFan'),
       phase(5, 'その結論、撤回します', 'spell', 'recall'),
       phase(5, '孫引きの連鎖', 'spell', 'citation'),
-      phase(5, 'インタビューの間合い', 'spell', 'interview'),
+      phase(5, '問いの回廊', 'spell', 'interview'),
       phase(5, '梟は暁に飛び立つ', 'survival', 'owlDawn'),
     ],
   },
