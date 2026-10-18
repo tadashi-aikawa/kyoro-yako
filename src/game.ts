@@ -1,6 +1,7 @@
 import { AudioBank } from './audio';
 import { type BgmCue, BgmPlayer } from './bgm';
 import { MOTION_SPRITES } from './boss-motion';
+import { patternPosition } from './boss-movement';
 import { dialogue, ENDINGS, type Line, midDialogue } from './dialogue';
 import { ENEMY_ROOMS, enemyFireFrames } from './enemy-design';
 import { obsidiaPosition } from './obsidia-movement';
@@ -81,7 +82,7 @@ export class Game {
   phaseIndex = -1;
   phase?: Phase;
   phaseFrame = 0;
-  private obsidiaEntry: [number, number] = [192, 77];
+  private bossEntry: [number, number] = [192, 77];
   phaseHp = 0;
   phaseMaxHp = 0;
   encoreCount = 0;
@@ -519,7 +520,7 @@ export class Game {
   }
 
   private beginPhase(phase: Phase): void {
-    if (this.stage === 2) this.obsidiaEntry = this.phase ? this.bossPosition() : [192, phase.spell ? 132 : 77];
+    this.bossEntry = this.phase ? this.bossPosition() : [192, phase.spell ? 132 : 77];
     this.phase = phase;
     this.phaseFrame = 0;
     this.lastBossShotFrame = -1;
@@ -647,7 +648,7 @@ export class Game {
 
   bossPosition(): [number, number] {
     if (this.phase?.pattern === 'sweep') return sweepPosition(this.phaseFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty));
-    if (this.stage === 2 && this.phase) return obsidiaPosition(this.phase.pattern, this.phaseFrame, this.obsidiaEntry);
+    if (this.stage === 2 && this.phase) return obsidiaPosition(this.phase.pattern, this.phaseFrame, this.bossEntry);
     if (this.phase?.pattern === 'owlDawn') return dawnPosition(this.phaseFrame);
     if (this.phase?.pattern === 'interview') return [this.minervaX, this.minervaY];
     if (this.phase?.pattern === 'jinraiClone') {
@@ -659,6 +660,10 @@ export class Game {
       return step >= 0 ? burstPosition(this, step) : dashPosition(this);
     }
     if (this.phase?.pattern === 'flash') return [192 + Math.sin(this.phaseFrame * 0.052) * 120, 132];
+    if (this.phase) {
+      const position = patternPosition(this.phase, this.phaseFrame, this.bossEntry, this.encoreCount);
+      if (position) return position;
+    }
     const baseY = this.phase?.spell ? 132 : 77;
     return [192 + Math.sin(this.phaseFrame * 0.012) * 42, baseY + Math.sin(this.phaseFrame * 0.018) * 4];
   }
