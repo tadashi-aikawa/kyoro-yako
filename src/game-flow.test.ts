@@ -17,7 +17,7 @@ function press(game: Game, code: string): void {
   listeners.keyup({ code, repeat: false, preventDefault: () => {} });
 }
 
-it('問いの回廊の輪もボムで消え、ポーズ中には広がらない', () => {
+it('エンドレス・インクワイアリーの輪もボムで消え、ポーズ中には広がらない', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   game.startStage(5); game.startBoss(false, 11);
   game.phaseFrame = 104; game.update();

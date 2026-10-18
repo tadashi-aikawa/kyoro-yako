@@ -21,11 +21,11 @@ function flight(difficulty: Game['difficulty'] = 'normal'): Game {
 function of(game: Game, motion: Bullet['motion']): Bullet[] { return game.bullets.objects.filter((b) => b.active && b.motion === motion); }
 function key(code: string): void { listeners.get('keydown')!({ code, repeat: false, preventDefault: () => {} }); }
 
-it('梟の星渡りへ改名し、手元から出るフクロウ本体は接触しても無害', () => {
+it('アストラル・フライトへ改名し、手元から出るフクロウ本体は接触しても無害', () => {
   const game = flight(); game.phaseFrame = 104; game.invincible = false; game.invulnFrames = 0;
   const [x, y] = game.bossPosition(); game.px = x + 16; game.py = y - 6;
   game.update();
-  expect(game.phase?.name).toBe('梟の星渡り');
+  expect(game.phase?.name).toBe('アストラル・フライト');
   expect(of(game, 'starOwl')).toHaveLength(1);
   expect(of(game, 'starTrail')).toHaveLength(2);
   expect(game.pendingHit).toBe(-1); expect(game.graze).toBe(0);

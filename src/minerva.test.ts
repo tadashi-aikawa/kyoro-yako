@@ -61,7 +61,7 @@ it('視線は左右へ等速で往復し、当たる弾だけ停止する', () =
   expect(watched.y).toBeGreaterThan(200);
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで発射間に上下左右へ動き、自機には追従せず、出した輪は動かさない', (difficulty) => {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('エンドレス・インクワイアリーは%sで発射間に上下左右へ動き、自機には追従せず、出した輪は動かさない', (difficulty) => {
   const game = phase(11, difficulty); const other = phase(11, difficulty);
   other.px = 25; other.py = 35;
   const origins = new Map<object, [number, number]>();
@@ -88,7 +88,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで
   expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(90);
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊の輪は%sで予告後に拡大しながら穴ごと回転する', (difficulty) => {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('エンドレス・インクワイアリーの輪は%sで予告後に拡大しながら穴ごと回転する', (difficulty) => {
   const game = phase(11, difficulty); game.phaseFrame = 105;
   emitMinerva(game, 'interview');
   const ring = game.interviewRings[0]; const angle = ring.gap;
@@ -102,7 +102,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊の輪�
   expect(interviewRingDistance(ring, ring.x + Math.cos(ring.gap) * ring.radius, ring.y + Math.sin(ring.gap) * ring.radius)).toBeGreaterThan(10);
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sでも連続した輪に穴が1か所だけあり、序盤は次の穴へ移動する時間がある', (difficulty) => {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('エンドレス・インクワイアリーは%sでも連続した輪に穴が1か所だけあり、序盤は次の穴へ移動する時間がある', (difficulty) => {
   const game = phase(11, difficulty);
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
   const centers: number[] = [];
@@ -130,7 +130,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで
   }
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで残り30秒未満から放出間隔を半分にし、回転方向の交互を保つ', (difficulty) => {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('エンドレス・インクワイアリーは%sで残り30秒未満から放出間隔を半分にし、回転方向の交互を保つ', (difficulty) => {
   const game = phase(11, difficulty);
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
   const period = INTERVIEW_PERIOD[level];
@@ -150,7 +150,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで
   }
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで下側の定位置を脅かし、60秒間少数の輪だけで動く', (difficulty) => {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('エンドレス・インクワイアリーは%sで下側の定位置を脅かし、60秒間少数の輪だけで動く', (difficulty) => {
   const game = phase(11, difficulty);
   const probes = [24, 108, 192, 276, 360].map((x) => [x, 398]);
   const hits = probes.map(() => false);
@@ -391,7 +391,7 @@ it('七重の輪は収縮後に予告付きで落ち、自機の高さを横切�
   expect(ring.vy).toBeGreaterThan(1.5);
 });
 
-it('仮説と梟の目は中央や左右端に止まっている自機にも届く', () => {
+it('仮説とパノプティコンは中央や左右端に止まっている自機にも届く', () => {
   for (const index of [5, 7]) {
     const game = phase(index);
     const hits = [0, 0, 0];
