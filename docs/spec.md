@@ -36,8 +36,9 @@ owleryのAIメンバーとエトキチが登場する、縦スクロールの弾
 
 - `public/assets/members/<slug>-face.webp`(540x540、透過)と `<slug>-stand.webp`(多くは縦長。mimikoとetokichiは正方形)
 - `public/assets/sprites/<slug>.webp` はフィールド用の透過SDスプライト。未配置・読み込み失敗時はstand画像へ縮退する
-- 動きの絵を持つボスは `<slug>-idle.webp` / `<slug>-left.webp` / `<slug>-right.webp` も持つ(現在は迅雷のみ。`src/boss-motion.ts` の `MOTION_BOSSES`)
+- 中ボス・ボスに出る7体は `<slug>-idle.webp` / `<slug>-left.webp` / `<slug>-right.webp` も持つ(`src/boss-motion.ts` の `MOTION_BOSSES`)
     - 待機中は元絵と `idle` を22フレームごとに交互に出す。花影の分身も待機の絵で、3体のコマをずらす
+    - 元絵の白が半透明のボスは、待機で元絵の代わりに描き直した `<slug>-base.webp` を出す(`REDRAWN_BASES`)。元絵は自機・会話などほかの用途にそのまま使う
     - 横移動の速度を平滑化し、0.3px/フレームを超えたら `left` / `right` へ切り替え、0.18px/フレームを下回ったら待機へ戻す
     - 24px/フレームを超える飛びとフェーズの切り替えは瞬間移動として待機から数え直す。技の専用ポーズは動きの絵より優先する
     - 動きの絵が読み込めていなければ元絵へ縮退する

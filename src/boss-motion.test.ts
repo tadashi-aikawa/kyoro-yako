@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
-import { bossSpriteId, createBossMotion, IDLE_STEP, updateBossMotion } from './boss-motion';
+import { bossSpriteId, createBossMotion, IDLE_STEP, MOTION_SPRITES, updateBossMotion } from './boss-motion';
+import { STAGES } from './stages';
 
 function drive(xs: number[], key = 'jinrai:phase', start = 0) {
   const motion = createBossMotion();
@@ -50,9 +51,23 @@ it('同じフレームの再描画では状態を進めない', () => {
   expect(motion.vx).toBe(vx);
 });
 
-it('待機中は元絵と待機絵を交互に出し、対象外のボスは元絵のまま', () => {
+it('待機中は元絵と待機絵を交互に出し、対象外は元絵のまま', () => {
   expect(bossSpriteId('jinrai', 'idle', 0)).toBe('jinrai');
   expect(bossSpriteId('jinrai', 'idle', IDLE_STEP)).toBe('jinrai-idle');
   expect(bossSpriteId('jinrai', 'left', 5)).toBe('jinrai-left');
-  expect(bossSpriteId('obsidia', 'right', 5)).toBe('obsidia');
+  expect(bossSpriteId('mimiko', 'right', 5)).toBe('mimiko');
+});
+
+it('元絵を描き直したボスは待機の片方に描き直しを使う', () => {
+  expect(bossSpriteId('neo', 'idle', 0)).toBe('neo-base');
+  expect(bossSpriteId('neo', 'idle', IDLE_STEP)).toBe('neo-idle');
+  expect(bossSpriteId('etokichi', 'idle', 0)).toBe('etokichi');
+});
+
+it('中ボス・ボスの全員が待機と左右の絵を持ち、配置済みの画像を指す', () => {
+  for (const stage of STAGES) for (const id of [stage.mid, stage.boss]) {
+    for (const pose of ['idle', 'left', 'right']) expect(MOTION_SPRITES).toContain(`${id}-${pose}`);
+  }
+  const placed = Object.keys(import.meta.glob('/public/assets/sprites/*.webp'));
+  for (const id of MOTION_SPRITES) expect(placed, id).toContain(`/public/assets/sprites/${id}.webp`);
 });

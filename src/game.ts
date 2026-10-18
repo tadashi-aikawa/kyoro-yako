@@ -1,6 +1,6 @@
 import { AudioBank } from './audio';
 import { type BgmCue, BgmPlayer } from './bgm';
-import { MOTION_BOSSES, MOTION_POSES } from './boss-motion';
+import { MOTION_SPRITES } from './boss-motion';
 import { dialogue, ENDINGS, type Line, midDialogue } from './dialogue';
 import { ENEMY_ROOMS, enemyFireFrames } from './enemy-design';
 import { emitBossNormal } from './patterns/boss-normal';
@@ -141,10 +141,10 @@ export class Game {
       sprite.src = `${import.meta.env.BASE_URL}assets/sprites/${id}.webp`;
       this.images[`${id}-sprite`] = sprite;
     }
-    for (const id of MOTION_BOSSES) for (const pose of MOTION_POSES) {
+    for (const id of MOTION_SPRITES) {
       const sprite = new Image();
-      sprite.src = `${import.meta.env.BASE_URL}assets/sprites/${id}-${pose}.webp`;
-      this.images[`${id}-${pose}-sprite`] = sprite;
+      sprite.src = `${import.meta.env.BASE_URL}assets/sprites/${id}.webp`;
+      this.images[`${id}-sprite`] = sprite;
     }
     const prayerSprite = new Image();
     prayerSprite.src = `${import.meta.env.BASE_URL}assets/sprites/minerva-prayer.webp`;

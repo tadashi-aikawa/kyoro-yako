@@ -1,7 +1,10 @@
 export type BossPose = 'idle' | 'left' | 'right';
 
-export const MOTION_BOSSES = ['jinrai'] as const;
-export const MOTION_POSES = ['idle', 'left', 'right'] as const;
+export const MOTION_BOSSES = ['etokichi', 'neo', 'obsidia', 'jinrai', 'chappy', 'claudine', 'minerva'] as const;
+const MOTION_POSES = ['idle', 'left', 'right'] as const;
+// 元絵の白が半透明のボスは、待機で交互に出す片方を描き直した元ポーズにする
+const REDRAWN_BASES: readonly string[] = ['neo', 'chappy'];
+export const MOTION_SPRITES = MOTION_BOSSES.flatMap((id) => [...MOTION_POSES, ...(REDRAWN_BASES.includes(id) ? ['base'] : [])].map((pose) => `${id}-${pose}`));
 export const IDLE_STEP = 22;
 const MOVE_ENTER = 0.3;
 const MOVE_EXIT = 0.18;
@@ -36,5 +39,6 @@ export function hasMotionSprites(id: string): boolean { return (MOTION_BOSSES as
 export function bossSpriteId(id: string, pose: BossPose, frame: number): string {
   if (!hasMotionSprites(id)) return id;
   if (pose !== 'idle') return `${id}-${pose}`;
-  return Math.floor(frame / IDLE_STEP) % 2 ? `${id}-idle` : id;
+  if (Math.floor(frame / IDLE_STEP) % 2) return `${id}-idle`;
+  return REDRAWN_BASES.includes(id) ? `${id}-base` : id;
 }
