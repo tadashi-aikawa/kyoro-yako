@@ -14,7 +14,7 @@ import { jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_FADE, updateJinraiHeart } from './patterns/jinrai-kiss';
 import { dawnPosition, emitMinerva, eyeX, interviewPosition, updateDawnOwls } from './patterns/minerva';
 import { type InterviewRing, interviewRingBlocksShot, updateInterviewRings } from './patterns/minerva-ring';
-import { emitNeo, inBog, updateVimBullet } from './patterns/neo';
+import { emitNeo, inBog, updateVimBullet, type VimAttack } from './patterns/neo';
 import { emitNeoEncore, encoreBogTime } from './patterns/neo-encore';
 import { emitObsidia, sweepPosition, tags } from './patterns/obsidia';
 import { Pool } from './pool';
@@ -113,6 +113,7 @@ export class Game {
   readonly interviewRings: InterviewRing[] = [];
   galaxyFlash?: GalaxyFlash;
   keyboardWord = '';
+  vimAttack?: VimAttack;
   jinraiDashTick = -1;
   jinraiDashDouble = false;
   jinraiDashCrossing = -1;
@@ -428,6 +429,7 @@ export class Game {
   private commitHit(): void {
     this.pendingHit = -1;
     if (this.invincible) return;
+    this.vimAttack = undefined;
     this.lives--;
     this.bombs = Math.max(3, this.bombs);
     const lostPower = Math.min(1, this.power);
@@ -735,6 +737,7 @@ export class Game {
 
   private clearBullets(): void {
     this.bullets.clear();
+    this.vimAttack = undefined;
     this.interviewRings.length = 0;
     this.galaxyFlash = undefined;
   }

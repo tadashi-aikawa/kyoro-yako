@@ -11,72 +11,74 @@ export const KEY_WORDS = [
 export function keyPosition(row: number, column: number): [number, number] {
   return [39 + row * 12 + column * 32, 98 + row * 26];
 }
-export const VIM_COMMANDS = ['5Gyy3p', '3Gyy2p', '4G2dd', '2Gyy3p', '6Gdd'] as const;
-const VIM_EDITS = [
-  { line: 5, copies: 3, remove: 0 }, { line: 3, copies: 2, remove: 0 },
-  { line: 4, copies: 0, remove: 2 }, { line: 2, copies: 3, remove: 0 }, { line: 6, copies: 0, remove: 1 },
+const VIM_ATTACKS = [
+  { command: '3j', rounds: 3, shift: 0, copies: 0, erase: false },
+  { command: '3j2hyyp', rounds: 3, shift: -1, copies: 1, erase: false },
+  { command: '2h', rounds: 1, shift: -1, copies: 0, erase: false },
+  { command: '2lyy2p', rounds: 1, shift: 1, copies: 2, erase: false },
+  { command: 'yy3p', rounds: 1, shift: 0, copies: 3, erase: false },
+  { command: '2hyy3p', rounds: 1, shift: -1, copies: 3, erase: false },
+  { command: '2l', rounds: 1, shift: 1, copies: 0, erase: false },
+  { command: '3jdd', rounds: 3, shift: 0, copies: 0, erase: true },
+  { command: 'dd', rounds: 2, shift: 0, copies: 0, erase: true },
 ] as const;
-export const VIM_PERIOD = 540;
-export const VIM_ROWS = 7;
-export const VIM_LINE_HEIGHT = 24;
-export const vimLineY = (row: number) => 104 + row * VIM_LINE_HEIGHT;
+export const VIM_COMMANDS = VIM_ATTACKS.map((attack) => attack.command);
+export const VIM_PERIOD = 210;
+export interface VimAttack { wave: number; x: number; y: number; angle: number; }
 export function vimScene(t: number, level: number) {
   const wave = Math.floor(Math.max(0, t) / VIM_PERIOD);
-  const command = VIM_COMMANDS[wave % VIM_COMMANDS.length];
-  const edit = VIM_EDITS[wave % VIM_EDITS.length];
+  const attack = VIM_ATTACKS[wave % VIM_ATTACKS.length];
   const step = Math.max(0, t) % VIM_PERIOD;
-  const warning = [110, 94, 78, 66][level];
-  const yankAt = warning + 28;
-  const editAt = yankAt + 28;
-  const launchAt = editAt + Math.max(0, edit.copies - 1) * 22 + 40;
-  const pasted = edit.copies ? Math.max(0, Math.min(edit.copies, Math.floor((step - editAt) / 22) + 1)) : 0;
-  const rowCount = VIM_ROWS + pasted - (step >= editAt ? edit.remove : 0);
-  // n p は一度の貼り付け。段階表示中もカーソルは最初に挿入した行に置く。
-  const cursorRow = step < warning ? 0 : Math.min(rowCount - 1, edit.line - 1 + (pasted ? 1 : 0));
-  const tokens = [`${edit.line}G`, ...(edit.copies ? ['yy', `${edit.copies}p`] : [edit.remove > 1 ? `${edit.remove}dd` : 'dd'])];
-  const token = step < warning ? -1 : step < yankAt ? 0 : edit.copies && step >= editAt ? 2 : 1;
-  return { wave, command, ...edit, step, warning, yankAt, editAt, launchAt, pasted, rowCount, cursorRow, tokens, token };
+  return { wave, ...attack, step, warning: [72, 60, 48, 40][level] };
 }
 export function updateVimBullet(b: Bullet): void {
-  b.motion = 'normal'; b.vy = b.spin;
+  // h/l は弾道を左/右へ2段ずらす。扇の速度は保ち、上下の進みを止めない。
+  const step = b.age - b.releaseAt;
+  if (step >= 0 && step < 12 || step >= 24 && step < 36) b.x += b.sway;
+  if (step >= 36) b.motion = 'normal';
 }
 
 function emitVim(game: Game, t: number, level: number): void {
   const scene = vimScene(t, level);
   if (game.bombFrames > 0) return;
-  const addKey = (x: number, row: number, column: number, label: string, color: number) => {
-    const b = game.spawnBullet(x, vimLineY(row), 0, 0, color, 'keycap');
-    if (!b) return;
-    // 見た目は幅18px。半径7なら自機半径2.5との和が列間の半分を上回り、細い縦抜けを残さない。
-    b.motion = 'vim'; b.keyLabel = label; b.radius = 7;
-    b.delay = scene.launchAt - scene.step; b.releaseAt = b.delay;
-    b.gridRow = row; b.gridColumn = column; b.dashWave = scene.wave;
-    b.spin = [1.25, 1.55, 1.85, 2.15][level];
-  };
   if (scene.step === 0) {
-    const gapX = [102, 278, 182, 310, 142][scene.wave % 5];
-    const gap = [84, 68, 56, 54][level];
-    const lines = ['const neo = vim()', 'normal mode only', 'copy this line()', 'yank into memory', 'paste the stars!', 'delete this line', 'return to normal'];
-    for (let row = 0; row < VIM_ROWS; row++) for (let col = 0; col < 22; col++) {
-      const x = 12 + col * 18;
-      // 段差を等間隔にし、削除しても移動可能な範囲へ収める。Easyだけは縦に共通の穴を残す。
-      const rowGap = gapX + (row / 3 - 1) * [16, 42, 45, 48][level] * (scene.wave % 2 ? -1 : 1);
-      if (Math.abs(x - rowGap) < gap / 2) continue;
-      addKey(x, row, col, lines[row][col % lines[row].length], row % 2 ? 1 : 2);
+    const [x, y] = game.bossPosition();
+    game.vimAttack = { wave: scene.wave, x, y, angle: Math.PI / 2 };
+  }
+  // 予告と後続射撃を同じ状態へ束ねる。ボム・被弾・技切替の消去でコピー射撃も中止する。
+  const attack = game.vimAttack;
+  if (!attack || attack.wave !== scene.wave) return;
+  const elapsed = scene.step - scene.warning;
+  if (elapsed === 0) {
+    [attack.x, attack.y] = game.bossPosition();
+    attack.angle = scene.command.startsWith('3j') ? Math.PI / 2 : Math.max(0.7, Math.min(Math.PI - 0.7, Math.atan2(game.py - attack.y, game.px - attack.x)));
+  }
+  let volley = -1;
+  let copied = false;
+  const lastRound = (scene.rounds - 1) * 20;
+  if (elapsed >= 0 && elapsed <= lastRound && elapsed % 20 === 0) volley = elapsed / 20;
+  // 複合コマンドは元の扇を横へ動かし終えてから、移動後の発射位置をコピーする。
+  // 最長の複合もEasyの予告72fを含め210f内に収める。
+  const copyAt = scene.shift ? lastRound + 56 : 36;
+  const copyGap = Math.max(scene.shift ? 24 : 36, scene.rounds * 20);
+  for (let copy = 0; copy < scene.copies; copy++) for (let round = 0; round < scene.rounds; round++) {
+    if (elapsed === copyAt + copy * copyGap + round * 20) { volley = (copy + 1) * scene.rounds + round; copied = true; }
+  }
+  if (volley >= 0) {
+    const n = [7, 9, 11, 13][level], spread = [0.15, 0.13, 0.115, 0.105][level];
+    const speed = [1.25, 1.45, 1.7, 1.9][level];
+    for (let i = 0; i < n; i++) {
+      const angle = attack.angle + (i - (n - 1) / 2) * spread;
+      const b = game.spawnBullet(attack.x + (copied ? scene.shift * 43.2 : 0), attack.y, Math.cos(angle) * speed, Math.sin(angle) * speed, scene.erase ? 3 : copied ? 2 : 1);
+      if (!b) continue;
+      b.dashWave = scene.wave; b.dashOrder = volley;
+      if (scene.shift && !copied) { b.motion = 'vim'; b.sway = scene.shift * 1.8; b.releaseAt = lastRound + 19 - elapsed; }
     }
   }
-  // 生きた行だけを編集する。ボム・被弾で消えた波から後続の複製を復活させない。
-  const keys = game.bullets.objects.filter((b) => b.active && b.motion === 'vim' && b.dashWave === scene.wave);
-  const sourceRow = scene.line - 1;
-  if (scene.copies && scene.step >= scene.editAt && scene.step < scene.editAt + scene.copies * 22 && (scene.step - scene.editAt) % 22 === 0) {
-    const row = scene.line + (scene.step - scene.editAt) / 22;
-    for (const b of keys) if (b.gridRow >= row) { b.gridRow++; b.y = vimLineY(b.gridRow); }
-    for (const b of keys) if (b.gridRow === sourceRow) addKey(b.x, row, b.gridColumn, b.keyLabel!, b.color);
-  }
-  if (scene.remove && scene.step === scene.editAt) for (const b of keys) {
-    if (b.gridRow >= sourceRow && b.gridRow < sourceRow + scene.remove) b.active = false;
-    else if (b.gridRow >= sourceRow + scene.remove) { b.gridRow -= scene.remove; b.y = vimLineY(b.gridRow); }
-  }
+  if (scene.erase && elapsed === lastRound + 30) game.bullets.forEach((b) => {
+    if (b.dashWave !== scene.wave || b.dashOrder !== 0) return;
+    game.spark(b.x, b.y, '#ffb3cc', 2); b.active = false;
+  });
 }
 export function enterScene(t: number, level: number) {
   const period = [260, 240, 220, 200][level];

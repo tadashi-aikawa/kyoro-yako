@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { claudineScene } from './patterns/claudine';
 import { FINALE_CHARGE, FINALE_START, ROSE_COUNT, ROSE_PERIOD } from './patterns/claudine-finale';
+import { vimScene } from './patterns/neo';
 import { MID_PHASE, PHASE_LIMIT, phaseHp, STAGE_DPS, STAGES } from './stages';
 
 beforeEach(() => {
@@ -57,7 +58,7 @@ it('エトワールの星は予告後に楕円軌道から重力でこぼれる'
   expect(star.vy).toBeGreaterThan(vy);
 });
 
-it('キーバインドは光るキーだけが予告後に落ち、Vimのキーは予告中に止まる', () => {
+it('キーバインドは光るキーだけが予告後に落ち、Vimは予告中に弾を出さない', () => {
   const rain = start(1, 1);
   const keys = rain.bullets.objects.filter((b) => b.active && b.motion === 'keyDrop');
   expect(keys).toHaveLength(6);
@@ -65,10 +66,7 @@ it('キーバインドは光るキーだけが予告後に落ち、Vimのキー�
   for (let i = 0; i < 74; i++) rain.update();
   expect(keys[0].y).toBeGreaterThan(y);
   const vim = start(1, 3);
-  const caps = vim.bullets.objects.filter((b) => b.active && b.motion === 'vim');
-  expect(new Set(caps.map((b) => b.gridRow)).size).toBe(7);
-  expect(caps.length).toBeGreaterThan(90);
-  expect(caps.every((b) => b.delay > 0)).toBe(true);
+  expect(vim.vimAttack).toBeDefined(); expect(vim.bullets.count).toBe(0);
 });
 
 it('沼では弾と自機が減速し、Enterの列は予告中に止まる', () => {
@@ -224,7 +222,8 @@ it('5面ネオの延長は1面の3つの仕掛けを順に使い、★は1つの
     game.phaseFrame = 104;
     game.bullets.clear();
     game.update();
-    expect(game.bullets.objects.some((b) => b.active && b.motion === motion), `extension ${extension + 1}`).toBe(true);
+    if (extension === 1) expect(game.vimAttack).toBeDefined();
+    else expect(game.bullets.objects.some((b) => b.active && b.motion === motion), `extension ${extension + 1}`).toBe(true);
     expect(game.remainingSpells).toBe(1);
   }
   game.skipPhase();
@@ -261,7 +260,6 @@ it('Easyほど各スペルの予告が長い', () => {
   for (const [stage, phase, motion, mid] of [
     [1, 0, 'etoileOrbit', true],
     [1, 1, 'keyDrop', false],
-    [1, 3, 'vim', false],
     [1, 6, 'enterLine', false],
     [2, 0, 'bookshelf', true],
     [2, 3, 'linkBeam', false],
@@ -270,4 +268,5 @@ it('Easyほど各スペルの予告が長い', () => {
     const lunatic = start(stage, phase, mid, 'lunatic').bullets.objects.find((b) => b.active && b.motion === motion)!;
     expect(easy.delay || easy.releaseAt, motion).toBeGreaterThan(lunatic.delay || lunatic.releaseAt);
   }
+  expect(vimScene(0, 0).warning).toBeGreaterThan(vimScene(0, 3).warning);
 });

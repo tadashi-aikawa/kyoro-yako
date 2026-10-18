@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { GALAXY_FIRE } from './patterns/etokichi';
-import { enterScene, KEY_ROWS, KEY_WORDS, keyPosition, VIM_PERIOD, vimScene } from './patterns/neo';
+import { enterScene, KEY_ROWS, KEY_WORDS, keyPosition, VIM_COMMANDS, VIM_PERIOD, vimScene } from './patterns/neo';
 import { ETOKICHI_FLASH, midPhases } from './stages';
 
 beforeEach(() => {
@@ -109,65 +109,117 @@ it('キーは乱数の異なる候補から選び、次の技へ単語を持ち�
   first.skipPhase(); expect(first.keyboardWord).toBe('');
 });
 
-it.each([
-  { command: '5Gyy3p', wave: 0, line: 5, copies: 3, remove: 0 },
-  { command: '3Gyy2p', wave: 1, line: 3, copies: 2, remove: 0 },
-  { command: '4G2dd', wave: 2, line: 4, copies: 0, remove: 2 },
-  { command: '2Gyy3p', wave: 3, line: 2, copies: 3, remove: 0 },
-  { command: '6Gdd', wave: 4, line: 6, copies: 0, remove: 1 },
-])('Vimの$commandは指定行を編集し、貼り付けと削除で後続行も詰め直す', ({ command, wave, line, copies, remove }) => {
+it.each(VIM_COMMANDS)('Vimの%sはコマンド予告が終わってから通常弾を発射する', (command) => {
   const game = start(3);
+  const wave = VIM_COMMANDS.indexOf(command);
   game.phaseFrame = 104 + wave * VIM_PERIOD; game.update();
   const scene = vimScene(wave * VIM_PERIOD, 1);
-  expect(scene.command).toBe(command);
-  const originals = active(game).map((b) => ({ b, row: b.gridRow, y: b.y }));
-  const source = originals.filter(({ row }) => row === line - 1).map(({ b }) => [b.x, b.gridColumn, b.keyLabel]);
-  run(game, scene.warning);
-  expect(vimScene(game.phaseFrame - 105, 1).cursorRow).toBe(line - 1);
-  expect(originals.every(({ b, y }) => b.y === y)).toBe(true);
-  run(game, scene.launchAt - scene.warning - 1);
-  expect(new Set(active(game).map((b) => b.gridRow)).size).toBe(7 + copies - remove);
-  if (copies) for (let row = line; row < line + copies; row++) {
-    expect(active(game).filter((b) => b.gridRow === row).map((b) => [b.x, b.gridColumn, b.keyLabel])).toEqual(source);
-  }
-  for (const { b, row } of originals) {
-    if (remove && row >= line - 1 && row < line - 1 + remove) expect(b.active).toBe(false);
-    else {
-      expect(b.gridRow).toBe(row + (copies && row >= line ? copies : 0) - (remove && row >= line - 1 + remove ? remove : 0));
-      expect(b.y).toBe(104 + b.gridRow * 24);
-    }
-  }
-  const living = active(game); const y = living[0].y;
-  game.update(); expect(living[0].y).toBeGreaterThan(y);
-  expect(living.every((b) => b.motion === 'normal')).toBe(true);
+  expect(scene.command).toBe(command); expect(game.vimAttack?.wave).toBe(wave);
+  run(game, scene.warning - 1); expect(active(game)).toHaveLength(0);
+  game.update(); expect(active(game)).toHaveLength(9);
+  expect(active(game).every((b) => b.kind === 'orb' && !b.keyLabel && b.vy > 0)).toBe(true);
 });
 
-it('Vimの編集は無害で、発射後だけ同じ場所の自機へ当たる', () => {
-  const game = start(3); game.phaseFrame = 104; game.update();
-  const b = active(game).find((b) => b.gridRow === 0)!;
-  game.px = b.x; game.py = b.y; game.invincible = false; game.invulnFrames = 0;
-  run(game, vimScene(0, 1).launchAt - 1);
-  expect(game.pendingHit).toBe(-1); expect(game.lives).toBe(2);
-  game.update(); expect(game.pendingHit).toBeGreaterThanOrEqual(0);
+it('3jは下向きの扇を3回発射する', () => {
+  const game = start(3); game.phaseFrame = 104; game.update(); run(game, vimScene(0, 1).warning + 40);
+  expect(active(game)).toHaveLength(27);
+  expect(new Set(active(game).map((b) => b.dashOrder))).toEqual(new Set([0, 1, 2]));
+  expect(active(game).every((b) => b.vy > 0)).toBe(true);
 });
 
-it('Vimはポーズで止まり、ボム後は同じ波を復活させず次のコマンドから再開する', () => {
-  const game = start(3); game.phaseFrame = 104; game.update();
-  const frame = game.phaseFrame, age = active(game)[0].age;
+it.each([['2h', -1], ['2l', 1]] as const)('%sは自然な弾道を保って横へ2段ずらす', (command, sign) => {
+  const game = start(3), wave = VIM_COMMANDS.indexOf(command);
+  game.phaseFrame = 104 + wave * VIM_PERIOD; game.update(); run(game, vimScene(wave * VIM_PERIOD, 1).warning);
+  const b = active(game)[4], x = b.x;
+  const shift = () => b.x - x - b.vx * (b.age - 1);
+  run(game, 17); expect(shift()).toBeCloseTo(0);
+  run(game, 12); expect(shift()).toBeCloseTo(sign * 21.6);
+  run(game, 12); expect(shift()).toBeCloseTo(sign * 21.6);
+  run(game, 12); expect(shift()).toBeCloseTo(sign * 43.2);
+  game.update(); expect(b.motion).toBe('normal');
+});
+
+it('yy3pは発射元と速度をコピーし、照準を引き直さず3回追加する', () => {
+  const game = start(3), wave = VIM_COMMANDS.indexOf('yy3p'); game.phaseFrame = 104 + wave * VIM_PERIOD; game.update();
+  run(game, vimScene(wave * VIM_PERIOD, 1).warning);
+  const origin = { ...game.vimAttack! };
+  const velocities = active(game).map((b) => [b.vx, b.vy]);
+  game.px = 350; run(game, 108);
+  expect(active(game)).toHaveLength(36);
+  for (let volley = 1; volley <= 3; volley++) {
+    const copies = active(game).filter((b) => b.dashOrder === volley);
+    expect(copies.map((b) => [b.vx, b.vy])).toEqual(velocities);
+    for (const b of copies) { expect(b.x - b.vx * b.age).toBeCloseTo(origin.x); expect(b.y - b.vy * b.age).toBeCloseTo(origin.y); }
+  }
+});
+
+it('ddは先行する扇だけを消し、後続の扇を残す', () => {
+  const game = start(3), wave = VIM_COMMANDS.indexOf('dd'); game.phaseFrame = 104 + wave * VIM_PERIOD; game.update();
+  run(game, vimScene(wave * VIM_PERIOD, 1).warning);
+  const first = active(game).slice(); run(game, 49);
+  expect(active(game)).toHaveLength(18); game.update();
+  expect(first.every((b) => !b.active)).toBe(true);
+  expect(active(game)).toHaveLength(9); expect(active(game).every((b) => b.dashOrder === 1)).toBe(true);
+});
+
+it('3j2hyypは3連射を2段左へずらしてから、移動後の扇を一組コピーする', () => {
+  const game = start(3), wave = VIM_COMMANDS.indexOf('3j2hyyp');
+  game.phaseFrame = 104 + wave * VIM_PERIOD; game.update(); run(game, vimScene(wave * VIM_PERIOD, 1).warning);
+  const origin = { ...game.vimAttack! };
+  run(game, 95); expect(active(game).every((b) => b.dashOrder < 3)).toBe(true);
+  run(game, 41);
+  const copies = active(game).filter((b) => b.dashOrder >= 3);
+  expect(copies).toHaveLength(27);
+  expect(new Set(copies.map((b) => b.dashOrder))).toEqual(new Set([3, 4, 5]));
+  for (const b of copies) { expect(b.motion).toBe('normal'); expect(b.x - b.vx * b.age).toBeCloseTo(origin.x - 43.2); }
+});
+
+it.each([['2lyy2p', 1, 3], ['2hyy3p', -1, 4]] as const)('%sは横移動した射撃を指定回数コピーする', (command, sign, volleys) => {
+  const game = start(3), wave = VIM_COMMANDS.indexOf(command);
+  game.phaseFrame = 104 + wave * VIM_PERIOD; game.update(); run(game, vimScene(wave * VIM_PERIOD, 1).warning);
+  const origin = { ...game.vimAttack! };
+  run(game, 56 + (volleys - 2) * 24);
+  expect(new Set(active(game).map((b) => b.dashOrder)).size).toBe(volleys);
+  for (const b of active(game).filter((b) => b.dashOrder > 0)) expect(b.x - b.vx * b.age).toBeCloseTo(origin.x + sign * 43.2);
+});
+
+it('Vimはポーズで止まり、ボム後のコピー射撃を中止して次の予告から再開する', () => {
+  const game = start(3), wave = VIM_COMMANDS.indexOf('yy3p'); game.phaseFrame = 104 + wave * VIM_PERIOD; game.update();
+  const frame = game.phaseFrame;
   game.scene = 'pause'; run(game, 40);
-  expect(game.phaseFrame).toBe(frame); expect(active(game)[0].age).toBe(age);
-  game.scene = 'stage'; game.bombFrames = 2; game.update(); game.bombFrames = 0;
-  run(game, VIM_PERIOD - 2); expect(active(game)).toHaveLength(0);
-  game.update(); expect(active(game).length).toBeGreaterThan(0);
-  game.skipPhase(); expect(active(game)).toHaveLength(0);
+  expect(game.phaseFrame).toBe(frame); expect(game.vimAttack?.wave).toBe(wave);
+  game.scene = 'stage'; run(game, vimScene(wave * VIM_PERIOD, 1).warning + 36);
+  game.bombFrames = 2; game.update(); game.bombFrames = 0; expect(game.vimAttack).toBeUndefined();
+  while (game.phaseFrame < 104 + (wave + 1) * VIM_PERIOD) game.update();
+  expect(active(game)).toHaveLength(0);
+  game.update(); expect(game.vimAttack?.wave).toBe(wave + 1);
+  game.skipPhase(); expect(active(game)).toHaveLength(0); expect(game.vimAttack).toBeUndefined();
 });
 
-it('5面の再演でも5Gyy3pで7行を10行にする', () => {
+it('5面の再演でもコマンドを予告し、3jで3回発射する', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   game.startStage(5); game.startBoss(true, 0); game.encoreCount = 2;
   game.phaseFrame = 104; game.update();
-  run(game, vimScene(0, 1).launchAt - 1);
-  expect(new Set(active(game).map((b) => b.gridRow)).size).toBe(10);
+  expect(active(game)).toHaveLength(0); run(game, vimScene(0, 1).warning + 40);
+  expect(active(game)).toHaveLength(27);
+});
+
+it('被弾が確定したらコピー射撃を中止する', () => {
+  const game = start(3), wave = VIM_COMMANDS.indexOf('yy3p');
+  game.phaseFrame = 104 + wave * VIM_PERIOD; game.update(); run(game, vimScene(wave * VIM_PERIOD, 1).warning);
+  game.invincible = false; game.invulnFrames = 0; game.pendingHit = 7;
+  game.update(); expect(game.lives).toBe(1); expect(game.vimAttack).toBeUndefined();
+  run(game, 108); expect(active(game).every((b) => b.dashOrder === 0)).toBe(true);
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sでも全コマンドの最後のコピーまで次の予告前に出る', (difficulty) => {
+  const volleys = [3, 6, 1, 3, 4, 4, 1, 3, 2];
+  for (const [wave, count] of volleys.entries()) {
+    const game = start(3, false, difficulty); game.phaseFrame = 104 + wave * VIM_PERIOD;
+    const seen = new Set<number>();
+    for (let i = 0; i < VIM_PERIOD; i++) { game.update(); for (const b of active(game)) seen.add(b.dashOrder); }
+    expect([...seen].sort((a, b) => a - b), `${difficulty} ${VIM_COMMANDS[wave]}`).toEqual(Array.from({ length: count }, (_, i) => i));
+  }
 });
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('Enterは%sでも行の穴を残して一斉に落ち、同じX座標に居続けられない', (difficulty) => {
@@ -189,23 +241,11 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('Enterは%sでも行の�
   expect(unsafe.size).toBe(361);
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('Vimの%sは列間と壁際を塞ぎ、Normal以上は1波の中でも静止して避け続けられない', (difficulty) => {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('Vimの%sは文字付きキーを使わず、60秒の弾数を抑える', (difficulty) => {
   const game = start(3, false, difficulty);
-  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
-  for (let wave = 0; wave < 5; wave++) {
-    game.bullets.clear(); game.phaseFrame = 104 + wave * VIM_PERIOD; game.update();
-    run(game, vimScene(wave * VIM_PERIOD, level).launchAt - 1);
-    const keys = active(game);
-    for (const row of new Set(keys.map((b) => b.gridRow))) {
-      const line = keys.filter((b) => b.gridRow === row).sort((a, b) => a.x - b.x);
-      expect(line[0].x - line[0].radius - 2.5).toBeLessThanOrEqual(9);
-      for (let i = 1; i < line.length; i++) if (line[i].gridColumn === line[i - 1].gridColumn + 1) {
-        expect(line[i].x - line[i - 1].x).toBeLessThan(line[i].radius + line[i - 1].radius + 5);
-      }
-    }
-    if (difficulty !== 'easy') for (let x = 9; x <= 375; x++) {
-      expect(keys.some((b) => Math.abs(x - b.x) <= b.radius + 2.5), `wave ${wave}, x ${x}`).toBe(true);
-    }
+  for (let i = 0; i < 3598; i++) {
+    game.update(); expect(game.bullets.count).toBeLessThanOrEqual(104);
+    expect(active(game).every((b) => b.kind === 'orb' && !b.keyLabel)).toBe(true);
   }
 });
 
