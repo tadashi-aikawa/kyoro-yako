@@ -53,7 +53,7 @@ export function updateInterviewRings(game: Game): void {
   for (let i = game.interviewRings.length - 1; i >= 0; i--) {
     const ring = game.interviewRings[i];
     if (ring.delay > 0) { ring.delay--; continue; }
-    if (!ring.launched) { ring.launched = true; game.audio.play('enemyShot'); }
+    if (!ring.launched) { ring.launched = true; game.triggerBossCast(); game.audio.play('enemyShot'); }
     ring.radius += ring.speed;
     ring.gap += ring.spin;
     const farthest = Math.hypot(Math.max(ring.x, FIELD.w - ring.x), Math.max(ring.y, FIELD.h - ring.y));

@@ -1,8 +1,15 @@
-import { expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { bossSpriteId, CAST_FRAMES, CAST_GAP, createBossMotion, IDLE_STEP, isCasting, MOTION_SPRITES, SPELL_CAST_FRAMES, updateBossMotion } from './boss-motion';
-import type { Game } from './game';
+import { Game } from './game';
 import { normalBeat } from './patterns/boss-normal';
 import { STAGES } from './stages';
+
+beforeEach(() => {
+  vi.stubGlobal('location', { search: '' });
+  vi.stubGlobal('window', { addEventListener: () => {} });
+  vi.stubGlobal('Image', class { src = ''; complete = true; naturalWidth = 0; });
+});
+afterEach(() => vi.unstubAllGlobals());
 
 function drive(xs: number[], key = 'jinrai:phase', start = 0) {
   const motion = createBossMotion();
@@ -74,22 +81,58 @@ it('中ボス・ボスの全員が待機・左右・構えの絵を持ち、配�
   for (const id of MOTION_SPRITES) expect(placed, id).toContain(`/public/assets/sprites/${id}.webp`);
 });
 
-it('スペルは宣言のカットインが明けて撃ち始める瞬間だけ構える', () => {
+it('スペルは開始時に長く構え、途中の発射でも構える', () => {
   expect(isCasting('spell', 0, 0)).toBe(false);
   expect(isCasting('spell', 105, 0)).toBe(true);
   expect(isCasting('midboss', 105 + SPELL_CAST_FRAMES - 1, 0)).toBe(true);
   expect(isCasting('spell', 105 + SPELL_CAST_FRAMES, 0)).toBe(false);
   expect(isCasting('spell', 400, 0)).toBe(false);
+  expect(isCasting('spell', 400, 400)).toBe(true);
+  expect(isCasting('spell', 400 + CAST_FRAMES - 1, 400)).toBe(true);
+  expect(isCasting('spell', 400 + CAST_FRAMES, 400)).toBe(false);
 });
 
-it('通常攻撃は一斉射の頭で構え、周期が短い技でも間隔を空ける', () => {
-  expect(isCasting('normal', 50, 84)).toBe(false);
-  expect(isCasting('normal', 105, 84)).toBe(true);
-  expect(isCasting('normal', 105 + CAST_FRAMES, 84)).toBe(false);
-  expect(isCasting('normal', 105 + 84, 84)).toBe(true);
-  const frames = Array.from({ length: 600 }, (_, i) => 105 + i).filter((f) => isCasting('normal', f, 21));
+it('通常攻撃は実際の一斉射で構え、連射でも移動へ戻る時間を残す', () => {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true;
+  game.startStage(4); game.startBoss(false, 0);
+  expect(isCasting('normal', 50)).toBe(false);
+  expect(isCasting('normal', 105)).toBe(false);
+  const frames: number[] = [];
+  const starts: number[] = [];
+  for (let i = 0; i < 705; i++) {
+    const before = game.bossCastFrame; game.update();
+    if (game.bossCastFrame !== before) starts.push(game.phaseFrame);
+    if (isCasting('normal', game.phaseFrame, game.bossCastFrame)) frames.push(game.phaseFrame);
+  }
+  expect(starts.length).toBeGreaterThan(2);
+  expect(starts.slice(1).every((f, i) => f - starts[i] >= CAST_GAP)).toBe(true);
   expect(frames.length).toBeLessThan(600 * CAST_FRAMES / CAST_GAP + CAST_FRAMES);
-  expect(frames.every((f) => (f - 105) % 21 < CAST_FRAMES)).toBe(true);
+});
+
+it.each([1, 2, 3, 4, 5])('%s面のスペルは開始後も発射の構えを繰り返す', (stage) => {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true;
+  game.startStage(stage); game.startBoss(false, 1);
+  const starts: number[] = [];
+  for (let i = 0; i < 900; i++) {
+    const before = game.bossCastFrame; game.update();
+    if (game.bossCastFrame !== before && game.phaseFrame > 145) starts.push(game.phaseFrame);
+  }
+  expect(starts.length).toBeGreaterThan(1);
+});
+
+it('遅延した輪は予告中に構えを開始せず、発射で構え、ポーズとフェーズ切替も追従する', () => {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true;
+  game.startStage(5); game.startBoss(false, 11);
+  for (let i = 0; i < 174; i++) game.update();
+  expect(game.bossCastFrame).toBe(-Infinity);
+  game.update();
+  expect(game.bossCastFrame).toBe(175);
+  game.scene = 'pause';
+  for (let i = 0; i < 60; i++) game.update();
+  expect(game.phaseFrame).toBe(175);
+  expect(isCasting('spell', game.phaseFrame, game.bossCastFrame)).toBe(true);
+  game.scene = 'stage'; game.skipPhase();
+  expect(game.bossCastFrame).toBe(-Infinity);
 });
 
 it('構えは移動より優先し、全ての通常攻撃が一斉射の周期を持つ', () => {

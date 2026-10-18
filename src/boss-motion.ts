@@ -39,14 +39,12 @@ export function updateBossMotion(motion: BossMotion, key: string, frame: number,
   return motion.pose;
 }
 
-// 構えは技の区切りでだけ出す。弾が本人から出るかは問わない。
-// スペルは宣言のカットインがボスを覆うので、カットインが明けて撃ち始める瞬間に構える。通常攻撃は一斉射の頭
-export function isCasting(kind: string, phaseFrame: number, beat: number): boolean {
+// 開始時の構えに加え、実際の発射を受けて構える。移動や専用ポーズの優先順位は描画側が決める。
+export function isCasting(kind: string, phaseFrame: number, castFrame = -Infinity): boolean {
   const t = phaseFrame - PATTERN_START;
   if (t < 0) return false;
-  if (kind !== 'normal') return t < SPELL_CAST_FRAMES;
-  if (beat <= 0) return false;
-  return t % (beat * Math.ceil(CAST_GAP / beat)) < CAST_FRAMES;
+  if (kind !== 'normal' && t < SPELL_CAST_FRAMES) return true;
+  return phaseFrame >= castFrame && phaseFrame - castFrame < CAST_FRAMES;
 }
 
 export function hasMotionSprites(id: string): boolean { return (MOTION_BOSSES as readonly string[]).includes(id); }

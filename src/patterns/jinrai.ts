@@ -205,7 +205,7 @@ export function emitJinraiPattern(game: Game, pattern: string, t: number): void 
       if (laser.age >= laser.life) { game.jinraiLasers.splice(i, 1); continue; }
       [laser.x, laser.y] = game.bossPosition();
       if (laser.age <= laser.warning) continue;
-      if (laser.age === laser.warning + 1) game.audio.play('laser');
+      if (laser.age === laser.warning + 1) { game.triggerBossCast(); game.audio.play('laser'); }
       laser.angle += laser.speed;
       const dx = game.px - laser.x;
       const dy = game.py - laser.y;

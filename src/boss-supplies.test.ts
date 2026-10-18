@@ -203,13 +203,13 @@ it('5面中ボスの時間延長は戦闘終了まで補充を増やさない', 
   expect(game.collectionFrames).toBe(180);
 });
 
-it('拾ってもPower4・ボム8を超えず、被弾でもボム備蓄を失わない', () => {
+it('拾ってもPower5・ボム8を超えず、被弾でもボム備蓄を失わない', () => {
   const game = start(3, 0, true);
-  game.power = 4; game.bombs = 8;
+  game.power = 5; game.bombs = 8;
   vi.mocked(Math.random).mockReturnValueOnce(0.1);
   game.skipPhase();
   for (const target of supplies(game)) { game.px = target.x; game.py = target.y; game.update(); }
-  expect(game.power).toBe(4); expect(game.bombs).toBe(8);
+  expect(game.power).toBe(5); expect(game.bombs).toBe(8);
   game.startBoss(false, 1);
   hit(game, 4);
   expect(game.bombs).toBe(8);

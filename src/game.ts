@@ -1,6 +1,6 @@
 import { AudioBank } from './audio';
 import { type BgmCue, BgmPlayer } from './bgm';
-import { MOTION_SPRITES } from './boss-motion';
+import { CAST_GAP, MOTION_SPRITES } from './boss-motion';
 import { patternPosition } from './boss-movement';
 import { dialogue, ENDINGS, type Line, midDialogue } from './dialogue';
 import { ENEMY_ROOMS, enemyFireFrames } from './enemy-design';
@@ -18,7 +18,7 @@ import { emitNeo, inBog } from './patterns/neo';
 import { emitNeoEncore, encoreBogTime } from './patterns/neo-encore';
 import { emitObsidia, sweepPosition, tags } from './patterns/obsidia';
 import { Pool } from './pool';
-import { autoCollect, bulletContact, bulletSpeed, circlesHit, type Difficulty, deathbomb, density, FIELD, type ItemKind, MAX_BOMBS, newExtends, type PlayerId, pointValue, safeLoad, safeSave } from './rules';
+import { autoCollect, bulletContact, bulletSpeed, circlesHit, type Difficulty, deathbomb, density, FIELD, type ItemKind, MAX_BOMBS, MAX_POWER, newExtends, type PlayerId, pointValue, safeLoad, safeSave } from './rules';
 import { type BossId, MID_PHASE, NAMES, type Phase, STAGES } from './stages';
 import { readRecords } from './story';
 
@@ -84,6 +84,7 @@ export class Game {
   phaseIndex = -1;
   phase?: Phase;
   phaseFrame = 0;
+  bossCastFrame = -Infinity;
   private bossEntry: [number, number] = [192, 77];
   phaseHp = 0;
   phaseMaxHp = 0;
@@ -204,7 +205,7 @@ export class Game {
     } else if (PLAYERS.includes(p as PlayerId) || DIFFICULTIES.includes(d as Difficulty)) {
       this.startStage(1);
     }
-    this.power = this.queryNumber('power', 0, 4, this.power);
+    this.power = this.queryNumber('power', 0, MAX_POWER, this.power);
     this.lives = Math.floor(this.queryNumber('lives', 0, 8, this.lives));
     this.bombs = Math.floor(this.queryNumber('bombs', 0, MAX_BOMBS, this.bombs));
   }
@@ -392,6 +393,18 @@ export class Game {
       shot.radius = 3;
       shot.homing = true;
     }
+    // 最大Powerの補助弾は半分の頻度。通常は斜め前方を補い、低速では全弾を正面へ束ねる。
+    if (tier >= MAX_POWER && this.frame % 10 === 0) {
+      for (const side of [-1, 1]) for (const [index, degrees] of [15, 30].entries()) {
+        const shot = this.shots.acquire(); if (!shot) break;
+        const angle = focus ? 0 : degrees * Math.PI / 180;
+        Object.assign(shot, {
+          x: this.px + side * (focus ? 15 + index * 6 : 12), y: this.py - 10,
+          vx: side * Math.sin(angle) * 10.5, vy: -Math.cos(angle) * 10.5,
+          damage: 0.65, radius: 2, homing: false,
+        });
+      }
+    }
     this.audio.play('shot');
   }
 
@@ -529,6 +542,7 @@ export class Game {
     this.phase = phase;
     this.phaseFrame = 0;
     this.lastBossShotFrame = -1;
+    this.bossCastFrame = -Infinity;
     this.encoreCount = 0;
     this.phaseHp = phase.hp;
     this.phaseMaxHp = phase.hp;
@@ -646,6 +660,7 @@ export class Game {
       if (phase.pattern === 'neoEncore' && this.encoreCount < 3) {
         this.encoreCount++;
         this.phaseFrame = 104;
+        this.bossCastFrame = -Infinity;
         this.clearBullets();
         this.message = '最後にもう一つだけ！';
         this.messageFrames = 100;
@@ -706,6 +721,11 @@ export class Game {
     return b;
   }
 
+  // 一斉射は1回の構えにまとめ、連射でも移動ポーズへ戻る時間を確保する。
+  triggerBossCast(): void {
+    if (this.phase && this.boss && this.phaseFrame >= 105 && this.phaseFrame - this.bossCastFrame >= CAST_GAP) this.bossCastFrame = this.phaseFrame;
+  }
+
   private clearBullets(): void {
     this.bullets.clear();
     this.interviewRings.length = 0;
@@ -728,7 +748,7 @@ export class Game {
         else {
           b.x = b.targetX; b.y = b.targetY;
           b.vx = b.sway; b.vy = b.swayRate; b.motion = 'normal';
-          if (b.gridColumn === 0 && b.gridRow === 0) this.audio.play('laser');
+          if (b.gridColumn === 0 && b.gridRow === 0) { this.triggerBossCast(); this.audio.play('laser'); }
         }
       }
       if (b.motion === 'codexBox' && b.age <= 38) { b.x += b.vx; b.y += b.vy; }
@@ -741,6 +761,7 @@ export class Game {
       if (b.motion === 'jinraiHeart') updateJinraiHeart(b, this.px, this.py);
       if (b.launchSoundPending) {
         b.launchSoundPending = false;
+        this.triggerBossCast();
         // 予告のdelayを通過した最初の移動フレームで、斉射をまとめて鳴らす。
         if (this.phase && this.boss && this.lastBossShotFrame !== this.frame) {
           this.lastBossShotFrame = this.frame;
@@ -1065,8 +1086,8 @@ export class Game {
   private collectItem(item: Pick<Item, 'kind' | 'y'>): void {
     this.audio.play('item');
     switch (item.kind) {
-      case 'small': this.power = Math.min(4, Math.round((this.power + 0.05) * 100) / 100); this.addScore(100); break;
-      case 'large': this.power = Math.min(4, this.power + 1); break;
+      case 'small': this.power = Math.min(MAX_POWER, Math.round((this.power + 0.05) * 100) / 100); this.addScore(100); break;
+      case 'large': this.power = Math.min(MAX_POWER, this.power + 1); break;
       case 'point': this.addScore(pointValue(item.y, this.point)); break;
       case 'bomb': this.bombs = Math.min(MAX_BOMBS, this.bombs + 1); break;
       case 'life': this.lives++; this.audio.play('extend'); break;

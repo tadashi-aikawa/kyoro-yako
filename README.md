@@ -103,7 +103,7 @@ pnpm exec vite preview --base=/kyoro-yako/ --host 127.0.0.1 --port 5198
 - `?player=mimiko&difficulty=hard`：自機と難易度を指定。自機は`mimiko`のみ。難易度は`easy`、`normal`、`hard`、`lunatic`。
 - `?invincible=1`：無敵。
 - `?autoshot=1`：ショットを常時発射。
-- `?power=4&lives=5&bombs=3`：開始時のPower(0〜4)・残機(0〜8)・ボム数(0〜8)を指定。
+- `?power=5&lives=5&bombs=3`：開始時のPower(0〜5)・残機(0〜8)・ボム数(0〜8)を指定。
 - `?ending=mimiko`：エンディングから開始。
 
 開発ビルドでは `window.__owlery.state()` で状態を取得し、`window.__owlery.skipPhase()` で現在のボスフェーズを進められます。

@@ -2,7 +2,6 @@ import { bossSpriteId, createBossMotion, isCasting, updateBossMotion } from './b
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
 import { PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
-import { normalBeat } from './patterns/boss-normal';
 import { bowProgress, claudineScene, complementBoundary, FAREWELL_RELEASE, flowerRadius, whiteSpaceCircle } from './patterns/claudine';
 import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, GRID_REPLAY_PERIOD, gridLayoutAt, gridPoint, gridRows, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_NAMES, WEATHER_PERIOD, WEATHER_REPLAY_PERIOD, weatherAt } from './patterns/claudine-weather-grid';
 import { BURST_MOVE, BURST_RETURN, BURST_SHOTS, burstVisibility, dashBurstStep } from './patterns/jinrai';
@@ -13,7 +12,7 @@ import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-rin
 import { bogs } from './patterns/neo';
 import { encoreBogTime } from './patterns/neo-encore';
 import { SWEEP_CHARGE, SWEEP_MOVE, SWEEP_PERIOD, SWEEP_SHOTS, sweepStep, sweepTarget, tags } from './patterns/obsidia';
-import { FIELD } from './rules';
+import { FIELD, MAX_POWER } from './rules';
 import { drawScenery } from './stage-scenery';
 import { NAMES, STAGES } from './stages';
 import { GAME_TITLE, RECORDS } from './story';
@@ -323,6 +322,7 @@ export class Renderer {
       if (game.phase.pattern === 'jinraiClone') {
         const scene = jinraiCloneScene(game.phaseFrame, game.phase.duration);
         const performingNinpo = scene.charging || scene.splitting;
+        const casting = isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
         // 跳ぶ分身は元の場所に煙を残し、跳び先へ向けて残像を並べる。
         for (const trail of scene.trails) {
           if (trail.age < 24) this.ninjaSmoke(trail.fromX, trail.fromY, trail.age);
@@ -344,7 +344,7 @@ export class Renderer {
             this.magic(body.x, body.y, game.frame, '#fff4bd', 30 + scene.chargeProgress * 10, 0.6);
           }
           const breathing = scene.charging ? 1 + Math.sin(game.frame * 0.09) * 0.025 : 1;
-          this.fieldCharacter(game, performingNinpo ? 'jinrai-seal' : this.readySprite(game, bossSpriteId(game.boss, 'idle', game.frame + index * 7)), body.x, body.y + (performingNinpo ? 0 : Math.sin(game.frame * 0.045) * 2), 64 * breathing, 0, body.opacity);
+          this.fieldCharacter(game, performingNinpo ? 'jinrai-seal' : this.readySprite(game, bossSpriteId(game.boss, casting && scene.firing[index] ? 'cast' : 'idle', game.frame + index * 7)), body.x, body.y + (performingNinpo ? 0 : Math.sin(game.frame * 0.045) * 2), 64 * breathing, 0, body.opacity);
           this.magic(body.x, body.y, game.frame, '#ffdc84', 25, 0.4 * body.opacity);
           c.restore();
         }
@@ -354,7 +354,7 @@ export class Renderer {
         const kissing = kiss >= 0 && kiss < KISS_POSE_END;
         const tilt = channeling || seal || sweepCharging || kissing ? 0 : Math.cos(game.phaseFrame * 0.012) * 0.045 + bow * 0.08;
         const pose = updateBossMotion(this.bossMotion, `${game.boss}:${game.phase.name}`, game.frame, x);
-        const casting = isCasting(game.phase.kind, game.phaseFrame, game.phase.kind === 'normal' ? normalBeat(game, game.phase.pattern) : 0);
+        const casting = isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
         const spriteId = kissing ? 'jinrai-kiss' : bossSpriteId(game.boss, casting ? 'cast' : pose, game.frame);
         const bossSprite = this.readySprite(game, spriteId);
         c.save(); c.translate(x, y); c.scale(1 + bow * 0.08, 1 - bow * 0.32); c.translate(-x, -y);
@@ -383,7 +383,11 @@ export class Renderer {
     }
     game.bullets.forEach((b) => { this.bullet(b); });
     for (const ring of game.interviewRings) this.interviewRing(ring);
-    game.shots.forEach((shot) => { c.fillStyle = '#a9f7ff'; c.shadowColor = c.fillStyle; c.shadowBlur = 6; c.fillRect(shot.x - shot.radius, shot.y - 6, shot.radius * 2, 12); c.shadowBlur = 0; });
+    game.shots.forEach((shot) => {
+      c.save(); c.translate(shot.x, shot.y); c.rotate(Math.atan2(shot.vx, -shot.vy));
+      c.fillStyle = '#a9f7ff'; c.shadowColor = c.fillStyle; c.shadowBlur = 6;
+      c.fillRect(-shot.radius, -6, shot.radius * 2, 12); c.restore();
+    });
     game.particles.forEach((p) => { c.globalAlpha = 1 - p.age / p.life; c.fillStyle = p.color; c.fillRect(p.x, p.y, p.size, p.size); c.globalAlpha = 1; });
     this.player(game);
     if (game.bombFrames > 0) this.bombEffect(game);
@@ -1023,15 +1027,11 @@ export class Renderer {
     this.uiText('ボム', 541, 237, 10, '#b4d9c5');
     this.uiText(String(game.bombs), 602, 257, 20, '#cfefd8', 'right');
     this.uiText('ショット強度', 442, 291, 11, '#b8c8c3');
-    this.uiText(`${game.power.toFixed(2)} / 4`, 607, 291, 11, '#f1e7cc', 'right');
-    for (let i = 0; i < 4; i++) {
-      c.fillStyle = '#2a3d42'; c.fillRect(442 + i * 42, 305, 37, 5);
-      c.fillStyle = '#b8d3b0'; c.fillRect(442 + i * 42, 305, 37 * Math.max(0, Math.min(1, game.power - i)), 5);
+    this.uiText(`${game.power.toFixed(2)} / ${MAX_POWER}`, 607, 291, 11, '#f1e7cc', 'right');
+    for (let i = 0; i < MAX_POWER; i++) {
+      c.fillStyle = '#2a3d42'; c.fillRect(442 + i * 34, 305, 29, 5);
+      c.fillStyle = '#b8d3b0'; c.fillRect(442 + i * 34, 305, 29 * Math.max(0, Math.min(1, game.power - i)), 5);
     }
-    this.uiText('かすり回数', 442, 332, 11, '#a8bfbb');
-    this.uiText(game.graze.toLocaleString(), 607, 332, 13, '#eff0dc', 'right');
-    this.uiText('点アイテム最大値', 442, 354, 10, '#a8bfbb');
-    this.uiText(game.point.toLocaleString(), 607, 354, 12, '#eff0dc', 'right');
     c.strokeStyle = '#405957'; c.beginPath(); c.moveTo(441, 374); c.lineTo(610, 374); c.stroke();
     this.image(game, `${game.player}-face`, 438, 382, 62, 62);
     this.uiText('書いて残す。', 506, 402, 12, '#eadbb9');

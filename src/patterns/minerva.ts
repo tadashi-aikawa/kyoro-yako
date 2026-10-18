@@ -70,6 +70,7 @@ export function updateDawnOwls(game: Game): void {
   for (const owl of game.dawnOwls) {
     owl.age++;
     if (owl.age <= owl.warning) continue;
+    if (owl.age === owl.warning + 1) game.triggerBossCast();
     let dx = owl.targetX - owl.x;
     let dy = owl.targetY - owl.y;
     let distance = Math.hypot(dx, dy);
