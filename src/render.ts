@@ -2,6 +2,7 @@ import { bossSpriteId, createBossMotion, isCasting, updateBossMotion } from './b
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
 import { PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
+import { notebookBomb, notebookBookmark, notebookFeather, notebookOwl, notebookPage, notebookStar } from './notebook-icons';
 import { CHAPPY_PORTS, CHAPPY_THROW, PARALLEL_BEAT } from './patterns/chappy';
 import { claudineScene, complementBoundary, whiteSpaceCircle } from './patterns/claudine';
 import { FINALE_CHARGE, FINALE_CRESCENDO, finaleTime, rosePulse } from './patterns/claudine-finale';
@@ -16,7 +17,7 @@ import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-rin
 import { bogs, enterScene, KEY_ROWS, keyPosition, vimScene } from './patterns/neo';
 import { encoreBogTime } from './patterns/neo-encore';
 import { SWEEP_CHARGE, SWEEP_MOVE, SWEEP_PERIOD, SWEEP_SHOTS, sweepStep, sweepTarget, tags } from './patterns/obsidia';
-import { FIELD, MAX_POWER } from './rules';
+import { FIELD, MAX_BOMBS, MAX_POWER } from './rules';
 import { drawScenery } from './stage-scenery';
 import { NAMES, STAGES } from './stages';
 import { GAME_TITLE, RECORDS } from './story';
@@ -377,7 +378,7 @@ export class Renderer {
     }
     game.enemies.forEach((enemy) => { this.enemy(game, enemy); });
     game.clones.forEach((clone) => { this.clone(clone, game.frame); });
-    game.items.forEach((item) => { this.item(item); });
+    game.items.forEach((item) => { this.item(game, item); });
     this.jinraiSpellTelegraphs(game);
     this.stageTelegraphs(game);
     this.galaxyFlash(game);
@@ -1052,12 +1053,34 @@ export class Renderer {
     c.restore();
   }
 
-  private item(item: Item): void {
-    const c = this.ctx;
-    const colors: Record<Item['kind'], string> = { small: '#f47c86', large: '#fb354b', point: '#59d9fb', bomb: '#78e4a6', life: '#ff92df' };
-    c.save(); c.translate(item.x, item.y); c.fillStyle = colors[item.kind]; c.shadowColor = c.fillStyle; c.shadowBlur = 9;
-    c.beginPath(); c.arc(0, 0, item.kind === 'large' || item.kind === 'life' ? 7 : 5, 0, Math.PI * 2); c.fill();
-    c.shadowBlur = 0; this.text(({ small: 'P', large: 'P', point: '点', bomb: 'B', life: '★' })[item.kind], 0, 0, 8, '#fff', 'center'); c.restore();
+  private item(game: Game, item: Item): void {
+    const image = game.images[`${game.player}-sprite`];
+    const owlReady = image.complete && image.naturalWidth > 0;
+    // 代用絵も保存し、読み込みに失敗してもキャンバスを毎フレーム作らない。
+    const key = item.kind === 'life' ? `item-life-${game.player}-${owlReady ? 'ready' : 'fallback'}` : `item-${item.kind}`;
+    let sprite = this.sprites.get(key);
+    if (!sprite) {
+      sprite = document.createElement('canvas');
+      sprite.width = sprite.height = Math.ceil(32 * this.pixelRatio);
+      const c = sprite.getContext('2d')!;
+      c.setTransform(sprite.width / 32, 0, 0, sprite.height / 32, 0, 0); c.translate(16, 16);
+      // 敵弾の発光・白縁と分け、拾うものは正立・暗い縁に揃える。
+      if (item.kind === 'small' || item.kind === 'large') {
+        c.rotate(-Math.atan2(19, 33));
+        notebookFeather(c, 0, -2, item.kind === 'large' ? 0.5 : 0.3, 1, true);
+      } else if (item.kind === 'bomb') {
+        c.fillStyle = '#14212a'; c.beginPath(); c.arc(0, 0, 8.5, 0, Math.PI * 2); c.fill();
+        notebookBomb(c, 0, 0, 7);
+      } else if (item.kind === 'point') {
+        notebookBookmark(c, 0, 0, 9, 14, '#81d7f4'); c.strokeStyle = '#162838'; c.lineWidth = 1.5; c.stroke();
+      } else {
+        c.fillStyle = '#14212a'; c.strokeStyle = '#ff92df'; c.lineWidth = 1.4;
+        c.beginPath(); c.arc(0, 0, 10, 0, Math.PI * 2); c.fill(); c.stroke();
+        notebookOwl(c, image, 0, 0, 17);
+      }
+      this.sprites.set(key, sprite);
+    }
+    this.ctx.drawImage(sprite, item.x - 16, item.y - 16, 32, 32);
   }
 
   private player(game: Game): void {
@@ -1165,43 +1188,60 @@ export class Renderer {
 
   private drawPanel(game: Game): void {
     const c = this.ctx;
-    this.card(426, 16, 199, 448, '#141d2a', '#4a5c5c');
-    this.uiText('owlery', 441, 37, 11, '#9ebcad');
-    this.uiText('みみこの冒険ノート', 441, 57, 15, '#f3e5c4');
+    c.save();
+    const rule = (y: number, alpha = 0.25) => {
+      c.strokeStyle = `rgba(184,197,180,${alpha})`; c.lineWidth = 0.6;
+      c.beginPath(); c.moveTo(448, y); c.lineTo(608, y); c.stroke();
+    };
+    const wash = c.createLinearGradient(426, 16, 626, 464);
+    wash.addColorStop(0, '#20383a'); wash.addColorStop(0.6, '#142329'); wash.addColorStop(1, '#1c2b30');
+    c.fillStyle = '#0b141d'; c.fillRect(426, 16, 199, 448);
+    c.fillStyle = wash; c.fillRect(430, 19, 192, 441);
+    c.strokeStyle = '#526c66'; c.lineWidth = 1; c.strokeRect(430.5, 19.5, 191, 440);
+    c.strokeStyle = '#314b4b'; c.beginPath(); c.moveTo(441, 23); c.lineTo(441, 456); c.stroke();
+    for (let y = 45; y < 458; y += 33) {
+      c.fillStyle = '#09171e'; c.beginPath(); c.ellipse(434, y, 2, 3.5, 0, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = '#a4ac91'; c.lineWidth = 1.6; c.beginPath(); c.ellipse(431, y - 1, 5, 2.8, -0.16, Math.PI * 0.2, Math.PI * 1.85); c.stroke();
+    }
+    for (let y = 138; y <= 374; y += 19) rule(y, 0.07);
+    notebookBookmark(c, 598, 34, 12, 30, '#9b697a');
+    this.uiText('owlery', 448, 38, 10, '#a1b6ad');
+    this.text('みみこの冒険ノート', 448, 59, 13, '#f0dfbb');
     for (let i = 0; i < STAGES.length; i++) {
-      const x = 449 + i * 36; const current = i === game.stage - 1;
+      const x = 456 + i * 34; const current = i === game.stage - 1;
       if (i < STAGES.length - 1) {
-        c.strokeStyle = i < game.stage - 1 ? '#90b3a2' : '#36494d';
-        c.beginPath(); c.moveTo(x + 8, 86); c.lineTo(x + 28, 86); c.stroke();
+        c.strokeStyle = i < game.stage - 1 ? '#9ca891' : '#3b5159'; c.lineWidth = 0.6;
+        c.beginPath(); c.moveTo(x + 8, 87); c.lineTo(x + 26, 87); c.stroke();
       }
-      c.fillStyle = current ? '#e8d49f' : i < game.stage - 1 ? '#739a8b' : '#263941';
-      c.beginPath(); c.arc(x, 86, current ? 9 : 6, 0, Math.PI * 2); c.fill();
-      this.uiText(String(i + 1), x, 86, 9, current ? '#263c35' : '#c4d4c9', 'center');
+      notebookStar(c, x, 87, current ? 8 : 5, current ? '#f1dda9' : i < game.stage - 1 ? '#a1bda8' : '#536579');
     }
     const room = STAGES[game.stage - 1].title.split(' 〜 ')[0];
-    this.uiText(room, 525, 110, 11, '#a9c5b7', 'center');
-    this.card(437, 129, 177, 84, '#202d37', '#3a4f54');
-    this.uiText('今回のスコア', 449, 146, 10, '#afc7bd');
-    this.uiText(game.score.toLocaleString(), 602, 172, 25, '#fff1ce', 'right', 153);
-    this.uiText('最高記録', 449, 199, 9, '#a0adad');
-    this.uiText(game.highScore.toLocaleString(), 602, 199, 11, '#c2d4c9', 'right', 105);
-    this.card(437, 223, 85, 48, '#242a39', '#414756');
-    this.card(529, 223, 85, 48, '#203532', '#3d5950');
-    this.uiText('残り回数', 449, 237, 10, '#d2c5d8');
-    this.uiText(String(Math.max(0, game.lives + 1)), 510, 257, 20, '#ead4e1', 'right');
-    this.uiText('ボム', 541, 237, 10, '#b4d9c5');
-    this.uiText(String(game.bombs), 602, 257, 20, '#cfefd8', 'right');
-    this.uiText('ショット強度', 442, 291, 11, '#b8c8c3');
-    this.uiText(`${game.power.toFixed(2)} / ${MAX_POWER}`, 607, 291, 11, '#f1e7cc', 'right');
+    this.uiText(room, 528, 111, 10, '#a1b6ad', 'center');
+    rule(126, 0.3);
+    this.uiText('今回のスコア', 448, 143, 9, '#a1b6ad');
+    this.uiText(game.score.toLocaleString(), 608, 166, 22, '#f0e1bf', 'right', 160);
+    this.uiText('最高記録', 448, 191, 9, '#a1b6ad');
+    this.uiText(game.highScore.toLocaleString(), 608, 191, 10, '#bdccc5', 'right', 106);
+    rule(206, 0.3);
+    this.uiText('残り回数', 448, 221, 10, '#dfc4d4');
+    const lives = Math.max(0, game.lives + 1);
+    if (!lives) this.uiText('0', 456, 242, 15, '#a0afaa');
+    // 7→8→9回のエクステンドでも絵の数が減らないよう、最初から7個で打ち止める。
+    for (let i = 0; i < Math.min(7, lives); i++) notebookOwl(c, game.images[`${game.player}-sprite`], 457.5 + i * 20, 240.5, 19);
+    if (lives > 7) this.uiText(`+${lives - 7}`, 608, 241, 11, '#e8ccda', 'right', 17);
+    this.uiText('ボム', 448, 269, 10, '#bfdcbf');
+    for (let i = 0; i < MAX_BOMBS; i++) notebookBomb(c, 456 + i * 20, 289, 7, i < game.bombs);
+    this.uiText('ショット強度', 448, 322, 10, '#c2d0c8');
+    this.uiText(game.power >= MAX_POWER ? 'MAX' : `${game.power.toFixed(2)} / ${MAX_POWER}`, 608, 322, 10, '#efdfb9', 'right');
     for (let i = 0; i < MAX_POWER; i++) {
-      c.fillStyle = '#2a3d42'; c.fillRect(442 + i * 34, 305, 29, 5);
-      c.fillStyle = '#b8d3b0'; c.fillRect(442 + i * 34, 305, 29 * Math.max(0, Math.min(1, game.power - i)), 5);
+      notebookFeather(c, 462 + i * 32, 350, 0.66, Math.max(0, Math.min(1, game.power - i)));
     }
-    c.strokeStyle = '#405957'; c.beginPath(); c.moveTo(441, 374); c.lineTo(610, 374); c.stroke();
-    this.image(game, `${game.player}-face`, 438, 382, 62, 62);
-    this.uiText('書いて残す。', 506, 402, 12, '#eadbb9');
-    this.uiText(`集めた記録 ${game.collectedRecords.length} / 5`, 506, 424, 10, '#a9bfb8');
-    this.uiText('みんなのことも。', 506, 440, 10, '#a9bfb8');
+    rule(382, 0.3);
+    this.image(game, `${game.player}-face`, 444, 390, 52, 52);
+    this.text('集めた記録', 504, 401, 11, '#d9c5a0');
+    for (let i = 0; i < RECORDS.length; i++) notebookPage(c, 512 + i * 21, 424, i < game.collectedRecords.length);
+    this.uiText(`${game.collectedRecords.length} / ${RECORDS.length}`, 608, 448, 9, '#a1b6ad', 'right');
+    c.restore();
   }
 
   private drawDialogue(game: Game): void {
