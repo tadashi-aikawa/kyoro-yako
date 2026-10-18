@@ -11,9 +11,22 @@ export const PRAYER_PERIOD = 360;
 export const PRAYER_CHARGE = 72;
 export const PRAYER_FIRE = 180;
 export const INTERVIEW_PERIOD = [330, 300, 270, 240] as const;
-export const INTERVIEW_SPEED = [0.38, 0.46, 0.54, 0.62] as const;
+export const INTERVIEW_SPEED = [0.5, 0.6, 0.7, 0.8] as const;
 export const INTERVIEW_SPIN = [0.001, 0.0012, 0.0014, 0.0016] as const;
 const INTERVIEW_GAP = [0.62, 0.54, 0.46, 0.4] as const;
+const INTERVIEW_STOPS = [[192, 132], [272, 104], [136, 182], [256, 164], [112, 102], [218, 82]] as const;
+
+export function interviewPosition(frame: number, level: number): [number, number] {
+  const t = Math.max(0, frame - 105);
+  const period = INTERVIEW_PERIOD[level];
+  const wave = Math.floor(t / period);
+  const from = INTERVIEW_STOPS[wave % INTERVIEW_STOPS.length];
+  const to = INTERVIEW_STOPS[(wave + 1) % INTERVIEW_STOPS.length];
+  // 発射の前後だけ一拍止まり、次の発射までに自機と無関係な観測点へ移る。
+  const progress = Math.max(0, Math.min(1, (t % period - 18) / (period - 36)));
+  const ease = progress * progress * (3 - 2 * progress);
+  return [from[0] + (to[0] - from[0]) * ease, from[1] + (to[1] - from[1]) * ease];
+}
 export function dawnPrayerStep(frame: number): number { return frame < 1800 ? -1 : (frame - 1800) % PRAYER_PERIOD; }
 export function dawnPosition(frame: number): [number, number] {
   const usual: [number, number] = [192 + Math.sin(frame * 0.012) * 42, 132 + Math.sin(frame * 0.018) * 4];
@@ -164,7 +177,7 @@ export function emitMinerva(game: Game, pattern: string): void {
     // 数百発を重ねず、描画・更新・当たり判定を輪1本で扱う。
     // 回転の接線速度も低速移動より遅くし、穴を追える余裕を残す。
     game.interviewRings.push({ x, y, radius: 45, speed: INTERVIEW_SPEED[level], gap,
-      opening: INTERVIEW_GAP[level], spin: INTERVIEW_SPIN[level], color: wave % 4, delay: warning, launched: false, grazed: false });
+      opening: INTERVIEW_GAP[level], spin: (wave % 2 ? -1 : 1) * INTERVIEW_SPIN[level], color: wave % 4, delay: warning, launched: false, grazed: false });
   }
   if (pattern === 'owlDawn') {
     // 残り45秒から、背後の上半面へ継続的に撃つ。上端での待機を許さない。

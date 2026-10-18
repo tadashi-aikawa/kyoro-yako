@@ -11,7 +11,7 @@ import { claudineScene, complementBoundary, emitClaudine, whiteSpaceCircle } fro
 import { emitEtokichi } from './patterns/etokichi';
 import { burstPosition, burstVisibility, dashBurstStep, dashPosition, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
 import { jinraiCloneScene } from './patterns/jinrai-clone';
-import { dawnPosition, emitMinerva, eyeX, updateDawnOwls } from './patterns/minerva';
+import { dawnPosition, emitMinerva, eyeX, interviewPosition, updateDawnOwls } from './patterns/minerva';
 import { type InterviewRing, updateInterviewRings } from './patterns/minerva-ring';
 import { emitNeo, inBog } from './patterns/neo';
 import { emitNeoEncore, encoreBogTime } from './patterns/neo-encore';
@@ -648,7 +648,7 @@ export class Game {
     if (this.phase?.pattern === 'sweep') return sweepPosition(this.phaseFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty));
     if (this.stage === 2 && this.phase) return obsidiaPosition(this.phase.pattern, this.phaseFrame, this.bossEntry);
     if (this.phase?.pattern === 'owlDawn') return dawnPosition(this.phaseFrame);
-    if (this.phase?.pattern === 'interview') return [192, 132];
+    if (this.phase?.pattern === 'interview') return interviewPosition(this.phaseFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty));
     if (this.phase?.pattern === 'jinraiClone') {
       const body = jinraiCloneScene(this.phaseFrame, this.phase.duration).bodies[0];
       return [body.x, body.y];

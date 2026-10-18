@@ -78,14 +78,31 @@ it('孫引きは2回だけ二分裂して三代目で止まる', () => {
   expect(game.bullets.objects.filter((b) => b.active && b.motion === 'citation' && b.gridRow === 3)).toHaveLength(0);
 });
 
-it('問いの回廊のミネルヴァは自機の位置によらず中央上で静止する', () => {
-  const game = phase(11);
-  for (const [px, py] of [[192, 132], [192, 398], [25, 35], [359, 340]]) for (let frame = 0; frame < 240; frame++) {
-    game.px = px; game.py = py;
-    game.update();
-    expect(game.bossPosition()).toEqual([192, 132]);
-    for (const ring of game.interviewRings) expect([ring.x, ring.y]).toEqual([192, 132]);
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで発射間に上下左右へ動き、自機には追従せず、出した輪は動かさない', (difficulty) => {
+  const game = phase(11, difficulty); const other = phase(11, difficulty);
+  other.px = 25; other.py = 35;
+  const origins = new Map<object, [number, number]>();
+  const xs: number[] = [], ys: number[] = [];
+  let previous = game.bossXY;
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
+  for (let frame = 0; frame < INTERVIEW_PERIOD[level] * 6 + 104; frame++) {
+    game.update(); other.update();
+    expect(game.bossXY).toEqual(other.bossXY);
+    const [x, y] = game.bossXY; xs.push(x); ys.push(y);
+    expect(Math.hypot(x - previous[0], y - previous[1])).toBeLessThan(2);
+    for (const ring of game.interviewRings) {
+      if (!origins.has(ring)) {
+        expect([ring.x, ring.y]).toEqual(game.bossXY);
+        origins.set(ring, [ring.x, ring.y]);
+      }
+      expect([ring.x, ring.y]).toEqual(origins.get(ring));
+    }
+    const local = (game.phaseFrame - 105) % INTERVIEW_PERIOD[level];
+    if (local === 0 || local === 1) expect(game.bossXY).toEqual(previous);
+    previous = [x, y];
   }
+  expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(150);
+  expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(90);
 });
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊の輪は%sで予告後に拡大しながら穴ごと回転する', (difficulty) => {
@@ -111,6 +128,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで
     expect(game.bullets.count).toBe(0);
     expect(game.interviewRings).toHaveLength(1);
     const ring = game.interviewRings[0];
+    expect(Math.sign(ring.spin)).toBe(wave % 2 ? -1 : 1);
     expect(ring.speed).toBeCloseTo(INTERVIEW_SPEED[level]);
     expect(INTERVIEW_SPEED[level]).toBeLessThan(1.65 / 2);
     centers.push(ring.x + (398 - ring.y) / Math.tan(ring.gap));
