@@ -61,7 +61,7 @@ const MOVEMENTS: Record<string, Movement> = {
   // 強風で左右へ流す花びらは本体を広く振ると画面外へ早く抜ける。中央寄りの弧で弾量を保つ。
   jinraiSakura: curve(52, 8, 780, 'arc'),
   jinraiPetal: curve(54, 22, 840, 'arc'),
-  // ミネルヴァは観測点で一拍置く。専用の追跡と祈りは既存処理に任せる。
+  // ミネルヴァは観測点で一拍置く。回廊の静止と祈りは専用処理に任せる。
   minervaStarFan: patrol([[124, 0], [260, 14]], 96, 136),
   minervaStarRings: curve(80, 16, 660, 'eight'),
   sevenRings: curve(70, 10, 840, 'ellipse'),

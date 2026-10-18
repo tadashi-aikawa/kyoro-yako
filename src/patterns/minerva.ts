@@ -12,6 +12,7 @@ export const PRAYER_CHARGE = 72;
 export const PRAYER_FIRE = 180;
 export const INTERVIEW_PERIOD = [330, 300, 270, 240] as const;
 export const INTERVIEW_SPEED = [0.38, 0.46, 0.54, 0.62] as const;
+export const INTERVIEW_SPIN = [0.001, 0.0012, 0.0014, 0.0016] as const;
 const INTERVIEW_GAP = [0.62, 0.54, 0.46, 0.4] as const;
 export function dawnPrayerStep(frame: number): number { return frame < 1800 ? -1 : (frame - 1800) % PRAYER_PERIOD; }
 export function dawnPosition(frame: number): [number, number] {
@@ -161,8 +162,9 @@ export function emitMinerva(game: Game, pattern: string): void {
     // 下側の画面内へ穴を向ける。輪ごとに左右を変え、下端での撃ち続けを通さない。
     const gap = Math.atan2(420 - y, 192 + Math.sin(wave * 1.05 + 0.6) * 135 - x);
     // 数百発を重ねず、描画・更新・当たり判定を輪1本で扱う。
+    // 回転の接線速度も低速移動より遅くし、穴を追える余裕を残す。
     game.interviewRings.push({ x, y, radius: 45, speed: INTERVIEW_SPEED[level], gap,
-      opening: INTERVIEW_GAP[level], color: wave % 4, delay: warning, launched: false, grazed: false });
+      opening: INTERVIEW_GAP[level], spin: INTERVIEW_SPIN[level], color: wave % 4, delay: warning, launched: false, grazed: false });
   }
   if (pattern === 'owlDawn') {
     // 残り45秒から、背後の上半面へ継続的に撃つ。上端での待機を許さない。

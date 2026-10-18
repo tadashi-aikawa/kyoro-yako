@@ -3,7 +3,7 @@ import { FIELD } from '../rules';
 
 export const INTERVIEW_RING_WIDTH = 6;
 export interface InterviewRing {
-  x: number; y: number; radius: number; speed: number; gap: number; opening: number;
+  x: number; y: number; radius: number; speed: number; gap: number; opening: number; spin: number;
   color: number; delay: number; launched: boolean; grazed: boolean;
 }
 
@@ -24,6 +24,7 @@ export function updateInterviewRings(game: Game): void {
     if (ring.delay > 0) { ring.delay--; continue; }
     if (!ring.launched) { ring.launched = true; game.audio.play('enemyShot'); }
     ring.radius += ring.speed;
+    ring.gap += ring.spin;
     const farthest = Math.hypot(Math.max(ring.x, FIELD.w - ring.x), Math.max(ring.y, FIELD.h - ring.y));
     if (ring.radius > farthest + 25) { game.interviewRings.splice(i, 1); continue; }
     if (game.invulnFrames > 0 || game.invincible || game.pendingHit >= 0) continue;

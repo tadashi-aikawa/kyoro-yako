@@ -78,14 +78,27 @@ it('孫引きは2回だけ二分裂して三代目で止まる', () => {
   expect(game.bullets.objects.filter((b) => b.active && b.motion === 'citation' && b.gridRow === 3)).toHaveLength(0);
 });
 
-it('追うボスは急に自機が近づいても間合いを保つ', () => {
+it('問いの回廊のミネルヴァは自機の位置によらず中央上で静止する', () => {
   const game = phase(11);
-  for (const [px, py] of [[192, 132], [192, 398], [25, 35], [359, 340]]) {
+  for (const [px, py] of [[192, 132], [192, 398], [25, 35], [359, 340]]) for (let frame = 0; frame < 240; frame++) {
     game.px = px; game.py = py;
     game.update();
-    const [x, y] = game.bossPosition();
-    expect(Math.hypot(px - x, py - y)).toBeGreaterThanOrEqual(155);
+    expect(game.bossPosition()).toEqual([192, 132]);
+    for (const ring of game.interviewRings) expect([ring.x, ring.y]).toEqual([192, 132]);
   }
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊の輪は%sで予告後に拡大しながら穴ごと回転する', (difficulty) => {
+  const game = phase(11, difficulty); game.phaseFrame = 105;
+  emitMinerva(game, 'interview');
+  const ring = game.interviewRings[0]; const angle = ring.gap;
+  for (let i = 0; i < MINERVA_WARNING[['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty)]; i++) updateInterviewRings(game);
+  expect(ring.gap).toBe(angle); expect(ring.radius).toBe(45);
+  for (let i = 0; i < 120; i++) updateInterviewRings(game);
+  expect(ring.gap - angle).toBeGreaterThan(0.1);
+  expect(ring.radius).toBeGreaterThan(45);
+  expect(ring.spin * 580).toBeLessThan(1.65);
+  expect(interviewRingDistance(ring, ring.x + Math.cos(ring.gap) * ring.radius, ring.y + Math.sin(ring.gap) * ring.radius)).toBeGreaterThan(10);
 });
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sでも連続した輪に穴が1か所だけあり、次の穴へ低速移動で間に合う', (difficulty) => {

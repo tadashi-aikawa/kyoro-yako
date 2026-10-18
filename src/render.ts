@@ -843,7 +843,6 @@ export class Renderer {
       const [x, y] = game.bossXY;
       c.strokeStyle = '#ffe2bd88'; c.lineWidth = 2; c.setLineDash([6, 7]);
       c.beginPath(); c.arc(x, y, 45, 0, Math.PI * 2); c.stroke(); c.setLineDash([]);
-      c.strokeStyle = '#f9d5e077'; c.beginPath(); c.moveTo(x, y); c.lineTo(game.px, game.py); c.stroke();
     }
     if (pattern === 'owlDawn') {
       const period = DAWN_PERIOD[level];

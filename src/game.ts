@@ -118,8 +118,6 @@ export class Game {
   jinraiBurstFromX = 192;
   jinraiBurstFromY = 132;
   jinraiBurstFlashUntil = 0;
-  minervaX = 192;
-  minervaY = 132;
   jinraiWindDirection = 0;
   readonly audio = new AudioBank();
   readonly bgm: BgmPlayer;
@@ -542,8 +540,6 @@ export class Game {
     this.jinraiBurstFromX = 192;
     this.jinraiBurstFromY = 132;
     this.jinraiBurstFlashUntil = 0;
-    this.minervaX = 192;
-    this.minervaY = 132;
     this.jinraiWindDirection = 0;
     this.bombUsed = false;
     this.hitDuringSpell = false;
@@ -631,7 +627,6 @@ export class Game {
   private updateBoss(): void {
     const phase = this.phase!;
     this.phaseFrame++;
-    if (phase.pattern === 'interview') this.updateMinervaChase();
     if (this.midboss) this.midbossElapsedFrames++;
     if (phase.spell) this.spellBonus = Math.max(0, this.spellBonus - 22);
     if (this.phaseFrame >= 105) this.emitPattern(phase.pattern);
@@ -653,7 +648,7 @@ export class Game {
     if (this.phase?.pattern === 'sweep') return sweepPosition(this.phaseFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty));
     if (this.stage === 2 && this.phase) return obsidiaPosition(this.phase.pattern, this.phaseFrame, this.bossEntry);
     if (this.phase?.pattern === 'owlDawn') return dawnPosition(this.phaseFrame);
-    if (this.phase?.pattern === 'interview') return [this.minervaX, this.minervaY];
+    if (this.phase?.pattern === 'interview') return [192, 132];
     if (this.phase?.pattern === 'jinraiClone') {
       const body = jinraiCloneScene(this.phaseFrame, this.phase.duration).bodies[0];
       return [body.x, body.y];
@@ -672,29 +667,6 @@ export class Game {
   }
 
   get bossXY(): [number, number] { return this.bossPosition(); }
-
-  private updateMinervaChase(): void {
-    const dx = this.px - this.minervaX;
-    const dy = this.py - this.minervaY;
-    const distance = Math.hypot(dx, dy);
-    if (distance > 175) {
-      const step = Math.min(0.9, distance - 175);
-      this.minervaX += dx / distance * step;
-      this.minervaY += dy / distance * step;
-    } else if (distance < 155) {
-      const angle = distance > 0.01 ? Math.atan2(-dy, -dx) : -Math.PI / 2;
-      const candidates = Array.from({ length: 8 }, (_, i) => angle + i * Math.PI / 4);
-      const reachable = candidates.map((a) => ({
-        x: Math.max(25, Math.min(359, this.px + Math.cos(a) * 160)),
-        y: Math.max(35, Math.min(340, this.py + Math.sin(a) * 160)),
-      })).filter((p) => Math.hypot(p.x - this.px, p.y - this.py) >= 155);
-      const nearest = reachable.sort((a, b) =>
-        Math.hypot(a.x - this.minervaX, a.y - this.minervaY) - Math.hypot(b.x - this.minervaX, b.y - this.minervaY))[0];
-      if (nearest) { this.minervaX = nearest.x; this.minervaY = nearest.y; }
-    }
-    this.minervaX = Math.max(25, Math.min(359, this.minervaX));
-    this.minervaY = Math.max(35, Math.min(340, this.minervaY));
-  }
 
   get remainingSpells(): number {
     if (!this.phase) return 0;
