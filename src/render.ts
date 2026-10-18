@@ -22,11 +22,15 @@ export class Renderer {
   private readonly sprites = new Map<string, HTMLCanvasElement>();
   private readonly bossMotion = createBossMotion();
   private readonly titleArt = Object.assign(new Image(), { src: `${import.meta.env.BASE_URL}assets/title/key-visual.webp` });
+  private titleLayer?: HTMLCanvasElement;
+  private pixelRatio = 1;
   constructor(private readonly ctx: CanvasRenderingContext2D) {
     this.setPixelRatio(1);
   }
 
   setPixelRatio(pixelRatio: number): void {
+    this.pixelRatio = pixelRatio;
+    this.titleLayer = undefined;
     this.sprites.clear();
     for (const kind of ['orb', 'needle', 'petal', 'star', 'glyph', 'keycap']) for (let color = 0; color < (kind === 'petal' ? 6 : 4); color++) for (let variant = 0; variant < (kind === 'star' ? 16 : kind === 'glyph' ? 1 + RAIN_GLYPHS.length * RAIN_FONTS.length : 1); variant++) {
       const canvas = document.createElement('canvas'); canvas.width = Math.ceil(28 * pixelRatio); canvas.height = Math.ceil(28 * pixelRatio);
@@ -93,30 +97,10 @@ export class Renderer {
 
   private drawTitle(game: Game): void {
     const c = this.ctx;
-    const art = this.titleArt;
-    if (art.complete && art.naturalWidth) {
-      const scale = Math.max(640 / art.naturalWidth, 480 / art.naturalHeight);
-      const w = art.naturalWidth * scale; const h = art.naturalHeight * scale;
-      c.drawImage(art, (640 - w) / 2, (480 - h) / 2, w, h);
-    }
-    // 題字とメニューの下だけ夜を深くする。
-    const veil = c.createLinearGradient(0, 0, 380, 0);
-    veil.addColorStop(0, 'rgba(5,8,22,0.82)'); veil.addColorStop(0.55, 'rgba(5,8,22,0.45)'); veil.addColorStop(1, 'rgba(5,8,22,0)');
-    c.fillStyle = veil; c.fillRect(0, 0, 380, 480);
+    // 絵と題字は毎フレーム描くとフレームレートが半分に落ちるので、一度だけ描いて使い回す。
+    if (!this.titleLayer) this.titleLayer = this.renderTitleLayer();
+    if (this.titleLayer) c.drawImage(this.titleLayer, 0, 0, 640, 480);
     this.stars(game.frame, 640, 480, 0.16);
-
-    c.save();
-    c.font = '52px "Hiragino Mincho ProN", "Yu Mincho", serif';
-    c.letterSpacing = '8px';
-    c.textAlign = 'left'; c.textBaseline = 'middle';
-    const gold = c.createLinearGradient(0, 86, 0, 138);
-    gold.addColorStop(0, '#fff6dc'); gold.addColorStop(0.55, '#ead39a'); gold.addColorStop(1, '#b8945a');
-    c.shadowColor = 'rgba(240,210,140,0.45)'; c.shadowBlur = 18;
-    c.fillStyle = gold; c.fillText(GAME_TITLE, 50, 112);
-    c.restore();
-    const rule = c.createLinearGradient(52, 0, 270, 0);
-    rule.addColorStop(0, 'rgba(234,211,154,0.7)'); rule.addColorStop(1, 'rgba(234,211,154,0)');
-    c.fillStyle = rule; c.fillRect(52, 150, 218, 1);
 
     const entries = ['はじめる', '練習', '音の設定', '遊び方', '冒険ノート'];
     entries.forEach((label, i) => {
@@ -133,6 +117,36 @@ export class Renderer {
     });
   }
 
+  private renderTitleLayer(): HTMLCanvasElement | undefined {
+    const art = this.titleArt;
+    if (!art.complete || !art.naturalWidth) return undefined;
+    const layer = document.createElement('canvas');
+    layer.width = Math.ceil(640 * this.pixelRatio); layer.height = Math.ceil(480 * this.pixelRatio);
+    const c = layer.getContext('2d')!;
+    c.setTransform(layer.width / 640, 0, 0, layer.height / 480, 0, 0);
+    c.imageSmoothingQuality = 'high';
+    const scale = Math.max(640 / art.naturalWidth, 480 / art.naturalHeight);
+    const w = art.naturalWidth * scale; const h = art.naturalHeight * scale;
+    c.drawImage(art, (640 - w) / 2, (480 - h) / 2, w, h);
+    // 題字とメニューの下だけ夜を深くする。
+    const veil = c.createLinearGradient(0, 0, 380, 0);
+    veil.addColorStop(0, 'rgba(5,8,22,0.82)'); veil.addColorStop(0.55, 'rgba(5,8,22,0.45)'); veil.addColorStop(1, 'rgba(5,8,22,0)');
+    c.fillStyle = veil; c.fillRect(0, 0, 380, 480);
+
+    c.font = '52px "Hiragino Mincho ProN", "Yu Mincho", serif';
+    c.letterSpacing = '8px';
+    c.textAlign = 'left'; c.textBaseline = 'middle';
+    const gold = c.createLinearGradient(0, 86, 0, 138);
+    gold.addColorStop(0, '#fff6dc'); gold.addColorStop(0.55, '#ead39a'); gold.addColorStop(1, '#b8945a');
+    c.shadowColor = 'rgba(240,210,140,0.45)'; c.shadowBlur = 18;
+    c.fillStyle = gold; c.fillText(GAME_TITLE, 50, 112);
+    c.shadowBlur = 0;
+    const rule = c.createLinearGradient(52, 0, 270, 0);
+    rule.addColorStop(0, 'rgba(234,211,154,0.7)'); rule.addColorStop(1, 'rgba(234,211,154,0)');
+    c.fillStyle = rule; c.fillRect(52, 150, 218, 1);
+    return layer;
+  }
+
   private image(game: Game, id: string, x: number, y: number, w: number, h: number, alpha = 1): void {
     const image = game.images[id];
     if (!image?.complete || !image.naturalWidth) return;
@@ -146,6 +160,11 @@ export class Renderer {
 
   private drawMenu(game: Game): void {
     const c = this.ctx;
+    if (game.scene === 'title') {
+      c.fillStyle = '#11192e'; c.fillRect(0, 0, 640, 480);
+      this.drawTitle(game);
+      return;
+    }
     const background = c.createLinearGradient(0, 0, 640, 480);
     background.addColorStop(0, '#101535'); background.addColorStop(0.55, '#292244'); background.addColorStop(1, '#533b57');
     c.fillStyle = background; c.fillRect(0, 0, 640, 480);
@@ -153,11 +172,6 @@ export class Renderer {
     for (let i = 0; i < 6; i++) {
       c.strokeStyle = `rgba(225,206,255,${0.045 + i * 0.012})`;
       c.beginPath(); c.arc(320, 440, 80 + i * 38 + Math.sin(game.frame * 0.01) * 4, 0, Math.PI * 2); c.stroke();
-    }
-    if (game.scene === 'title') {
-      c.fillStyle = '#11192e'; c.fillRect(0, 0, 640, 480);
-      this.drawTitle(game);
-      return;
     }
     if (game.scene === 'notebook') { this.drawNotebook(game); return; }
     if (game.scene === 'difficulty') { this.text('難易度を選択', 320, 86, 30, '#fff2d6', 'center'); this.menuEntries(['Easy', 'Normal', 'Hard', 'Lunatic'], game.menu, 158); }
