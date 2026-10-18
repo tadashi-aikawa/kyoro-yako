@@ -97,7 +97,7 @@ it('ポーズ中は投げた塊の移動と射撃時計が止まる', () => {
   expect([source.age, source.x, source.y, game.phaseFrame]).toEqual(snapshot);
 });
 
-it.each(['normal', 'hard', 'lunatic'] as const)('%sの並列実行は画面下の中央に留まり続けると当たる', (difficulty) => {
+it.each(['normal', 'hard', 'lunatic'] as const)('%sのサブエージェント召喚は画面下の中央に留まり続けると当たる', (difficulty) => {
   const game = start(1, difficulty); game.invulnFrames = 0; game.lives = 8;
   game.px = 192; game.py = 393;
   for (let i = 0; i < 1500 && game.pendingHit < 0 && game.lives === 8; i++) game.update();

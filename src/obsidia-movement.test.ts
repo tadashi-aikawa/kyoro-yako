@@ -58,7 +58,7 @@ it('次の技は直前の位置から宣言中に中央へ戻り、途中の再�
 it('移動した本体から弾が出て、本体位置へのショットが命中する', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   game.startStage(2); game.startBoss(false, 1); game.phaseFrame = 196;
-  game.update(); // Normalの必要ないものは消すは92フレームごとに発射
+  game.update(); // Normalの断捨離は92フレームごとに発射
   const position = game.bossPosition();
   const bullet = game.bullets.objects.find((b) => b.active)!;
   expect(bullet).toBeDefined();
