@@ -3,6 +3,7 @@ import { Game } from './game';
 import { emitBossNormal, normalPeriod } from './patterns/boss-normal';
 import { emitJinraiPattern } from './patterns/jinrai';
 import { CLONE_HOP, CLONE_SHOOT, CLONE_STAGGER, HOP_OUT, jinraiCloneScene } from './patterns/jinrai-clone';
+import { KISS_CHARGE, KISS_FADE, KISS_LIFE, KISS_PERIOD, kissEdgeWarning, updateJinraiHeart } from './patterns/jinrai-kiss';
 import { bulletSpeed } from './rules';
 import { MID_PHASE, STAGES } from './stages';
 
@@ -54,17 +55,107 @@ it('Power 4.00で本体を追いながら撃ち込むと全フェーズを制限
   }
 });
 
-it('手裏剣は壁で一度跳ね返り、反射時に小弾を出す', () => {
+it('宵の誘いは予告のあと1発ずつ送り、画面外の弾も含めて数を制限する', () => {
+  for (const [level, difficulty] of (['easy', 'normal', 'hard', 'lunatic'] as const).entries()) {
+    const game = new Game(); game.audio.volume = 0; game.invincible = true;
+    game.difficulty = difficulty; game.startStage(4); game.startBoss(false, 1);
+    expect(game.phase?.name).toBe('宵の誘い');
+    for (let t = 0; t < KISS_CHARGE; t++) emitJinraiPattern(game, 'jinraiKiss', t);
+    expect(game.bullets.count).toBe(0);
+    for (let t = KISS_CHARGE; t < KISS_PERIOD[level]; t++) emitJinraiPattern(game, 'jinraiKiss', t);
+    const hearts = game.bullets.objects.filter((b) => b.active);
+    expect(hearts).toHaveLength(1);
+    expect(hearts.every((b) => b.kind === 'heart' && b.motion === 'jinraiHeart' && b.color === 3)).toBe(true);
+    hearts[0].x = -80;
+    for (let t = KISS_PERIOD[level]; t < KISS_LIFE * 2; t++) emitJinraiPattern(game, 'jinraiKiss', t);
+    expect(game.bullets.count).toBe(Math.ceil(KISS_LIFE / KISS_PERIOD[level]));
+  }
+});
+
+it('ハートは移動した自機へ旋回し、速度を保つ', () => {
   const game = phase(1);
-  const star = game.bullets.objects.find((b) => b.active && b.motion === 'jinraiBounce');
-  expect(star).toBeDefined();
-  if (!star) return;
-  star.delay = 0; star.x = star.vx < 0 ? 9 : 375;
-  const before = game.bullets.count;
+  for (let i = 0; i < KISS_CHARGE; i++) game.update();
+  const heart = game.bullets.objects.find((b) => b.active && b.motion === 'jinraiHeart')!;
+  expect(heart).toBeDefined();
+  heart.x = 192; heart.y = 150; heart.vx = 0; heart.vy = 1.95;
+  game.px = 320; game.py = 380;
+  for (let i = 0; i < 30; i++) game.update();
+  expect(heart.vx).toBeGreaterThan(0.3);
+  expect(Math.hypot(heart.vx, heart.vy)).toBeCloseTo(1.95);
+  game.px = 30;
+  const vx = heart.vx;
   game.update();
-  expect(star.bounced).toBe(true);
-  expect(game.bullets.count).toBeGreaterThan(before);
-  expect(star.color).toBe(3);
+  expect(heart.vx).toBeLessThan(vx);
+});
+
+it('接近したハートは通り抜け、画面の外へ出ても再び戻ってくる', () => {
+  const game = phase(1);
+  emitJinraiPattern(game, 'jinraiKiss', KISS_CHARGE);
+  const heart = game.bullets.objects.find((b) => b.active)!;
+  heart.x = 192; heart.y = 380; heart.vx = 0; heart.vy = 1.95;
+  game.px = 192; game.py = 398;
+  let outside = false, returned = false;
+  for (let i = 0; i < 300; i++) {
+    game.update();
+    expect(heart.active).toBe(true);
+    expect(heart.motion).toBe('jinraiHeart');
+    if (heart.y > 473) outside = true;
+    if (outside && heart.y < 448) { returned = true; break; }
+  }
+  expect(outside).toBe(true);
+  expect(returned).toBe(true);
+});
+
+it('ハートは最後の1秒だけ無害になり、10秒で光を残して消える', () => {
+  for (const fading of [false, true]) {
+    const game = phase(1);
+    emitJinraiPattern(game, 'jinraiKiss', KISS_CHARGE);
+    const heart = game.bullets.objects.find((b) => b.active)!;
+    heart.x = game.px; heart.y = game.py; heart.vx = 0; heart.vy = 0;
+    heart.age = KISS_LIFE - KISS_FADE - (fading ? 1 : 2);
+    game.invincible = false; game.invulnFrames = 0;
+    game.update();
+    expect(game.pendingHit >= 0).toBe(!fading);
+    heart.age = KISS_LIFE - 1;
+    game.update();
+    expect(heart.active).toBe(false);
+    expect(game.particles.count).toBeGreaterThan(0);
+  }
+});
+
+it('画面外のハートを四辺の印で示し、無害になると印を消す', () => {
+  const game = phase(1);
+  emitJinraiPattern(game, 'jinraiKiss', KISS_CHARGE);
+  const heart = game.bullets.objects.find((b) => b.active)!;
+  for (const [x, y, ex, ey] of [[-80, 200, 10, 200], [460, 200, 374, 200], [192, -80, 192, 10], [192, 560, 192, 438]]) {
+    heart.x = x; heart.y = y;
+    expect(kissEdgeWarning(heart)).toEqual([ex, ey]);
+  }
+  heart.x = 192; heart.y = 398;
+  expect(kissEdgeWarning(heart)).toBeUndefined();
+  heart.y = 530; heart.age = KISS_LIFE - KISS_FADE;
+  expect(kissEdgeWarning(heart)).toBeUndefined();
+});
+
+it('技を倒したときは画面外のハートも画面内の得点アイテムに変える', () => {
+  const game = phase(1);
+  emitJinraiPattern(game, 'jinraiKiss', KISS_CHARGE);
+  const heart = game.bullets.objects.find((b) => b.active)!;
+  heart.x = 192; heart.y = 560;
+  game.skipPhase(); game.update();
+  const points = game.items.objects.filter((item) => item.active && item.kind === 'point');
+  expect(points).toHaveLength(1);
+  expect(points[0].y).toBeLessThan(448);
+});
+
+it('追尾は角度の±π境界でも最短方向へ曲がる', () => {
+  const game = phase(1);
+  emitJinraiPattern(game, 'jinraiKiss', KISS_CHARGE);
+  const heart = game.bullets.objects.find((b) => b.active)!;
+  heart.x = 192; heart.y = 200; heart.vx = -2; heart.vy = 0.001;
+  updateJinraiHeart(heart, 30, 190);
+  expect(heart.vy).toBeLessThan(0);
+  expect(heart.vx).toBeLessThan(-1.99);
 });
 
 it('簪のレーザーは予告中に無害で、その後に回転する', () => {

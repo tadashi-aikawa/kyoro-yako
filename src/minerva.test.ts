@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { dawnPrayerStep, emitMinerva, eyeX, hypothesisBrightness, INTERVIEW_PERIOD, INTERVIEW_SPEED, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE, PRAYER_PERIOD } from './patterns/minerva';
-import { interviewRingDistance, updateInterviewRings } from './patterns/minerva-ring';
+import { interviewRingBlocksShot, interviewRingDistance, updateInterviewRings } from './patterns/minerva-ring';
 import { STAGES } from './stages';
 
 beforeEach(() => {
@@ -114,7 +114,8 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊の輪�
   for (let i = 0; i < 120; i++) updateInterviewRings(game);
   expect(ring.gap - angle).toBeGreaterThan(0.1);
   expect(ring.radius).toBeGreaterThan(45);
-  expect(ring.spin * 580).toBeLessThan(1.65);
+  expect(ring.spin * 580).toBeLessThan(3.65);
+  expect(ring.spin).toBeCloseTo([0.001, 0.0012, 0.0014, 0.0016][['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty)] * 3);
   expect(interviewRingDistance(ring, ring.x + Math.cos(ring.gap) * ring.radius, ring.y + Math.sin(ring.gap) * ring.radius)).toBeGreaterThan(10);
 });
 
@@ -130,7 +131,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで
     const ring = game.interviewRings[0];
     expect(Math.sign(ring.spin)).toBe(wave % 2 ? -1 : 1);
     expect(ring.speed).toBeCloseTo(INTERVIEW_SPEED[level]);
-    expect(INTERVIEW_SPEED[level]).toBeCloseTo([0.5, 0.6, 0.7, 0.8][level] * 3);
+    expect(INTERVIEW_SPEED[level]).toBeCloseTo([0.5, 0.6, 0.7, 0.8][level]);
     centers.push(ring.x + (398 - ring.y) / Math.tan(ring.gap));
     for (let step = 0; step < 360; step++) {
       const angle = ring.gap + step * Math.PI / 180;
@@ -192,6 +193,32 @@ it('輪のかすりは1本につき1回だけ加点し、技の切り替えと�
   game.startBoss(false, 11); game.phaseFrame = 105; emitMinerva(game, 'interview');
   expect(game.interviewRings).toHaveLength(1);
   game.startStage(1); expect(game.interviewRings).toHaveLength(0);
+});
+
+it.each([
+  { gap: 0, delay: 0, launched: true, blocked: true },
+  { gap: Math.PI / 2, delay: 0, launched: true, blocked: false },
+  { gap: 0, delay: 10, launched: false, blocked: false },
+])('回廊のシールドは実体を遮り穴と予告を通す: %j', ({ gap, delay, launched, blocked }) => {
+  const game = phase(11); game.phaseFrame = 104;
+  game.interviewRings.push({ x: 192, y: 132, radius: 100, speed: 0, spin: 0, gap, opening: 0.54, color: 0, delay, launched, grazed: false });
+  const shot = game.shots.acquire()!;
+  // 1フレームで輪を跨いでボスへ届くショットでも、先に輪へ当たる。
+  Object.assign(shot, { x: 192, y: 260, vx: 0, vy: -120, radius: 3, damage: 10, homing: false });
+  const hp = game.phaseHp;
+  game.update();
+  expect(shot.active).toBe(false);
+  expect(game.phaseHp).toBe(hp - (blocked ? 0 : 10));
+});
+
+it('シールドの丸い端をかするショットも止まり、穴の内側のショットは止まらない', () => {
+  const game = phase(11); game.phaseFrame = 105; emitMinerva(game, 'interview');
+  const ring = { ...game.interviewRings[0], x: 0, y: 0, radius: 100, gap: Math.PI / 2, opening: Math.PI / 2, delay: 0, launched: true };
+  expect(interviewRingBlocksShot(ring, 75, 85, 75, 55, 3)).toBe(true);
+  expect(interviewRingBlocksShot(ring, 60, 85, 60, 75, 3)).toBe(false);
+  expect(interviewRingBlocksShot(ring, 0, 110, 0, 90, 3)).toBe(false);
+  expect(interviewRingBlocksShot(ring, -150, 0, 150, 0, 3)).toBe(true);
+  expect(interviewRingBlocksShot(ring, 100, 0, 100, 0, 3)).toBe(true);
 });
 
 it('終符の時間切れ直前も編隊が画面内に残る', () => {

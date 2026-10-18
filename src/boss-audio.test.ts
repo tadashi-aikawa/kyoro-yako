@@ -121,7 +121,8 @@ it('カットインは攻撃開始前に消え、入れ替えたボスに技が�
     for (let i = 0; i < 100; i++) game.update();
     expect(game.cutin).toBe(0);
     expect(game.bullets.count).toBe(0);
-    for (let i = 0; i < 5; i++) game.update();
+    // 宵の誘いはカットイン後にも、手元にハートを灯す18フレームの予告が入る。
+    for (let i = 0; i < 5 + (stage === 4 ? 18 : 0); i++) game.update();
     expect(game.bullets.count, `stage ${stage}`).toBeGreaterThan(0);
   }
 });

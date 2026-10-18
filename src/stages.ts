@@ -58,7 +58,7 @@ export const STAGES: Stage[] = [
     title: '忍び寄る夜桜 〜 Night of the Thunder', boss: 'jinrai', mid: 'jinrai', bgm: 'stage-sakura', colors: ['#101b40', '#5c325e', '#f3a5bd'],
     phases: [
       phase(4, '通常攻撃・忍び足', 'normal', 'jinraiRapidFan'),
-      phase(4, '跳ね返る千本手裏剣', 'spell', 'jinraiBounce'),
+      phase(4, '宵の誘い', 'spell', 'jinraiKiss'),
       phase(4, '通常攻撃・夜風', 'normal', 'jinraiRapidRings'),
       phase(4, '夜桜の簪', 'spell', 'jinraiLaser'),
       phase(4, '通常攻撃・雷待ち', 'normal', 'jinraiRapidFan'),

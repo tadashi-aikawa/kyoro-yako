@@ -54,7 +54,7 @@ const MOVEMENTS: Record<string, Movement> = {
   jinraiRapidFan: patrol([[108, 0], [276, 12]], 84, 46),
   jinraiRapidRings: curve(100, 18, 420, 'arc'),
   jinraiFan: patrol([[128, -16], [256, 6]], 76, 100),
-  jinraiBounce: curve(90, 16, 480, 'arc'),
+  jinraiKiss: curve(90, 16, 480, 'arc'),
   // レーザーの寿命260フレームは静止し、次の発射までの40フレームだけ位置を替える。
   jinraiLaser: patrol([[148, -12], [236, -12]], 40, 260, true),
   jinraiThunder: curve(90, 20, 600, 'eight'),

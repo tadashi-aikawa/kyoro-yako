@@ -7,6 +7,7 @@ import { bowProgress, claudineScene, complementBoundary, FAREWELL_RELEASE, flowe
 import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, GRID_REPLAY_PERIOD, gridLayoutAt, gridPoint, gridRows, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_NAMES, WEATHER_PERIOD, WEATHER_REPLAY_PERIOD, weatherAt } from './patterns/claudine-weather-grid';
 import { BURST_MOVE, BURST_RETURN, BURST_SHOTS, burstVisibility, dashBurstStep } from './patterns/jinrai';
 import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
+import { KISS_CHARGE, KISS_FADE, KISS_ORIGIN, KISS_POSE_END, kissEdgeWarning, kissStep } from './patterns/jinrai-kiss';
 import { DAWN_PERIOD, dawnLane, dawnPrayerStep, eyeX, HYPOTHESIS_COLUMNS, HYPOTHESIS_PERIOD, hypothesisBrightness, hypothesisSide, hypothesisX, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE } from './patterns/minerva';
 import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-ring';
 import { bogs } from './patterns/neo';
@@ -34,7 +35,7 @@ export class Renderer {
     this.pixelRatio = pixelRatio;
     this.titleLayer = undefined;
     this.sprites.clear();
-    for (const kind of ['orb', 'needle', 'petal', 'star', 'glyph', 'keycap']) for (let color = 0; color < (kind === 'petal' ? 6 : 4); color++) for (let variant = 0; variant < (kind === 'star' ? 16 : kind === 'glyph' ? 1 + RAIN_GLYPHS.length * RAIN_FONTS.length : 1); variant++) {
+    for (const kind of ['orb', 'needle', 'petal', 'star', 'heart', 'glyph', 'keycap']) for (let color = 0; color < (kind === 'petal' ? 6 : 4); color++) for (let variant = 0; variant < (kind === 'star' ? 16 : kind === 'glyph' ? 1 + RAIN_GLYPHS.length * RAIN_FONTS.length : 1); variant++) {
       const canvas = document.createElement('canvas'); canvas.width = Math.ceil(28 * pixelRatio); canvas.height = Math.ceil(28 * pixelRatio);
       const c = canvas.getContext('2d')!;
       c.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
@@ -48,6 +49,12 @@ export class Renderer {
       if (kind === 'needle') { c.beginPath(); c.ellipse(0, 0, 2.5, 7, 0, 0, Math.PI * 2); c.fill(); c.stroke(); }
       if (kind === 'petal') { c.rotate(Math.PI / 4); c.beginPath(); c.ellipse(0, 0, 4, 7, 0, 0, Math.PI * 2); c.fill(); }
       if (kind === 'star') { c.beginPath(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; const r = i % 2 ? 3 : 8; if (i === 0) c.moveTo(Math.cos(a) * r, Math.sin(a) * r); else c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); c.fill(); c.stroke(); }
+      if (kind === 'heart') {
+        c.beginPath(); c.moveTo(0, 6);
+        c.bezierCurveTo(-11, -1, -6, -9, 0, -4);
+        c.bezierCurveTo(6, -9, 11, -1, 0, 6);
+        c.closePath(); c.fill(); c.stroke();
+      }
       if (kind === 'glyph') {
         c.font = variant === 0 ? 'bold 13px serif' : RAIN_FONTS[(variant - 1) % RAIN_FONTS.length];
         c.textAlign = 'center'; c.textBaseline = 'middle';
@@ -343,13 +350,16 @@ export class Renderer {
         }
       } else {
         const bow = game.boss === 'claudine' && game.phase.pattern === 'final' ? bowProgress(game.phaseFrame - 105) : 0;
-        const tilt = channeling || seal || sweepCharging ? 0 : Math.cos(game.phaseFrame * 0.012) * 0.045 + bow * 0.08;
+        const kiss = game.phase.pattern === 'jinraiKiss' ? kissStep(game.phaseFrame - 105, game.difficulty) : -1;
+        const kissing = kiss >= 0 && kiss < KISS_POSE_END;
+        const tilt = channeling || seal || sweepCharging || kissing ? 0 : Math.cos(game.phaseFrame * 0.012) * 0.045 + bow * 0.08;
         const pose = updateBossMotion(this.bossMotion, `${game.boss}:${game.phase.name}`, game.frame, x);
         const casting = isCasting(game.phase.kind, game.phaseFrame, game.phase.kind === 'normal' ? normalBeat(game, game.phase.pattern) : 0);
-        const bossSprite = this.readySprite(game, bossSpriteId(game.boss, casting ? 'cast' : pose, game.frame));
+        const spriteId = kissing ? 'jinrai-kiss' : bossSpriteId(game.boss, casting ? 'cast' : pose, game.frame);
+        const bossSprite = this.readySprite(game, spriteId);
         c.save(); c.translate(x, y); c.scale(1 + bow * 0.08, 1 - bow * 0.32); c.translate(-x, -y);
         if (seal) { c.shadowColor = '#ffe591'; c.shadowBlur = 8 + Math.min(20, (burst - BURST_MOVE) * 0.6); }
-        this.fieldCharacter(game, channeling ? 'minerva-prayer' : seal ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || sweepCharging ? 0 : Math.sin(game.frame * 0.045) * 2) + bow * 10, 64, tilt, burstVisibility(burst));
+        this.fieldCharacter(game, channeling ? 'minerva-prayer' : seal ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || sweepCharging || kissing ? 0 : Math.sin(game.frame * 0.045) * 2) + bow * 10, 64, tilt, burstVisibility(burst));
         c.restore();
       }
       c.fillStyle = '#140c27aa'; c.fillRect(15, 6, 350, 13);
@@ -443,18 +453,15 @@ export class Renderer {
         c.restore();
       }
     }
-    if (pattern === 'jinraiBounce' && t >= 0) {
-      const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
-      const cycle = t % [118, 105, 94, 82][level];
-      if (cycle < [43, 36, 30, 25][level]) {
+    if (pattern === 'jinraiKiss' && t >= 0) {
+      const step = kissStep(t, game.difficulty);
+      if (step < KISS_CHARGE) {
         const [x, y] = game.bossXY;
-        c.strokeStyle = '#ffe7a777'; c.lineWidth = 2;
-        for (let i = 0; i < [3, 4, 5, 6][level]; i++) {
-          const vx = (i % 2 ? 1 : -1) * (1.8 + level * 0.16);
-          const vy = 0.9 + Math.floor(i / 2) * 0.25;
-          const travel = (i % 2 ? FIELD.w - 8 - x : x - 8) / Math.abs(vx);
-          c.beginPath(); c.moveTo(x, y); c.lineTo(x + vx * travel, y + vy * travel); c.stroke();
-        }
+        const sprite = this.sprites.get('heart-3-0');
+        const size = 14 + step / KISS_CHARGE * 14;
+        c.save(); c.globalAlpha = 0.35 + step / KISS_CHARGE * 0.65;
+        if (sprite) c.drawImage(sprite, x + KISS_ORIGIN[0] - size / 2, y + KISS_ORIGIN[1] - size / 2, size, size);
+        c.restore();
       }
     }
     if (pattern === 'jinraiDash' && t >= 0) {
@@ -599,6 +606,21 @@ export class Renderer {
   }
 
   private bullet(b: Bullet): void {
+    const edge = kissEdgeWarning(b);
+    if (edge) {
+      // 画面外で向き直るハートを見失わないよう、縁に輪郭だけのハートを出す。
+      const c = this.ctx;
+      c.save(); c.translate(edge[0], edge[1]);
+      c.globalAlpha = 0.65 + Math.sin(b.age * 0.18) * 0.2;
+      c.strokeStyle = '#ffb9d2'; c.lineWidth = 1.4;
+      c.beginPath(); c.moveTo(0, 4);
+      c.bezierCurveTo(-7, -1, -4, -6, 0, -3); c.bezierCurveTo(4, -6, 7, -1, 0, 4);
+      c.closePath(); c.stroke();
+      c.rotate(Math.atan2(FIELD.h / 2 - edge[1], FIELD.w / 2 - edge[0]));
+      c.beginPath(); c.moveTo(10, -3); c.lineTo(13, 0); c.lineTo(10, 3); c.stroke();
+      c.restore();
+      return;
+    }
     if (b.motion === 'bookshelf') {
       const c = this.ctx;
       const left = b.targetX > 0 ? 0 : b.x;
@@ -622,12 +644,15 @@ export class Renderer {
     if (b.motion === 'vanish' && b.age > b.fadeAt - 20 && b.age % 8 < 4) return;
     if (b.motion === 'trim' && b.age > b.fadeAt - 36 && b.age % 8 < 4) return;
     if (b.motion === 'citation' && b.gridRow < 2 && b.age >= b.releaseAt - 24 && b.age % 8 < 4) return;
+    const heartFade = b.motion === 'jinraiHeart' ? Math.max(0, (b.age - b.fadeAt + KISS_FADE) / KISS_FADE) : 0;
+    if (heartFade > 0 && b.age % 10 < 4) return;
     const variant = b.motion === 'typographyRain' ? 1 + b.gridColumn * RAIN_FONTS.length + b.gridRow
       : b.kind === 'star' ? Math.floor(((b.age * 0.045) % (Math.PI * 2)) / (Math.PI * 2) * 16) : 0;
     const sprite = this.sprites.get(`${b.kind}-${b.color}-${variant}`);
     if (sprite) {
       const c = this.ctx;
       if (b.delay > 0) c.globalAlpha = 0.36;
+      if (heartFade > 0) c.globalAlpha = 1 - heartFade;
       if (b.motion === 'typographyRain') {
         const size = b.radius / 3;
         c.save(); c.translate(b.x, b.y); c.rotate(b.rotation);
@@ -636,7 +661,7 @@ export class Renderer {
         c.save(); c.translate(b.x, b.y); c.rotate(b.rotation);
         c.drawImage(sprite, -14, -14, 28, 28); c.restore();
       } else c.drawImage(sprite, b.x - 14, b.y - 14, 28, 28);
-      if (b.delay > 0) c.globalAlpha = 1;
+      if (b.delay > 0 || heartFade > 0) c.globalAlpha = 1;
       if (b.motion === 'vanish') this.text('×', b.x, b.y + 1, 13, '#fff2b8', 'center');
     }
   }

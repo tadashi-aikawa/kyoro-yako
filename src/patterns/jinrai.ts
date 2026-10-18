@@ -3,6 +3,7 @@ import { SAKURA_PERIOD } from '../game';
 import { bulletSpeed, DIFFICULTY, density, FIELD } from '../rules';
 import { emitBossNormal } from './boss-normal';
 import { CLONE_CHARGE, jinraiCloneScene } from './jinrai-clone';
+import { emitJinraiKiss } from './jinrai-kiss';
 
 export const BURST_MOVE = 18;
 export const BURST_SHOTS = [48, 66, 84] as const;
@@ -71,13 +72,8 @@ export function emitJinraiPattern(game: Game, pattern: string, t: number): void 
       }
       return;
     }
-    if (pattern === 'jinraiBounce' && t % [118, 105, 94, 82][level] === 0) {
-      const n = [3, 4, 5, 6][level];
-      for (let i = 0; i < n; i++) {
-        const side = i % 2 ? 1 : -1;
-        const b = game.spawnBullet(x, y, side * (1.8 + level * 0.16), 0.9 + Math.floor(i / 2) * 0.25, 2, 'star');
-        if (b) { b.motion = 'jinraiBounce'; b.radius = 8; b.delay = [43, 36, 30, 25][level]; }
-      }
+    if (pattern === 'jinraiKiss') {
+      emitJinraiKiss(game, t, level);
       return;
     }
     if (pattern === 'jinraiLaser') {
