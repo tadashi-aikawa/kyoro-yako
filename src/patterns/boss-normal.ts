@@ -6,7 +6,7 @@ export function normalPeriod(game: Game, frames: number): number {
 }
 
 const NORMAL_BEATS: Record<string, number> = {
-  neoTripleTap: 106, neoSyncopation: 104, obsidiaShelves: 30, obsidiaIndex: 60, claudinePetalArc: 52, claudineQuietRings: 64,
+  neoTripleTap: 144, neoSyncopation: 152, obsidiaShelves: 30, obsidiaIndex: 60, claudinePetalArc: 52, claudineQuietRings: 64,
   jinraiRapidFan: 84, jinraiRapidRings: 96,
 };
 
@@ -46,17 +46,12 @@ export function emitBossNormal(game: Game, pattern: string, t: number, origin = 
   if (pattern === 'neoTripleTap' || pattern === 'neoSyncopation') {
     const syncopation = pattern === 'neoSyncopation';
     const step = t % beat;
-    const tap = syncopation ? 10 : 8;
-    if (step === 0 || step === tap || step === tap * 2) {
-      const n = count(3, 5);
-      fan(n, (n - 1) * 0.19, speed(1.6), 1, 'needle');
+    if (step === 0) {
+      const n = Math.max(3, count(3, 5) | 1);
+      fan(n, (n - 1) * 0.24, speed(1.35), 1, 'needle');
     }
-    if (Math.floor(t / beat) % 2 === 0 && (step === 42 || step === 56)) {
-      const n = count(12, 15);
-      for (let i = 0; i < n; i++) {
-        const bx = 8 + i * 368 / (n - 1) + (step === 56 ? Math.sin(i * Math.PI / (n - 1)) * 10 : 0);
-        shot(bx, -8, syncopation ? Math.sin(t * 0.015) * 0.18 : 0, speed(1.6), 2, 'star');
-      }
+    if (step === Math.round(beat / 2)) {
+      fan(count(syncopation ? 8 : 7, 11), Math.PI * 0.85, speed(1.2), 2, 'star', Math.PI / 2);
     }
     return;
   }

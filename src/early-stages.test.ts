@@ -57,16 +57,16 @@ it('エトワールの星は予告後に楕円軌道から重力でこぼれる'
   expect(star.vy).toBeGreaterThan(vy);
 });
 
-it('キーバインドは光るキーだけが予告後に落ち、円には切れ目がある', () => {
+it('キーバインドは光るキーだけが予告後に落ち、Vimのキーは予告中に止まる', () => {
   const rain = start(1, 1);
   const keys = rain.bullets.objects.filter((b) => b.active && b.motion === 'keyDrop');
-  expect(keys).toHaveLength(3);
+  expect(keys).toHaveLength(6);
   const y = keys[0].y;
-  for (let i = 0; i < 58; i++) rain.update();
+  for (let i = 0; i < 74; i++) rain.update();
   expect(keys[0].y).toBeGreaterThan(y);
-  const circle = start(1, 3);
-  const caps = circle.bullets.objects.filter((b) => b.active && b.motion === 'keyCircle');
-  expect(caps).toHaveLength(12);
+  const vim = start(1, 3);
+  const caps = vim.bullets.objects.filter((b) => b.active && b.motion === 'vim');
+  expect(caps).toHaveLength(30);
   expect(caps.every((b) => b.delay > 0)).toBe(true);
 });
 
@@ -218,7 +218,7 @@ it('残り10秒で旧弾を消し、1秒の構えから薔薇と自機狙いを�
 it('5面ネオの延長は1面の3つの仕掛けを順に使い、★は1つのまま', () => {
   const game = start(5, 0, true);
   expect(game.remainingSpells).toBe(1);
-  for (const [extension, motion] of ['keyDrop', 'keyCircle', 'normal'].entries()) {
+  for (const [extension, motion] of ['keyDrop', 'vim', 'normal'].entries()) {
     game.encoreCount = extension + 1;
     game.phaseFrame = 104;
     game.bullets.clear();
@@ -260,7 +260,7 @@ it('Easyほど各スペルの予告が長い', () => {
   for (const [stage, phase, motion, mid] of [
     [1, 0, 'etoileOrbit', true],
     [1, 1, 'keyDrop', false],
-    [1, 3, 'keyCircle', false],
+    [1, 3, 'vim', false],
     [1, 6, 'enterLine', false],
     [2, 0, 'bookshelf', true],
     [2, 3, 'linkBeam', false],

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game, type Item } from './game';
-import { STAGES } from './stages';
+import { midPhases, STAGES } from './stages';
 
 const listeners: Record<string, (event: { code: string; repeat: boolean; preventDefault: () => void }) => void> = {};
 beforeEach(() => {
@@ -131,7 +131,7 @@ it('弾消しで点アイテムがプールを埋めても補充品を優先す�
 it('全ステージの戦闘最後に回収時間を設け、拾わなければ補充しない', () => {
   for (let stage = 1; stage <= STAGES.length; stage++) {
     for (const mid of [true, false]) {
-      const game = start(stage, mid ? 0 : STAGES[stage - 1].phases.length - 1, mid);
+      const game = start(stage, mid ? midPhases(STAGES[stage - 1].mid).length - 1 : STAGES[stage - 1].phases.length - 1, mid);
       game.bombs = 0;
       game.power = 3;
       game.px = 12; game.py = 439;

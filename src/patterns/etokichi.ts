@@ -1,5 +1,40 @@
 import type { Game } from '../game';
 
+export interface GalaxyFlash { x: number; y: number; angle: number; age: number; warning: number; width: number; }
+export const GALAXY_PERIOD = 360;
+export const GALAXY_FIRE = 90;
+
+export function emitGalaxyFlash(game: Game, t: number): void {
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
+  if (t % GALAXY_PERIOD !== 0) return;
+  const [x, y] = game.bossPosition();
+  game.galaxyFlash = { x, y, angle: Math.atan2(Math.max(90, game.py - y), game.px - x), age: 0, warning: [108, 90, 76, 64][level], width: [32, 40, 48, 56][level] };
+  game.audio.play('prayerCharge');
+}
+
+export function updateGalaxyFlash(game: Game): void {
+  const beam = game.galaxyFlash;
+  if (!beam) return;
+  beam.age++;
+  if (beam.age > beam.warning + GALAXY_FIRE) { game.galaxyFlash = undefined; return; }
+  if (beam.age <= beam.warning) return;
+  if (beam.age === beam.warning + 1) {
+    game.triggerBossCast(); game.audio.play('laser'); game.flash = 8;
+    const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
+    const count = [10, 14, 18, 22][level];
+    for (let i = 0; i < count; i++) {
+      const a = (i + 0.5) * Math.PI * 2 / count;
+      game.spawnBullet(beam.x, beam.y, Math.cos(a) * (0.85 + level * 0.15), Math.sin(a) * (0.85 + level * 0.15), i % 2 ? 0 : 1, 'star');
+    }
+  }
+  const dx = game.px - beam.x, dy = game.py - beam.y;
+  const along = dx * Math.cos(beam.angle) + dy * Math.sin(beam.angle);
+  const across = Math.abs(dx * Math.sin(beam.angle) - dy * Math.cos(beam.angle));
+  if (along >= 0 && along < 580 && across < beam.width / 2 + 2.5 && game.invulnFrames <= 0 && !game.invincible && game.pendingHit < 0) {
+    game.pendingHit = 0; game.hitDuringSpell = true;
+  }
+}
+
 export function emitEtokichi(game: Game, t: number): void {
   if (t % 390 !== 0) return;
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);

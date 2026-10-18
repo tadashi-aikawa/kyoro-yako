@@ -100,6 +100,7 @@ pnpm exec vite preview --base=/kyoro-yako/ --host 127.0.0.1 --port 5198
 
 - `?stage=1`：指定ステージの道中から開始。値は1〜5。
 - `?boss=2&phase=1`：指定ボスのフェーズから開始。値は1〜5。フェーズは0始まり。
+- `?boss=1&mid=1&phase=1`：中ボスの指定フェーズから開始。この例はエトキチギャラクシーフラッシュ。
 - `?player=mimiko&difficulty=hard`：自機と難易度を指定。自機は`mimiko`のみ。難易度は`easy`、`normal`、`hard`、`lunatic`。
 - `?invincible=1`：無敵。
 - `?autoshot=1`：ショットを常時発射。

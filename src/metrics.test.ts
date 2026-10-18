@@ -81,8 +81,11 @@ it('全5面に10種の編隊が登場し、上部の滞在と道中の密度を�
         boss.update();
         if (frame > 400 && frame % 60 === 0) bossCounts.push(bossMetric(boss));
       }
-      const margin = stage === 1 && phase === 2 ? 1.05 : 1;
-      expect(average(bossCounts), `stage ${stage} phase ${phase}: 通常攻撃は道中の1.1倍以上、ネオ通常2は下限に5%以上の余裕`).toBeGreaterThanOrEqual(average(earlyCounts) * 1.1 * margin);
+      if (stage === 1) {
+        // 1面の通常攻撃は回避を覚える休息区間。道中より密度を上げる旧基準から除く。
+        expect(average(bossCounts)).toBeGreaterThan(10);
+        expect(average(bossCounts)).toBeLessThan(average(earlyCounts));
+      } else expect(average(bossCounts), `stage ${stage} phase ${phase}: 通常攻撃は道中の1.1倍以上`).toBeGreaterThanOrEqual(average(earlyCounts) * 1.1);
     }
     expect(average(counts)).toBeGreaterThan(previousAverage);
     previousAverage = average(counts);

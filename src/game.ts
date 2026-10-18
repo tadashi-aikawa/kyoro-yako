@@ -8,22 +8,22 @@ import { obsidiaPosition } from './obsidia-movement';
 import { emitBossNormal } from './patterns/boss-normal';
 import { emitChappy } from './patterns/chappy';
 import { claudineScene, complementBoundary, emitClaudine, whiteSpaceCircle } from './patterns/claudine';
-import { emitEtokichi } from './patterns/etokichi';
+import { emitEtokichi, emitGalaxyFlash, type GalaxyFlash, updateGalaxyFlash } from './patterns/etokichi';
 import { burstPosition, burstVisibility, dashBurstStep, dashPosition, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
 import { jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_FADE, updateJinraiHeart } from './patterns/jinrai-kiss';
 import { dawnPosition, emitMinerva, eyeX, interviewPosition, updateDawnOwls } from './patterns/minerva';
 import { type InterviewRing, interviewRingBlocksShot, updateInterviewRings } from './patterns/minerva-ring';
-import { emitNeo, inBog } from './patterns/neo';
+import { emitNeo, inBog, updateVimBullet } from './patterns/neo';
 import { emitNeoEncore, encoreBogTime } from './patterns/neo-encore';
 import { emitObsidia, sweepPosition, tags } from './patterns/obsidia';
 import { Pool } from './pool';
 import { autoCollect, bulletContact, bulletSpeed, circlesHit, type Difficulty, deathbomb, density, FIELD, type ItemKind, MAX_BOMBS, MAX_POWER, newExtends, type PlayerId, pointValue, safeLoad, safeSave } from './rules';
-import { type BossId, MID_PHASE, NAMES, type Phase, STAGES } from './stages';
+import { type BossId, midPhases, NAMES, type Phase, STAGES } from './stages';
 import { readRecords } from './story';
 
 export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'stage' | 'dialogue' | 'clear' | 'pause' | 'gameover' | 'ending' | 'credits';
-export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'question' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'citation' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'keyDrop' | 'keyCircle' | 'enterLine' | 'bookshelf' | 'vanish' | 'linkNode' | 'linkBeam' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
+export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'question' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'citation' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'linkNode' | 'linkBeam' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
 export interface JinraiLaser { x: number; y: number; angle: number; age: number; warning: number; life: number; speed: number; }
 export interface JinraiMark { x: number; y: number; age: number; warning: number; }
 export interface DawnOwl { x: number; y: number; targetX: number; targetY: number; age: number; warning: number; color: number; }
@@ -111,6 +111,8 @@ export class Game {
   readonly jinraiMarks: JinraiMark[] = [];
   readonly dawnOwls: DawnOwl[] = [];
   readonly interviewRings: InterviewRing[] = [];
+  galaxyFlash?: GalaxyFlash;
+  keyboardWord = '';
   jinraiDashTick = -1;
   jinraiDashDouble = false;
   jinraiDashCrossing = -1;
@@ -198,7 +200,7 @@ export class Game {
     const stage = Number(this.params.get('stage'));
     if (Number.isInteger(boss) && boss >= 1 && boss <= STAGES.length) {
       this.startStage(boss);
-      this.startBoss(false, Math.max(0, Math.floor(Number(this.params.get('phase')) || 0)));
+      this.startBoss(this.params.get('mid') === '1', Math.max(0, Math.floor(Number(this.params.get('phase')) || 0)));
       this.messageFrames = 0;
     } else if (Number.isInteger(stage) && stage >= 1 && stage <= STAGES.length) {
       this.startStage(stage);
@@ -533,13 +535,15 @@ export class Game {
     this.collectionFrames = 0;
     this.midboss = mid;
     this.boss = mid ? STAGES[this.stage - 1].mid : STAGES[this.stage - 1].boss;
-    this.phaseIndex = mid ? 0 : Math.max(0, Math.min(index, STAGES[this.stage - 1].phases.length - 1));
-    this.beginPhase(mid ? MID_PHASE[this.boss] : STAGES[this.stage - 1].phases[this.phaseIndex]);
+    const phases = mid ? midPhases(this.boss) : STAGES[this.stage - 1].phases;
+    this.phaseIndex = Math.max(0, Math.min(index, phases.length - 1));
+    this.beginPhase(phases[this.phaseIndex]);
   }
 
   private beginPhase(phase: Phase): void {
     this.bossEntry = this.phase ? this.bossPosition() : [192, phase.spell ? 132 : 77];
     this.phase = phase;
+    this.keyboardWord = '';
     this.phaseFrame = 0;
     this.lastBossShotFrame = -1;
     this.bossCastFrame = -Infinity;
@@ -591,7 +595,7 @@ export class Game {
     });
     this.clearBullets(); this.clones.clear();
     this.flash = 8;
-    const next = this.midboss ? undefined : STAGES[this.stage - 1].phases[this.phaseIndex + 1];
+    const next = (this.midboss ? midPhases(this.boss!) : STAGES[this.stage - 1].phases)[this.phaseIndex + 1];
     if (next) { this.phaseIndex++; this.beginPhase(next); }
     else {
       if (!this.midboss) this.phaseIndex++;
@@ -654,6 +658,7 @@ export class Game {
     if (phase.spell) this.spellBonus = Math.max(0, this.spellBonus - 22);
     if (this.phaseFrame >= 105) this.emitPattern(phase.pattern);
     updateJinraiHazards(this);
+    updateGalaxyFlash(this);
     updateDawnOwls(this);
     if (phase.pattern !== 'final' && phase.pattern !== 'owlDawn' && this.phaseHp <= 0) { this.finishPhase(true); return; }
     if (this.phaseFrame >= phase.duration * 60) {
@@ -694,7 +699,7 @@ export class Game {
 
   get remainingSpells(): number {
     if (!this.phase) return 0;
-    return this.midboss ? Number(this.phase.spell) : STAGES[this.stage - 1].phases.slice(this.phaseIndex + 1).filter((phase) => phase.spell).length;
+    return this.midboss ? midPhases(this.boss!).slice(this.phaseIndex).filter((phase) => phase.spell).length : STAGES[this.stage - 1].phases.slice(this.phaseIndex + 1).filter((phase) => phase.spell).length;
   }
 
   bossTargets(): [number, number][] {
@@ -707,6 +712,7 @@ export class Game {
     if (this.phase?.kind === 'normal') emitBossNormal(this, pattern, t);
     else if (pattern.startsWith('jinrai')) emitJinraiPattern(this, pattern, t);
     else if (pattern === 'etoile') emitEtokichi(this, t);
+    else if (pattern === 'galaxyFlash') emitGalaxyFlash(this, t);
     else if (this.stage === 1 && !this.midboss) emitNeo(this, pattern, t);
     else if (this.stage === 2) emitObsidia(this, pattern, t);
     else if (pattern === 'neoEncore') emitNeoEncore(this, t);
@@ -718,6 +724,7 @@ export class Game {
   spawnBullet(x: number, y: number, vx: number, vy: number, color: number, kind: Bullet['kind'] = 'orb'): Bullet | undefined {
     const b = this.bullets.acquire(); if (!b) return undefined;
     Object.assign(b, { x, y, vx, vy, color, kind, radius: kind === 'star' ? 5 : kind === 'needle' ? 3 : 4, grazed: false, age: 0, split: false, delay: 0, fadeAt: 0, motion: 'normal', targetX: 0, targetY: 0, gridColumn: -1, gridRow: -1, dashWave: -1, dashOrder: -1, releaseAt: 0, sway: 0, swayRate: 0, swayPhase: 0, rotation: 0, spin: 0, launchSoundPending: !!(this.phase && this.boss) });
+    b.keyLabel = undefined;
     return b;
   }
 
@@ -729,6 +736,7 @@ export class Game {
   private clearBullets(): void {
     this.bullets.clear();
     this.interviewRings.length = 0;
+    this.galaxyFlash = undefined;
   }
 
   grazeAt(x: number, y: number): void {
@@ -759,6 +767,7 @@ export class Game {
         b.active = false; return;
       }
       if (b.motion === 'jinraiHeart') updateJinraiHeart(b, this.px, this.py);
+      if (b.motion === 'vim') updateVimBullet(b);
       if (b.launchSoundPending) {
         b.launchSoundPending = false;
         this.triggerBossCast();
@@ -791,14 +800,6 @@ export class Game {
         } else b.color = b.age >= b.releaseAt - [70, 56, 44, 34][['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty)] ? 1 : 2;
       }
       if (b.motion === 'etoileFall') b.vy += 0.012;
-      if (b.motion === 'keyCircle') {
-        if (b.age === b.releaseAt) { b.vx = 0; b.vy = 0; }
-        if (b.age === b.releaseAt + 27) {
-          b.vx = Math.cos(b.swayPhase) * 1.15;
-          b.vy = Math.sin(b.swayPhase) * 1.15;
-          b.motion = 'normal';
-        }
-      }
       if (b.motion === 'bookshelf' && b.age === b.releaseAt) {
         b.vx *= -1;
         const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty);

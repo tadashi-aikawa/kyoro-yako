@@ -1,6 +1,41 @@
-import type { Game } from '../game';
+import type { Bullet, Game } from '../game';
 
 const levelOf = (game: Game) => ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
+export const KEY_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'] as const;
+export const KEY_WORDS = [
+  ['CODE', 'EDIT', 'FILE', 'STAR', 'TYPE', 'VIM', 'OWL'],
+  ['EDITOR', 'CONFIG', 'PLUGIN', 'SCRIPT', 'TYPING', 'INSERT', 'NORMAL', 'SYNTAX', 'OBJECT', 'MODULE', 'BACKUP', 'SEARCH', 'SWITCH'],
+  ['KEYBOARD', 'BACKFIRE', 'DOCUMENT', 'TRIANGLE', 'CHAMPION', 'PAINTBOX'],
+  ['WORKSPACE', 'ALGORITHM', 'COPYRIGHT', 'QUICKSTEP', 'NIGHTMARE'],
+] as const;
+export function keyPosition(row: number, column: number): [number, number] {
+  return [39 + row * 12 + column * 32, 98 + row * 26];
+}
+export const VIM_COMMANDS = ['h', 'j', 'k', 'l', 'dd'] as const;
+export const VIM_PERIOD = 360;
+export const VIM_MOVE = 48;
+export function vimScene(t: number, level: number) {
+  const wave = Math.floor(Math.max(0, t) / VIM_PERIOD);
+  const command = VIM_COMMANDS[wave % VIM_COMMANDS.length];
+  const warning = [96, 78, 64, 52][level];
+  const dx = command === 'h' ? -32 : command === 'l' ? 32 : 0;
+  const dy = command === 'j' ? 34 : command === 'k' ? -34 : 0;
+  return { wave, command, warning, dx, dy, step: Math.max(0, t) % VIM_PERIOD };
+}
+export function updateVimBullet(b: Bullet): void {
+  if (b.age <= b.releaseAt) {
+    const progress = Math.max(0, Math.min(1, (b.age - b.releaseAt + VIM_MOVE) / VIM_MOVE));
+    b.x = b.targetX + b.sway * progress; b.y = b.targetY + b.swayRate * progress;
+  } else { b.motion = 'normal'; b.vy = b.spin; }
+}
+export function enterScene(t: number, level: number) {
+  const period = [260, 240, 220, 200][level];
+  const wave = Math.floor(Math.max(0, t) / period);
+  const spacing = [20, 18, 16, 14][level];
+  const offset = Math.sin(wave * 2.4) * spacing * 0.45;
+  const gapX = [88, 192, 296, 192][wave % 4] + Math.sin(wave * 1.7) * 12;
+  return { wave, period, step: Math.max(0, t) % period, spacing, offset, gapX, gap: [78, 68, 60, 52][level], release: period - 56, y: 112 + wave % 3 * 30 };
+}
 export function bogs(t: number): [number, number, number][] {
   const cycle = Math.floor(Math.max(0, t) / 270);
   const growth = t < 0 ? 1 : Math.min(1, (t % 270 + 1) / 75);
@@ -14,28 +49,28 @@ export function emitNeo(game: Game, pattern: string, t: number): void {
   const level = levelOf(game);
   const [x, y] = game.bossPosition();
   if (pattern === 'keyRain' && t % [190, 170, 150, 130][level] === 0) {
-    const row = Math.floor(t / [190, 170, 150, 130][level]) % 3;
-    const columns = [9, 10, 11, 12][level];
-    const selected = [2, 3, 4, 5][level];
-    const base = Math.floor(t / [190, 170, 150, 130][level]) * 3;
-    for (let i = 0; i < selected; i++) {
-      const column = (base + i * 3) % columns;
-      const bx = 34 + column * 316 / (columns - 1);
-      const b = game.spawnBullet(bx, 56 + row * 25, 0, [0.92, 1.05, 1.18, 1.32][level], 2, 'keycap');
-      if (b) { b.motion = 'keyDrop'; b.delay = [72, 58, 46, 36][level]; b.radius = 6; }
+    const words = KEY_WORDS[level].filter((word) => word !== game.keyboardWord);
+    game.keyboardWord = words[Math.floor(Math.random() * words.length)];
+    for (const letter of game.keyboardWord) {
+      const row = KEY_ROWS.findIndex((keys) => keys.includes(letter));
+      const column = KEY_ROWS[row].indexOf(letter);
+      const [bx, by] = keyPosition(row, column);
+      const b = game.spawnBullet(bx, by, 0, [1.15, 1.35, 1.55, 1.75][level], 2, 'keycap');
+      if (b) { b.motion = 'keyDrop'; b.delay = [90, 74, 60, 48][level]; b.radius = 6; b.keyLabel = letter; }
     }
   }
-  if (pattern === 'keyInvite' && t % [230, 205, 185, 165][level] === 0) {
-    const count = [11, 14, 17, 20][level];
-    const cx = Math.max(86, Math.min(298, game.px));
-    const cy = Math.max(86, Math.min(362, game.py));
-    const gap = Math.floor(((Math.atan2(game.py - cy, game.px - cx) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2) * count);
-    const warning = [85, 70, 55, 44][level];
-    for (let i = 0; i < count; i++) {
-      if ((i - gap + count) % count < 2) continue;
-      const a = i * Math.PI * 2 / count;
-      const b = game.spawnBullet(cx + Math.cos(a) * 82, cy + Math.sin(a) * 82, -Math.cos(a) * [0.34, 0.42, 0.50, 0.58][level], -Math.sin(a) * [0.34, 0.42, 0.50, 0.58][level], 1, 'keycap');
-      if (b) { b.motion = 'keyCircle'; b.delay = warning; b.releaseAt = warning + 24; b.targetX = cx; b.targetY = cy; b.swayPhase = a; b.radius = 5; }
+  if (pattern === 'vim' && t % VIM_PERIOD === 0) {
+    const scene = vimScene(t, level);
+    const gapColumn = [2, 5, 8, 5, 2][scene.wave % 5];
+    for (let row = 0; row < 3; row++) for (let col = 0; col < 11; col++) {
+      if (Math.abs(col - gapColumn) <= (level === 0 ? 1 : 0)) continue;
+      const b = game.spawnBullet(32 + Math.sin(scene.wave * 1.7) * 12 + col * 32, 110 + row * 34, 0, 0, row === 1 ? 1 : 2, 'keycap');
+      if (!b) continue;
+      b.motion = 'vim'; b.keyLabel = scene.command; b.radius = 5;
+      b.delay = scene.warning; b.releaseAt = scene.warning + VIM_MOVE;
+      b.targetX = b.x; b.targetY = b.y; b.sway = scene.dx; b.swayRate = scene.dy;
+      b.spin = [1.05, 1.25, 1.45, 1.65][level]; b.gridRow = row;
+      if (scene.command === 'dd' && row === 1) b.fadeAt = scene.warning;
     }
   }
   if (pattern === 'dotfiles' && t % [64, 54, 46, 40][level] === 0) {
@@ -46,14 +81,14 @@ export function emitNeo(game: Game, pattern: string, t: number): void {
     }
   }
   if (pattern === 'enter') {
-    const period = [175, 155, 140, 125][level];
-    const step = t % period;
-    const total = [13, 15, 17, 19][level];
-    const rate = [7, 6, 5, 4][level];
+    const { step, spacing, offset, gapX, gap, release, y } = enterScene(t, level);
+    const total = Math.floor(368 / spacing) + 1;
+    const rate = [6, 5, 4, 3][level];
     if (step % rate !== 0 || step / rate >= total) return;
-    const row = Math.floor(t / period) % 3;
     const i = Math.floor(step / rate);
-    const b = game.spawnBullet(24 + i * 336 / (total - 1), 112 + row * 42, 0, [1.0, 1.18, 1.34, 1.5][level], 1, 'glyph');
-    if (b) { b.motion = 'enterLine'; b.delay = period - step + [56, 48, 40, 32][level]; b.radius = 4; }
+    const bx = Math.max(7, Math.min(377, 8 + i * spacing + offset));
+    if (Math.abs(bx - gapX) < gap / 2) return;
+    const b = game.spawnBullet(bx, y, 0, [1.2, 1.4, 1.6, 1.8][level], 1, 'glyph');
+    if (b) { b.motion = 'enterLine'; b.delay = release - step; b.radius = 4; }
   }
 }

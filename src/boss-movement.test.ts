@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { hasBossMovement, patternPosition } from './boss-movement';
 import { Game } from './game';
-import { MID_PHASE, STAGES } from './stages';
+import { MID_PHASE, midPhases, STAGES } from './stages';
 
 const SPECIAL = new Set(['sweep', 'jinraiClone', 'jinraiDash', 'interview', 'owlDawn']);
 beforeEach(() => {
@@ -20,14 +20,14 @@ function start(stage: number, index: number, mid = false): Game {
 it('確認済みの2面と専用移動を除く全中ボス・全ボスの技に新しい移動がある', () => {
   for (const [index, stage] of STAGES.entries()) {
     if (index === 1) continue;
-    for (const phase of [MID_PHASE[stage.mid], ...stage.phases]) {
+    for (const phase of [...midPhases(stage.mid), ...stage.phases]) {
       expect(hasBossMovement(phase.pattern), phase.pattern).toBe(!SPECIAL.has(phase.pattern));
     }
   }
 });
 
 it('新しい全軌道は画面上部に収まり、周期をまたいでも位置が飛ばない', () => {
-  for (const phase of [...Object.values(MID_PHASE), ...STAGES.flatMap((stage) => stage.phases)]) {
+  for (const phase of [...STAGES.flatMap((stage) => midPhases(stage.mid)), ...STAGES.flatMap((stage) => stage.phases)]) {
     if (!hasBossMovement(phase.pattern)) continue;
     let previous = patternPosition(phase, 0, [280, 150])!;
     const xs: number[] = [], ys: number[] = [], speeds: number[] = [];

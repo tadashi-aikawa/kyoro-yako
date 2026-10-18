@@ -35,10 +35,11 @@ function curve(width: number, height: number, period: number, shape: 'arc' | 'el
 const MOVEMENTS: Record<string, Movement> = {
   // エトキチはゆっくり止まり、ネオは短い位置替えやショートカットを繰り返す。
   etoile: patrol([[242, -12], [142, -12]], 84, 180),
+  galaxyFlash: patrol([[126, -20], [258, 12], [192, -16]], 84, 276, true),
   neoTripleTap: patrol([[126, 0], [252, 20]], 72, 100),
   neoSyncopation: patrol([[112, 18], [192, -8], [272, 18]], 64, 66),
   keyRain: patrol([[112, -14], [272, -14]], 84, 160),
-  keyInvite: curve(72, 22, 660, 'arc'),
+  vim: patrol([[126, -12], [258, 12]], 84, 180),
   dotfiles: curve(82, 24, 660, 'eight'),
   enter: patrol([[112, -24], [272, -24]], 84, 180),
   neoEncore: patrol([[108, -12], [276, -12], [192, 16]], 96, 160),

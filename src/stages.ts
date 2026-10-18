@@ -21,7 +21,7 @@ export const STAGES: Stage[] = [
       phase(1, '通常攻撃・はじめの一打', 'normal', 'neoTripleTap'),
       phase(1, '全画面キーバインド', 'spell', 'keyRain'),
       phase(1, '通常攻撃・ショートカット', 'normal', 'neoSyncopation'),
-      phase(1, 'このキーボード、いいでしょ！', 'spell', 'keyInvite'),
+      phase(1, 'ノーマルモードから逃がさない', 'spell', 'vim'),
       phase(1, '通常攻撃・次の設定', 'normal', 'neoTripleTap'),
       phase(1, 'dotfilesの沼', 'spell', 'dotfiles'),
       phase(1, 'Enterで一斉送信', 'spell', 'enter'),
@@ -98,6 +98,10 @@ export const MID_PHASE: Record<BossId, Phase> = {
   claudine: phase(3, '整列', 'midboss', 'space'),
   minerva: phase(5, '予備の仮説', 'midboss', 'sevenRings'),
 };
+export const ETOKICHI_FLASH = phase(1, 'エトキチギャラクシーフラッシュ', 'midboss', 'galaxyFlash');
+export function midPhases(boss: BossId): Phase[] {
+  return boss === 'etokichi' ? [MID_PHASE.etokichi, ETOKICHI_FLASH] : [MID_PHASE[boss]];
+}
 export const NAMES: Record<BossId, string> = {
   etokichi: 'エトキチ', neo: 'ネオ', obsidia: 'オブシディア', jinrai: '迅雷', claudine: 'クロディーヌ', chappy: 'チャッピー', minerva: 'ミネルヴァ',
 };

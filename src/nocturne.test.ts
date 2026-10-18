@@ -35,7 +35,7 @@ function clear(g: Game, stage: number): void {
 }
 
 it('中ボスでは記録を獲得せず、ボス後の会話を終えたときに獲得する', () => {
-  const g = game(); g.startStage(1); g.startBoss(true, 0); g.skipPhase();
+  const g = game(); g.startStage(1); g.startBoss(true, 0); g.skipPhase(); g.skipPhase();
   while (g.collectionFrames > 0) g.update();
   for (let i = 0; i < g.lines.length; i++) press(g, 'KeyZ');
   expect(g.collectedRecords).toEqual([]);

@@ -10,7 +10,7 @@ import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_CHARGE, KISS_FADE, KISS_ORIGIN, KISS_POSE_END, kissEdgeWarning, kissStep } from './patterns/jinrai-kiss';
 import { DAWN_PERIOD, dawnLane, dawnPrayerStep, eyeX, HYPOTHESIS_COLUMNS, HYPOTHESIS_PERIOD, hypothesisBrightness, hypothesisSide, hypothesisX, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE } from './patterns/minerva';
 import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-ring';
-import { bogs } from './patterns/neo';
+import { bogs, enterScene, KEY_ROWS, keyPosition, VIM_MOVE, vimScene } from './patterns/neo';
 import { encoreBogTime } from './patterns/neo-encore';
 import { SWEEP_CHARGE, SWEEP_MOVE, SWEEP_PERIOD, SWEEP_SHOTS, sweepStep, sweepTarget, tags } from './patterns/obsidia';
 import { FIELD, MAX_POWER } from './rules';
@@ -324,7 +324,7 @@ export class Renderer {
       if (game.phase.pattern === 'jinraiClone') {
         const scene = jinraiCloneScene(game.phaseFrame, game.phase.duration);
         const performingNinpo = scene.charging || scene.splitting;
-        const casting = isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
+        const casting = !!game.galaxyFlash || isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
         // 跳ぶ分身は元の場所に煙を残し、跳び先へ向けて残像を並べる。
         for (const trail of scene.trails) {
           if (trail.age < 24) this.ninjaSmoke(trail.fromX, trail.fromY, trail.age);
@@ -356,7 +356,7 @@ export class Renderer {
         const kissing = kiss >= 0 && kiss < KISS_POSE_END;
         const tilt = channeling || seal || sweepCharging || kissing || rose >= 0 ? 0 : Math.cos(game.phaseFrame * 0.012) * 0.045;
         const pose = updateBossMotion(this.bossMotion, `${game.boss}:${game.phase.name}`, game.frame, x);
-        const casting = isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
+        const casting = !!game.galaxyFlash || isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
         const spriteId = rose >= FINALE_CHARGE ? 'claudine-finale' : kissing ? 'jinrai-kiss' : bossSpriteId(game.boss, rose >= 0 || casting ? 'cast' : pose, game.frame);
         const bossSprite = this.readySprite(game, spriteId);
         c.save();
@@ -376,6 +376,7 @@ export class Renderer {
     game.items.forEach((item) => { this.item(item); });
     this.jinraiSpellTelegraphs(game);
     this.stageTelegraphs(game);
+    this.galaxyFlash(game);
     this.minervaTelegraphs(game);
     for (const owl of game.dawnOwls) {
       c.save();
@@ -414,6 +415,46 @@ export class Renderer {
     this.focusMarker(game);
     c.restore();
     c.strokeStyle = '#b5a8d4'; c.lineWidth = 2; c.strokeRect(FIELD.x, FIELD.y, FIELD.w, FIELD.h);
+  }
+
+  private galaxyFlash(game: Game): void {
+    const beam = game.galaxyFlash;
+    if (!beam) return;
+    const c = this.ctx;
+    const charging = beam.age <= beam.warning;
+    const progress = Math.min(1, beam.age / beam.warning);
+    const half = beam.width / 2;
+    c.save(); c.translate(beam.x, beam.y); c.rotate(beam.angle);
+    if (charging) {
+      c.fillStyle = '#a98bff16'; c.fillRect(0, -half, 580, beam.width);
+      c.strokeStyle = '#bda7ff'; c.globalAlpha = 0.45 + progress * 0.45; c.lineWidth = 1;
+      for (const side of [-1, 1]) { c.beginPath(); c.moveTo(0, side * half); c.lineTo(580, side * half); c.stroke(); }
+      c.setLineDash([6, 9]); c.beginPath(); c.moveTo(0, 0); c.lineTo(580, 0); c.stroke(); c.setLineDash([]);
+    } else {
+      c.globalAlpha = 0.9 + Math.sin((beam.age - beam.warning) * 0.3) * 0.1;
+      c.shadowColor = '#9b65ff'; c.shadowBlur = 18;
+      c.fillStyle = '#250c48'; c.fillRect(0, -half, 580, beam.width);
+      c.fillStyle = '#9160ef'; c.fillRect(0, -half, 580, beam.width);
+      c.shadowBlur = 0;
+      c.fillStyle = '#66d9f2'; c.fillRect(0, -half * 0.64, 580, beam.width * 0.64);
+      c.fillStyle = '#fcf5ff'; c.fillRect(0, -half * 0.18, 580, beam.width * 0.18);
+      for (let i = 0; i < 24; i++) {
+        const sx = (i * 71 + beam.age * 8) % 580;
+        const sy = Math.sin(i * 3.1 + beam.age * 0.12) * half * 0.8;
+        c.fillStyle = i % 2 ? '#fff0fa' : '#f79cd9'; c.fillRect(sx, sy, 9 + i % 3 * 4, 1.5);
+      }
+    }
+    c.globalAlpha = 0.9; c.strokeStyle = '#84e7ff'; c.lineWidth = 2;
+    c.beginPath(); c.ellipse(0, 0, 18, 30 + progress * 10, game.frame * 0.025, 0, Math.PI * 2); c.stroke();
+    c.strokeStyle = '#e5a3ff'; c.beginPath(); c.ellipse(0, 0, 24, 43, -game.frame * 0.018, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = '#fff5ff'; c.shadowColor = '#a77cff'; c.shadowBlur = 16;
+    c.beginPath(); c.arc(0, 0, charging ? 4 + progress * 9 : 15, 0, Math.PI * 2); c.fill();
+    if (charging) for (let i = 0; i < 15; i++) {
+      const a = i * Math.PI * 2 / 15 + beam.age * 0.04;
+      const r = 80 * (1 - progress) + 17 + i % 3 * 4;
+      c.fillRect(Math.cos(a) * r, Math.sin(a) * r * 0.7, 2, 2);
+    }
+    c.restore();
   }
 
   private magic(x: number, y: number, frame: number, color: string, radius: number, alpha: number): void {
@@ -613,6 +654,15 @@ export class Renderer {
   }
 
   private bullet(b: Bullet): void {
+    if (b.kind === 'keycap' && b.keyLabel) {
+      const c = this.ctx;
+      c.save(); c.globalAlpha = b.delay > 0 ? 0.55 + Math.sin(b.age * 0.13) * 0.2 : 1;
+      c.shadowColor = PALETTE[b.color]; c.shadowBlur = b.delay > 0 ? 5 : 3;
+      c.fillStyle = PALETTE[b.color]; c.strokeStyle = '#fff5db'; c.lineWidth = 1;
+      c.beginPath(); c.roundRect(b.x - 9, b.y - 8, 18, 16, 2); c.fill(); c.stroke();
+      c.shadowBlur = 0; this.text(b.keyLabel, b.x, b.y + 3, b.keyLabel.length > 1 ? 8 : 10, '#221d39', 'center');
+      c.restore(); return;
+    }
     const edge = kissEdgeWarning(b);
     if (edge) {
       // 画面外で向き直るハートを見失わないよう、縁に輪郭だけのハートを出す。
@@ -729,7 +779,7 @@ export class Renderer {
   }
 
   private stageTelegraphs(game: Game): void {
-    const pattern = game.phase?.pattern === 'neoEncore' ? [undefined, 'keyRain', 'keyInvite', 'dotfiles'][game.encoreCount] : claudineScene(game);
+    const pattern = game.phase?.pattern === 'neoEncore' ? [undefined, 'keyRain', 'vim', 'dotfiles'][game.encoreCount] : claudineScene(game);
     if (!pattern) return;
     const c = this.ctx;
     const t = game.phaseFrame - 105;
@@ -737,17 +787,38 @@ export class Renderer {
     const sceneTime = lite ? t % 600 : t;
     c.save();
     if (pattern === 'keyRain') {
-      c.strokeStyle = '#f5db8a66'; c.lineWidth = 1;
-      for (let row = 0; row < 3; row++) for (let col = 0; col < 10; col++) c.strokeRect(25 + col * 35, 47 + row * 25, 27, 19);
+      c.strokeStyle = '#bbaad566'; c.lineWidth = 1;
+      for (const [row, keys] of KEY_ROWS.entries()) for (const [col, label] of [...keys].entries()) {
+        const [x, y] = keyPosition(row, col);
+        c.strokeRect(x - 12, y - 9, 24, 18); this.text(label, x, y + 3, 9, '#bcafd4', 'center');
+      }
+      if (game.keyboardWord && game.bullets.objects.some((b) => b.active && b.motion === 'keyDrop')) {
+        c.font = 'bold 15px ui-monospace, monospace'; c.textAlign = 'center';
+        c.fillStyle = '#fff0b7'; c.fillText(game.keyboardWord, 192, 190);
+      }
     }
-    let circleShown = false;
-    if (pattern === 'keyInvite') game.bullets.forEach((b) => {
-      if (circleShown || b.motion !== 'keyCircle' || b.delay <= 0) return;
-      c.strokeStyle = '#80dfff66'; c.lineWidth = 2;
-      c.beginPath(); c.arc(b.targetX, b.targetY, 82, 0, Math.PI * 2); c.stroke();
-      circleShown = true;
-    });
     const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
+    if (pattern === 'vim' && t >= 0) {
+      const { command, step, warning, dx, dy } = vimScene(t, level);
+      const descriptions = { h: 'h ←', j: 'j ↓', k: 'k ↑', l: 'l →', dd: 'dd' };
+      if (step < warning + VIM_MOVE) {
+        this.text(descriptions[command], 192, 254, 24, '#fff0b7', 'center');
+        this.text('-- NORMAL --', 192, 274, 11, '#bfc9a0', 'center');
+      }
+      if (step < warning) {
+        game.bullets.forEach((b) => {
+          if (b.motion !== 'vim' || b.delay <= 0) return;
+          c.strokeStyle = command === 'dd' && b.gridRow === 1 ? '#ffb6d8' : '#a2d8e866';
+          c.lineWidth = 1;
+          if (command === 'dd' && b.gridRow === 1) {
+            c.beginPath(); c.moveTo(b.x - 9, b.y); c.lineTo(b.x + 9, b.y); c.stroke();
+          } else {
+            c.strokeRect(b.x + dx - 9, b.y + dy - 8, 18, 16);
+            c.beginPath(); c.moveTo(b.x, b.y); c.lineTo(b.x + dx, b.y + dy); c.stroke();
+          }
+        });
+      }
+    }
     if (pattern === 'dotfiles' && t >= -[120, 95, 75, 60][level]) {
       const bogTime = game.phase?.pattern === 'neoEncore' ? encoreBogTime(game) : t;
       for (const [x, y, r] of bogs(bogTime)) {
@@ -756,9 +827,8 @@ export class Renderer {
       }
     }
     if (pattern === 'enter' && t >= 0) {
-      const period = [175, 155, 140, 125][level];
-      const step = t % period;
-      if (step > period - [70, 58, 48, 38][level]) this.text('↵', 364, 112 + Math.floor(t / period) % 3 * 42, 22, '#fff0a0', 'center');
+      const { step, release, y } = enterScene(t, level);
+      if (step < release && step > release - 48) this.text('↵', 365, y - 16, 22, '#fff0a0', 'center');
     }
     if (pattern === 'bookshelf') game.bullets.forEach((b) => {
       if (b.motion !== 'bookshelf' || b.delay <= 0) return;

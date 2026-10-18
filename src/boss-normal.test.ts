@@ -93,16 +93,11 @@ it.each(cases)('$patternの弾は停止・再照準・加速をせず直進す�
   }
 });
 
-it.each([0, 2])('ネオ通常%dは短い3連打を刻み、休符に薄い星格子を置く', (index) => {
+it.each([0, 2])('ネオ通常%dは自機狙いと下向きの扇を交互に撃ち、短い連打を重ねない', (index) => {
   const emitted = waves(start(1, index), 6);
-  const taps = emitted.filter((wave) => wave.bullets.every((b) => b.kind === 'needle'));
-  const grid = emitted.filter((wave) => wave.bullets.every((b) => b.kind === 'star'));
-  expect(taps.length).toBeGreaterThanOrEqual(4);
-  for (let i = 1; i < 3; i++) expect(taps[i].t - taps[i - 1].t).toBeLessThanOrEqual(12);
-  expect(taps[3].t - taps[2].t).toBeGreaterThanOrEqual(24);
-  expect(grid).toHaveLength(2);
-  expect(grid.every((wave) => wave.t > taps[2].t && wave.t < taps[3].t)).toBe(true);
-  expect(grid.flatMap((w) => w.bullets).every((b) => b.x >= 8 && b.x <= 376)).toBe(true);
+  expect(emitted.map((wave) => wave.bullets[0].kind)).toEqual(['needle', 'star', 'needle', 'star', 'needle', 'star']);
+  for (let i = 1; i < emitted.length; i++) expect(emitted[i].t - emitted[i - 1].t).toBeGreaterThanOrEqual(60);
+  expect(emitted.every((wave) => wave.bullets.every((b) => b.x === wave.centerX && b.y === wave.centerY && b.vy > 0))).toBe(true);
 });
 
 it.each([0, 2])('オブシディア通常%dは通れる弾間の横列を左右交互に重ねる', (index) => {
@@ -158,12 +153,29 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('迅雷は高速を維�
   }
 });
 
-it.each(cases.filter(({ stage }) => stage !== 4))('$patternの弾速は全難易度で旧版相当の1.6〜1.7×unitに収まる', ({ stage, index }) => {
+it.each(cases.filter(({ stage }) => stage !== 1 && stage !== 4))('$patternの弾速は全難易度で旧版相当の1.6〜1.7×unitに収まる', ({ stage, index }) => {
   for (const difficulty of ['easy', 'normal', 'hard', 'lunatic'] as const) {
     for (const { bullets } of waves(start(stage, index, difficulty))) for (const b of bullets) {
       expect(velocity(b)).toBeGreaterThanOrEqual(bulletSpeed(difficulty, 1.6) - 0.00001);
       expect(velocity(b)).toBeLessThanOrEqual(bulletSpeed(difficulty, 1.7) + 0.00001);
     }
+  }
+});
+
+it.each([0, 2])('ネオ通常%dは全難易度で1.35×unit以下へ減速する', (index) => {
+  for (const difficulty of ['easy', 'normal', 'hard', 'lunatic'] as const) {
+    for (const { bullets } of waves(start(1, index, difficulty))) for (const b of bullets) {
+      expect(velocity(b)).toBeLessThanOrEqual(bulletSpeed(difficulty, 1.35) + 0.00001);
+    }
+  }
+});
+
+it.each([0, 2])('ネオ通常%dは全難易度で自機を狙う中央の弾を残す', (index) => {
+  for (const difficulty of ['easy', 'normal', 'hard', 'lunatic'] as const) {
+    const game = start(1, index, difficulty); game.px = 280;
+    const { bullets, centerX, centerY } = waves(game, 1)[0];
+    expect(bullets.length % 2).toBe(1);
+    expect(bullets.some((b) => Math.abs(b.vx * (game.py - centerY) - b.vy * (game.px - centerX)) < 0.00001)).toBe(true);
   }
 });
 
@@ -184,7 +196,7 @@ it.each(cases)('$patternはボス至近でも斉射を減らさない', ({ stage
   expect(volleys).toBeGreaterThan(0);
 });
 
-it.each(cases.filter(({ stage }) => stage <= 2))('$patternの上端の列弾は自機の位置によらず画面外から全弾発射する', ({ stage, index }) => {
+it.each(cases.filter(({ stage }) => stage === 2))('$patternの上端の列弾は自機の位置によらず画面外から全弾発射する', ({ stage, index }) => {
   const game = start(stage, index);
   const row = waves(game).find((wave) => wave.bullets.every((b) => b.y === -8))!;
   expect(row).toBeDefined();

@@ -8,7 +8,7 @@ export function encoreBogTime(game: Game): number {
 
 export function emitNeoEncore(game: Game, t: number): void {
   if (game.encoreCount === 1) emitNeo(game, 'keyRain', t);
-  else if (game.encoreCount === 2) emitNeo(game, 'keyInvite', t);
+  else if (game.encoreCount === 2) emitNeo(game, 'vim', t);
   else if (game.encoreCount === 3) emitNeo(game, 'dotfiles', t);
   else if (t % 85 === 0) {
     const [x, y] = game.bossPosition();
