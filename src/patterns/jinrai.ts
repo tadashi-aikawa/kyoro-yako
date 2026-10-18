@@ -48,8 +48,9 @@ export function emitJinraiPattern(game: Game, pattern: string, t: number): void 
         for (const body of scene.bodies) game.spark(body.x, body.y, '#e2c9ff', 18);
       }
       if (game.phaseFrame === scene.chargeStart + CLONE_CHARGE) game.audio.play('ninpo');
-      if (scene.shotFrame >= 0) for (const origin of game.bossTargets()) {
-        emitBossNormal(game, 'jinraiRapidFan', scene.shotFrame, origin);
+      // 跳んでいる分身は撃たない。斉射の拍は全員で共有し、戻った分身は次の斉射から加わる。
+      if (scene.shotFrame >= 0) for (const [index, body] of scene.bodies.entries()) {
+        if (scene.firing[index]) emitBossNormal(game, 'jinraiRapidFan', scene.shotFrame, [body.x, body.y]);
       }
       return;
     }

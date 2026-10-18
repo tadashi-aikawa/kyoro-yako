@@ -6,7 +6,7 @@ import { normalBeat } from './patterns/boss-normal';
 import { bowProgress, claudineScene, complementBoundary, FAREWELL_RELEASE, flowerRadius, whiteSpaceCircle } from './patterns/claudine';
 import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, GRID_REPLAY_PERIOD, gridLayoutAt, gridPoint, gridRows, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_NAMES, WEATHER_PERIOD, WEATHER_REPLAY_PERIOD, weatherAt } from './patterns/claudine-weather-grid';
 import { BURST_MOVE, BURST_RETURN, BURST_SHOTS, burstVisibility, dashBurstStep } from './patterns/jinrai';
-import { jinraiCloneScene } from './patterns/jinrai-clone';
+import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
 import { DAWN_PERIOD, dawnLane, dawnPrayerStep, eyeX, HYPOTHESIS_COLUMNS, HYPOTHESIS_PERIOD, hypothesisBrightness, hypothesisSide, hypothesisX, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE } from './patterns/minerva';
 import { bogs } from './patterns/neo';
 import { encoreBogTime } from './patterns/neo-encore';
@@ -315,6 +315,17 @@ export class Renderer {
       if (game.phase.pattern === 'jinraiClone') {
         const scene = jinraiCloneScene(game.phaseFrame, game.phase.duration);
         const performingNinpo = scene.charging || scene.splitting;
+        // 跳ぶ分身は元の場所に煙を残し、跳び先へ向けて残像を並べる。
+        for (const trail of scene.trails) {
+          if (trail.age < 24) this.ninjaSmoke(trail.fromX, trail.fromY, trail.age);
+          const sprite = this.readySprite(game, bossSpriteId(game.boss, trail.toX < trail.fromX ? 'left' : 'right', game.frame));
+          for (let i = 1; i <= 3; i++) {
+            if (trail.age < i * 2) continue;
+            const p = i / 4;
+            const fade = (1 - trail.age / HOP_SHOWN) * (0.2 + p * 0.25);
+            this.fieldCharacter(game, sprite, trail.fromX + (trail.toX - trail.fromX) * p, trail.fromY + (trail.toY - trail.fromY) * p, 64, 0, fade);
+          }
+        }
         for (const [index, body] of scene.bodies.entries()) {
           if (body.opacity <= 0) continue;
           c.save(); c.globalAlpha = body.opacity;

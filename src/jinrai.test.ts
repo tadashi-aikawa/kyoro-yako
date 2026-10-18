@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { emitBossNormal, normalPeriod } from './patterns/boss-normal';
 import { emitJinraiPattern } from './patterns/jinrai';
-import { jinraiCloneScene } from './patterns/jinrai-clone';
+import { CLONE_HOP, CLONE_SHOOT, CLONE_STAGGER, HOP_OUT, jinraiCloneScene } from './patterns/jinrai-clone';
 import { bulletSpeed } from './rules';
 import { MID_PHASE, STAGES } from './stages';
 
@@ -373,16 +373,54 @@ it('花影は単身で5秒撃ち、印を結んで溜めたあと2秒かけて�
 
 it('花影は残り30秒で二身の射撃を止め、再び溜めてから三身になる', () => {
   const game = phase(8); game.phaseFrame = 1799; game.update();
-  expect(game.bossTargets()).toEqual([[116, 142], [268, 142]]);
+  expect(game.bossTargets()).toEqual([[92, 100], [292, 100]]);
   expect(jinraiCloneScene(1800).charging).toBe(true);
   expect(game.bullets.count).toBe(0);
   for (let frame = 1801; frame < 2010; frame++) {
     game.update(); expect(game.bullets.count).toBe(0);
   }
-  expect(jinraiCloneScene(1950).bodies).toEqual([{ x: 101, y: 142, opacity: 1 }, { x: 192, y: 124, opacity: 0.5 }, { x: 283, y: 142, opacity: 1 }]);
+  expect(jinraiCloneScene(1950).bodies).toEqual([{ x: 89, y: 121, opacity: 1 }, { x: 192, y: 124, opacity: 0.5 }, { x: 295, y: 121, opacity: 1 }]);
   game.update();
   expect(game.bossTargets()).toEqual([[86, 142], [192, 124], [298, 142]]);
   expect(game.bullets.count).toBe(42);
+});
+
+it('花影の分身は4秒撃つごとに残像を残して跳び、少しずつずれて全員が撃たない間を作る', () => {
+  for (const [shotStart, count] of [[615, 2], [2010, 3]] as const) {
+    const before = jinraiCloneScene(shotStart + CLONE_SHOOT - 1);
+    expect(before.firing).toEqual(Array(count).fill(true));
+    // 跳び始めは分身ごとにずれる。
+    const starts = before.bodies.map((_, index) => {
+      let frame = shotStart;
+      while (jinraiCloneScene(frame).firing[index]) frame++;
+      return frame;
+    });
+    expect(starts).toEqual(Array.from({ length: count }, (_, index) => shotStart + CLONE_SHOOT + index * CLONE_STAGGER));
+    const hop = jinraiCloneScene(starts[0] + HOP_OUT);
+    expect(hop.bodies[0].opacity).toBe(0);
+    expect(hop.trails[0]).toMatchObject({ fromX: before.bodies[0].x, fromY: before.bodies[0].y });
+    expect([hop.bodies[0].x, hop.bodies[0].y]).not.toEqual([before.bodies[0].x, before.bodies[0].y]);
+    let quiet = 0;
+    for (let frame = starts[0]; frame < starts[0] + CLONE_HOP + count * CLONE_STAGGER; frame++) if (!jinraiCloneScene(frame).firing.some(Boolean)) quiet++;
+    expect(quiet).toBe(CLONE_HOP - (count - 1) * CLONE_STAGGER);
+    const back = jinraiCloneScene(starts[count - 1] + CLONE_HOP);
+    expect(back.firing).toEqual(Array(count).fill(true));
+    expect(back.bodies.every((body) => body.opacity === 1)).toBe(true);
+  }
+});
+
+it('花影で跳んでいる分身は撃たず、残る分身だけが撃つ', () => {
+  const game = phase(8);
+  const start = 615 + CLONE_SHOOT;
+  let volleys = 0;
+  for (let frame = start; frame < start + CLONE_STAGGER; frame++) {
+    game.phaseFrame = frame;
+    game.bullets.clear(); emitJinraiPattern(game, 'jinraiClone', frame - 615);
+    const shots = game.bullets.objects.filter((b) => b.active);
+    if (shots.length) volleys++;
+    expect(shots.every((b) => b.x === 268 && b.y === 142)).toBe(true);
+  }
+  expect(volleys).toBeGreaterThan(0);
 });
 
 it('二身で祈っている間も両方への命中を受け付ける', () => {
