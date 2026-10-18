@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { type Bullet, Game } from './game';
-import { STAR_FLIGHT_PERIOD, STAR_FLIGHT_STAGGER, STAR_FLIGHT_TIME, STAR_TRAIL_WARNING, starFlightPoint } from './patterns/minerva-flight';
+import { STAR_FLIGHT_PERIOD, STAR_FLIGHT_TIME, STAR_TRAIL_WARNING, starFlightPoint } from './patterns/minerva-flight';
 import { bulletContact, FIELD } from './rules';
 
 const levels = ['easy', 'normal', 'hard', 'lunatic'] as const;
@@ -66,17 +66,42 @@ it('次の飛行が始まっても、画面内の前の周期の羽は残る', (
   expect(previous.some((b) => b.active && b.motion === 'starTrail' && b.age > 1)).toBe(true);
 });
 
-it('後半の次の旋回から2羽が手元を出て、24フレームずらして異なる道を飛ぶ', () => {
+it('最初15秒は1羽で、残り45秒ちょうどに2羽が手元を出て異なる道を飛ぶ', () => {
   const game = flight();
-  while (game.phaseFrame < 1800) game.update();
-  expect(of(game, 'starOwl').every((b) => b.gridColumn === 0)).toBe(true);
-  while (game.phaseFrame < 2025 + STAR_FLIGHT_STAGGER - 1) game.update();
-  expect(of(game, 'starOwl')).toHaveLength(1); game.update();
+  while (game.phaseFrame < 899) {
+    game.update();
+    expect(of(game, 'starOwl').length).toBeLessThanOrEqual(1);
+    expect(of(game, 'starOwl').every((b) => b.gridColumn === 0)).toBe(true);
+  }
+  const feathers = of(game, 'starTrail'); game.update();
   const owls = of(game, 'starOwl'); expect(owls).toHaveLength(2);
-  const [x, y] = game.bossPosition(); expect([owls[1].x, owls[1].y]).toEqual([x + 16, y - 6]);
+  const [x, y] = game.bossPosition();
+  for (const owl of owls) expect([owl.x, owl.y]).toEqual([x + 16, y - 6]);
   expect(owls[1].sway).toBe(-owls[0].sway);
-  while (game.phaseFrame < 2025 + STAR_FLIGHT_PERIOD - 1) game.update();
-  expect(of(game, 'starOwl')).toHaveLength(0); expect(of(game, 'starTrail').length).toBeGreaterThan(0);
+  expect(feathers.some((b) => b.active && b.age > 1)).toBe(true);
+  game.update(); expect(owls[0].x).not.toBe(owls[1].x);
+});
+
+it('残り20秒ちょうどに3羽目が手元を出て、飛行中の2羽と羽はそのまま残る', () => {
+  const game = flight();
+  while (game.phaseFrame < 2399) {
+    game.update(); expect(of(game, 'starOwl').length).toBeLessThanOrEqual(2);
+  }
+  const previous = of(game, 'starOwl'); expect(previous).toHaveLength(2);
+  const ages = previous.map((b) => b.age), feathers = of(game, 'starTrail');
+  game.update(); expect(of(game, 'starOwl')).toHaveLength(3);
+  previous.forEach((b, i) => { expect(b.active).toBe(true); expect(b.age).toBe(ages[i] + 1); });
+  const third = of(game, 'starOwl').find((b) => b.gridColumn === 2)!;
+  const [x, y] = game.bossPosition(); expect([third.x, third.y]).toEqual([x + 16, y - 6]);
+  expect(feathers.some((b) => b.active && b.age > 1)).toBe(true);
+  // 出発時刻だけをずらして既存の道をなぞるのではなく、曲がり方も変える。
+  const middle = starFlightPoint(STAR_FLIGHT_TIME / 2, 192, 126, third.sway, third.gridRow);
+  for (const owl of previous) {
+    const other = starFlightPoint(STAR_FLIGHT_TIME / 2, 192, 126, owl.sway, owl.gridRow);
+    expect(Math.hypot(middle[0] - other[0], middle[1] - other[1])).toBeGreaterThan(60);
+  }
+  game.update();
+  expect(previous.every((b) => Math.hypot(b.x - third.x, b.y - third.y) > 1)).toBe(true);
 });
 
 it.each(levels)('%sで飛行は自機に追従せず、発射原点が固定され、下端にも羽が届き、弾数は有界', (difficulty) => {
@@ -106,7 +131,7 @@ it.each(levels)('%sで飛行は自機に追従せず、発射原点が固定さ�
       probes.forEach(([x, y], index) => { if (bulletContact(x, y, b.x, b.y, b.radius, false) === 'hit') hits[index] = true; });
     }
   }
-  expect(maxOwls).toBe(2); expect(maxBullets).toBeLessThan(160); expect(deepest).toBeGreaterThan(398);
+  expect(maxOwls).toBe(3); expect(maxBullets).toBeLessThan(260); expect(deepest).toBeGreaterThan(398);
   expect(hits.some(Boolean)).toBe(true);
   const path = Array.from({ length: STAR_FLIGHT_TIME }, (_, age) => starFlightPoint(age, 192, 126, 1, 0));
   expect(Math.max(...path.map(([x]) => x)) - Math.min(...path.map(([x]) => x))).toBeGreaterThan(240);

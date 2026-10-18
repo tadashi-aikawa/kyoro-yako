@@ -2,7 +2,6 @@ import type { Bullet, Game } from '../game';
 
 export const STAR_FLIGHT_PERIOD = 480;
 export const STAR_FLIGHT_TIME = 288;
-export const STAR_FLIGHT_STAGGER = 24;
 export const STAR_TRAIL_WARNING = 48;
 export const STAR_TRAIL_SPACING = [12, 10, 8, 7] as const;
 export const STAR_TRAIL_SPEED = [0.95, 1.15, 1.35, 1.5] as const;
@@ -22,20 +21,24 @@ export function starFlightPoint(age: number, originX: number, originY: number, s
 
 export function emitStarFlight(game: Game): void {
   if (game.bombFrames > 0) return;
-  const t = game.phaseFrame - 105;
-  if (t < 0) return;
-  const local = t % STAR_FLIGHT_PERIOD;
-  const cycleStart = game.phaseFrame - local;
-  const late = cycleStart >= ((game.phase?.duration ?? 60) - 30) * 60;
-  if (local !== 0 && !(late && local === STAR_FLIGHT_STAGGER)) return;
-  const slot = local === 0 ? 0 : 1;
-  const wave = Math.floor(t / STAR_FLIGHT_PERIOD);
+  const duration = game.phase?.duration ?? 60;
+  const pairStart = (duration - 45) * 60;
+  const thirdStart = (duration - 20) * 60;
+  // 2羽への切替では周期を揃え直す。3羽目は既存の飛行を続けたまま手元から加える。
+  const starts = [game.phaseFrame < pairStart ? 105 : pairStart, pairStart, thirdStart];
   const [x, y] = game.bossPosition();
-  const owl = game.spawnBullet(x + 16, y - 6, 0, 0, slot === 0 ? 2 : 0, 'star');
-  if (!owl) return;
-  Object.assign(owl, { motion: 'starOwl', radius: 0, targetX: x + 16, targetY: y - 6,
-    gridColumn: slot, gridRow: wave, sway: (wave + slot) % 2 ? -1 : 1, launchSoundPending: false });
-  game.triggerBossCast(); game.audio.play('wind');
+  let launched = false;
+  for (let slot = 0; slot < starts.length; slot++) {
+    const t = game.phaseFrame - starts[slot];
+    if (t < 0 || t % STAR_FLIGHT_PERIOD !== 0) continue;
+    const wave = Math.floor(t / STAR_FLIGHT_PERIOD);
+    const owl = game.spawnBullet(x + 16, y - 6, 0, 0, slot === 1 ? 0 : 2, 'star');
+    if (!owl) continue;
+    Object.assign(owl, { motion: 'starOwl', radius: 0, targetX: x + 16, targetY: y - 6,
+      gridColumn: slot, gridRow: wave, sway: (wave + slot) % 2 ? -1 : 1, launchSoundPending: false });
+    launched = true;
+  }
+  if (launched) { game.triggerBossCast(); game.audio.play('wind'); }
 }
 
 // 発射源は接触判定・画面外削除へ進ませない。ボムや技終了では弾プールごと消える。
