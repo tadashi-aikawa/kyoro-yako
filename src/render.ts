@@ -1056,19 +1056,25 @@ export class Renderer {
   private item(game: Game, item: Item): void {
     const image = game.images[`${game.player}-sprite`];
     const owlReady = image.complete && image.naturalWidth > 0;
+    const size = item.kind === 'large' ? 48 : 32;
     // 代用絵も保存し、読み込みに失敗してもキャンバスを毎フレーム作らない。
     const key = item.kind === 'life' ? `item-life-${game.player}-${owlReady ? 'ready' : 'fallback'}` : `item-${item.kind}`;
     let sprite = this.sprites.get(key);
     if (!sprite) {
       sprite = document.createElement('canvas');
-      sprite.width = sprite.height = Math.ceil(32 * this.pixelRatio);
+      sprite.width = sprite.height = Math.ceil(size * this.pixelRatio);
       const c = sprite.getContext('2d')!;
-      c.setTransform(sprite.width / 32, 0, 0, sprite.height / 32, 0, 0); c.translate(16, 16);
-      // 敵弾の発光・白縁と分け、拾うものは正立・暗い縁に揃える。
+      c.setTransform(sprite.width / size, 0, 0, sprite.height / size, 0, 0); c.translate(size / 2, size / 2);
+      // 羽根としおりは正立・暗い縁にし、敵弾の発光・白縁と分ける。
       if (item.kind === 'small' || item.kind === 'large') {
         c.rotate(-Math.atan2(19, 33));
-        notebookFeather(c, 0, -2, item.kind === 'large' ? 0.5 : 0.3, 1, true);
+        notebookFeather(c, 0, -2, item.kind === 'large' ? 0.8 : 0.5, 1, true);
       } else if (item.kind === 'bomb') {
+        const aura = c.createRadialGradient(0, 0, 7, 0, 0, 13);
+        aura.addColorStop(0, 'rgba(113,218,157,0.48)'); aura.addColorStop(0.5, 'rgba(113,218,157,0.3)'); aura.addColorStop(1, 'rgba(113,218,157,0)');
+        c.fillStyle = aura; c.beginPath(); c.arc(0, 0, 13, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#244b3d'; c.strokeStyle = '#92d7ab'; c.lineWidth = 0.8;
+        c.beginPath(); c.arc(0, 0, 10.5, 0, Math.PI * 2); c.fill(); c.stroke();
         c.fillStyle = '#14212a'; c.beginPath(); c.arc(0, 0, 8.5, 0, Math.PI * 2); c.fill();
         notebookBomb(c, 0, 0, 7);
       } else if (item.kind === 'point') {
@@ -1080,7 +1086,7 @@ export class Renderer {
       }
       this.sprites.set(key, sprite);
     }
-    this.ctx.drawImage(sprite, item.x - 16, item.y - 16, 32, 32);
+    this.ctx.drawImage(sprite, item.x - size / 2, item.y - size / 2, size, size);
   }
 
   private player(game: Game): void {
