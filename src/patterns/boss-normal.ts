@@ -6,8 +6,8 @@ export function normalPeriod(game: Game, frames: number): number {
 }
 
 // 通常攻撃は直線運動だけ。1斉射の弾間を保ち、発射のテンポで密度を増やす。
-export function emitBossNormal(game: Game, pattern: string, t: number): void {
-  const [x, y] = game.bossPosition();
+export function emitBossNormal(game: Game, pattern: string, t: number, origin = game.bossPosition()): void {
+  const [x, y] = origin;
   const count = (base: number, maximum: number) => Math.min(maximum, density(game.difficulty, base));
   const speed = (base: number) => bulletSpeed(game.difficulty, base);
   const period = (frames: number) => normalPeriod(game, frames);

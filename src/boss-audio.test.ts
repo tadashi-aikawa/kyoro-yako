@@ -31,6 +31,15 @@ it('迅雷の通常攻撃は短い専用SEを斉射ごとに1回鳴らし、汎�
   expect(play).not.toHaveBeenCalledWith('enemyShot');
 });
 
+it('花影の三身同時射撃は通常攻撃と同じ専用SEを1回だけ鳴らす', () => {
+  const game = new Game(); game.invincible = true; game.startStage(4); game.startBoss(false, 8);
+  const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
+  game.phaseFrame = 104; game.update();
+  expect(game.bullets.count).toBe(42);
+  expect(play.mock.calls.filter(([sound]) => sound === 'jinraiShot')).toHaveLength(1);
+  expect(play).not.toHaveBeenCalledWith('enemyShot');
+});
+
 it('発射SEは予告中に鳴らず、インタビューの輪が動き始める時に鳴る', () => {
   const game = new Game(); game.invincible = true; game.startStage(5); game.startBoss(false, 11);
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
@@ -77,7 +86,7 @@ it('格子は行数によらず一斉移動のSEを1回だけ鳴らす', () => {
 });
 
 it('一閃と夜桜の突風が発動に同期する', () => {
-  const game = new Game(); game.startStage(4); game.startBoss(false, 9);
+  const game = new Game(); game.startStage(4); game.startBoss(false, 10);
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
   game.jinraiDashTick = 61;
   emitJinraiPattern(game, 'jinraiDash', 0);

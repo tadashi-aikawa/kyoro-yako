@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
+import { emitBossNormal, normalPeriod } from './patterns/boss-normal';
+import { emitJinraiPattern } from './patterns/jinrai';
 import { MID_PHASE, STAGES } from './stages';
 
 beforeEach(() => {
@@ -16,10 +18,10 @@ function phase(index: number): Game {
   return game;
 }
 
-it('迅雷の10フェーズへ直行でき、Power 4.00の理論火力で14秒・25秒になる', () => {
+it('迅雷の11フェーズへ直行でき、Power 4.00の理論火力で14秒・25秒になる', () => {
   const dps = (2 + Math.floor(4 / 2)) * 1.35 * (60 / 5);
   expect(dps).toBeCloseTo(64.8);
-  expect(STAGES[3].phases).toHaveLength(10);
+  expect(STAGES[3].phases).toHaveLength(11);
   STAGES[3].phases.forEach((p, index) => {
     vi.stubGlobal('location', { search: `?boss=4&phase=${index}` });
     const game = new Game(); game.audio.volume = 0;
@@ -132,8 +134,8 @@ it('夜桜の舞の突風は予告後90フレーム流し、風下の花びら�
   expect(petal.y - y).toBeLessThan(1);
 });
 
-it('5枚目は迅雷を起点とした花吹雪が広がり続ける', () => {
-  const game = phase(8);
+it('花吹雪は迅雷を起点として広がり続ける', () => {
+  const game = phase(9);
   expect(game.phase?.name).toBe('花吹雪');
   const initial = game.bullets.objects.filter((b) => b.active);
   expect(initial.length).toBeGreaterThanOrEqual(6);
@@ -153,7 +155,7 @@ it('花吹雪は難易度が上がるほど螺旋の腕を増やす', () => {
   let previous = 0;
   for (const [index, difficulty] of (['easy', 'normal', 'hard', 'lunatic'] as const).entries()) {
     const game = new Game(); game.audio.volume = 0; game.invincible = true;
-    game.difficulty = difficulty; game.startStage(4); game.startBoss(false, 8);
+    game.difficulty = difficulty; game.startStage(4); game.startBoss(false, 9);
     game.phaseFrame = 104; game.update();
     expect(game.bullets.count, `difficulty ${index}`).toBeGreaterThan(previous);
     previous = game.bullets.count;
@@ -161,7 +163,7 @@ it('花吹雪は難易度が上がるほど螺旋の腕を増やす', () => {
 });
 
 it('一閃は15秒後に煙で消えて中央へ瞬間移動し、雷と花びらを三連発散して横断へ戻る', () => {
-  const game = phase(9);
+  const game = phase(10);
   const play = vi.spyOn(game.audio, 'play');
   while (game.phaseFrame < 899) game.update();
   const before = game.bossXY;
@@ -188,7 +190,7 @@ it('一閃は15秒後に煙で消えて中央へ瞬間移動し、雷と花び�
 });
 
 it('忍術で消えている間はショットが本体のいた場所を通り抜ける', () => {
-  const game = phase(9);
+  const game = phase(10);
   while (game.phaseFrame < 909) game.update();
   const [x, y] = game.bossXY;
   const hp = game.phaseHp;
@@ -205,7 +207,7 @@ it('忍術で消えている間はショットが本体のいた場所を通り�
 });
 
 it('一閃は16px間隔の列に切れ目を作り、停止後に光って時間差で飛ぶ', () => {
-  const game = phase(9);
+  const game = phase(10);
   while (game.jinraiDashTick < 45) game.update();
   const held = game.bullets.objects.filter((b) => b.active && b.motion === 'jinraiHold');
   expect(held).toHaveLength(20);
@@ -227,7 +229,7 @@ it('一閃は16px間隔の列に切れ目を作り、停止後に光って時間
 });
 
 it('一閃の高さは3段を巡回し、体力半分以下では次の巡回から往復する', () => {
-  const game = phase(9);
+  const game = phase(10);
   expect(game.bossXY[1]).toBe(115);
   game.phaseHp = game.phaseMaxHp / 2;
   while (game.jinraiDashCrossing < 1) game.update();
@@ -243,7 +245,7 @@ it('一閃の高さは3段を巡回し、体力半分以下では次の巡回か
 
 it('一閃はNormalの進行中に画面内へ40〜90発を維持する', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
-  game.startStage(4); game.startBoss(false, 9);
+  game.startStage(4); game.startBoss(false, 10);
   for (let frame = 1; frame <= 720; frame++) {
     game.update();
     if (frame < 240 || frame % 60 !== 0) continue;
@@ -254,7 +256,7 @@ it('一閃はNormalの進行中に画面内へ40〜90発を維持する', () => 
 });
 
 it('一閃の後半でもNormalは90発以下に収まり、Lunaticの列にも切れ目が残る', () => {
-  const normal = phase(9);
+  const normal = phase(10);
   normal.phaseHp = normal.phaseMaxHp / 2;
   for (let frame = 1; frame <= 600; frame++) {
     normal.update();
@@ -264,23 +266,72 @@ it('一閃の後半でもNormalは90発以下に収まり、Lunaticの列にも�
     expect(visible, `frame ${frame}`).toBeLessThanOrEqual(90);
   }
   const lunatic = new Game(); lunatic.audio.volume = 0; lunatic.invincible = true;
-  lunatic.difficulty = 'lunatic'; lunatic.startStage(4); lunatic.startBoss(false, 9);
+  lunatic.difficulty = 'lunatic'; lunatic.startStage(4); lunatic.startBoss(false, 10);
   while (lunatic.jinraiDashTick < 37) lunatic.update();
   const positions = lunatic.bullets.objects.filter((b) => b.active && b.dashWave === 0).map((b) => b.x).sort((a, b) => a - b);
   expect(positions).toHaveLength(20);
   expect(positions.slice(1).filter((x, i) => x - positions[i] > 40)).toHaveLength(1);
 });
 
-it('花影の本体に命中すると分身の位置が入れ替わる', () => {
+it('中ボスは分身せず、単身から左右にずれた針の扇を二連射する', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   game.startStage(4); game.startBoss(true, 0);
-  game.phaseFrame = 147;
-  const [x, y] = game.bossXY;
-  const shot = game.shots.acquire();
-  expect(shot).toBeDefined();
-  if (!shot) return;
-  Object.assign(shot, { x, y: y + 10, vx: 0, vy: -10, radius: 3, damage: 1.35, homing: false });
+  expect(game.phase).toMatchObject({ name: '宵雷の扇', pattern: 'jinraiFan', kind: 'midboss' });
+  game.phaseFrame = 104; game.update();
+  expect(game.bossTargets()).toHaveLength(1);
+  const first = game.bullets.objects.filter((b) => b.active);
+  expect(first).toHaveLength(13);
+  expect(first.every((b) => b.kind === 'needle')).toBe(true);
+  for (let frame = 0; frame < 18; frame++) game.update();
+  const second = game.bullets.objects.filter((b) => b.active && b.age === 1);
+  expect(second).toHaveLength(13);
+  expect(Math.atan2(first[6].vy, first[6].vx)).not.toBeCloseTo(Math.atan2(second[6].vy, second[6].vx));
+});
+
+it('花影の3人は全難易度で通常攻撃と同じ針弾を同じタイミングで放つ', () => {
+  for (const difficulty of ['easy', 'normal', 'hard', 'lunatic'] as const) {
+    const game = phase(8); game.difficulty = difficulty;
+    const beat = normalPeriod(game, 84);
+    for (let t = 0; t < beat * 2; t++) {
+      game.bullets.clear(); emitJinraiPattern(game, 'jinraiClone', t);
+      const actual = game.bullets.objects.filter((b) => b.active).map((b) => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, radius: b.radius, kind: b.kind, color: b.color }));
+      expect(actual.length % 3).toBe(0);
+      for (const [index, origin] of game.bossTargets().entries()) {
+        game.bullets.clear(); emitBossNormal(game, 'jinraiRapidFan', t, origin);
+        const expected = game.bullets.objects.filter((b) => b.active).map((b) => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, radius: b.radius, kind: b.kind, color: b.color }));
+        expect(actual.slice(index * expected.length, (index + 1) * expected.length)).toEqual(expected);
+      }
+    }
+  }
+});
+
+it('花影はどの分身への命中も共有HPを減らし、被弾後も全員の位置が変わらない', () => {
+  const game = phase(8);
+  const positions = game.bossTargets();
+  const hp = game.phaseHp;
+  for (const [index, [x, y]] of positions.entries()) {
+    const shot = game.shots.acquire()!;
+    Object.assign(shot, { x, y, vx: 0, vy: 0, radius: 3, damage: 10, homing: false });
+    game.update();
+    expect(game.phaseHp).toBe(hp - (index + 1) * 10);
+    expect(shot.active).toBe(false);
+    expect(game.bossTargets()).toEqual(positions);
+  }
+  // 1発が複数人へ重なってもダメージを重複させない。
+  const shot = game.shots.acquire()!;
+  Object.assign(shot, { x: 192, y: 132, vx: 0, vy: 0, radius: 130, damage: 10, homing: false });
   game.update();
-  expect(game.jinraiRealCopy).toBe(2);
-  expect(game.phaseHp).toBeLessThan(MID_PHASE.jinrai.hp);
+  expect(game.phaseHp).toBe(hp - 40);
+});
+
+it('ホーミングは最寄りの分身を狙い、次フェーズでは単身へ戻る', () => {
+  const game = phase(8);
+  const shot = game.shots.acquire()!;
+  Object.assign(shot, { x: 72, y: 230, vx: 0, vy: -8, radius: 3, damage: 1, homing: true });
+  game.update();
+  expect(shot.vx).toBeCloseTo((86 - 72) / 55);
+  game.skipPhase();
+  while (game.collectionFrames > 0) game.update();
+  expect(game.phase?.pattern).toBe('jinraiPetal');
+  expect(game.bossTargets()).toHaveLength(1);
 });

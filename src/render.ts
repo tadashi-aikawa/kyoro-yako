@@ -291,15 +291,12 @@ export class Renderer {
         }
         c.restore();
       }
-      if (!seal) this.magic(x, y, game.frame, stage.colors[2], 38, 0.7 * burstVisibility(burst));
+      if (!seal && (game.phase.pattern !== 'jinraiClone' || game.phaseFrame < 105)) this.magic(x, y, game.frame, stage.colors[2], 38, 0.7 * burstVisibility(burst));
       if (game.phase.pattern === 'jinraiClone' && game.phaseFrame >= 105) {
         for (let i = 0; i < 3; i++) {
           const [cx, cy] = game.jinraiCopyPosition(i);
-          if (i === game.jinraiRealCopy && game.phaseFrame < game.jinraiCopyHiddenUntil) continue;
-          c.save(); c.globalAlpha = i === game.jinraiRealCopy ? 1 : 0.5;
           this.fieldCharacter(game, game.boss, cx, cy + Math.sin(game.frame * 0.045) * 2, 64, 0);
-          c.restore();
-          if (i === game.jinraiRealCopy) this.magic(cx, cy, game.frame, '#ffdc84', 25, 0.4);
+          this.magic(cx, cy, game.frame, '#ffdc84', 25, 0.4);
         }
       } else {
         const bow = game.boss === 'claudine' && game.phase.pattern === 'final' ? bowProgress(game.phaseFrame - 105) : 0;

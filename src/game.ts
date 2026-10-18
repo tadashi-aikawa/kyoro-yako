@@ -102,8 +102,6 @@ export class Game {
   readonly jinraiLasers: JinraiLaser[] = [];
   readonly jinraiMarks: JinraiMark[] = [];
   readonly dawnOwls: DawnOwl[] = [];
-  jinraiRealCopy = 1;
-  jinraiCopyHiddenUntil = 0;
   jinraiDashTick = -1;
   jinraiDashDouble = false;
   jinraiDashCrossing = -1;
@@ -521,8 +519,6 @@ export class Game {
     this.jinraiLasers.length = 0;
     this.jinraiMarks.length = 0;
     this.dawnOwls.length = 0;
-    this.jinraiRealCopy = 1;
-    this.jinraiCopyHiddenUntil = 0;
     this.jinraiDashTick = -1;
     this.jinraiDashDouble = false;
     this.jinraiDashCrossing = -1;
@@ -643,7 +639,7 @@ export class Game {
     if (this.phase?.pattern === 'sweep') return sweepPosition(this.phaseFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty));
     if (this.phase?.pattern === 'owlDawn') return dawnPosition(this.phaseFrame);
     if (this.phase?.pattern === 'interview') return [this.minervaX, this.minervaY];
-    if (this.phase?.pattern === 'jinraiClone') return this.jinraiCopyPosition(this.jinraiRealCopy);
+    if (this.phase?.pattern === 'jinraiClone') return this.jinraiCopyPosition(1);
     if (this.phase?.pattern === 'jinraiDash') {
       const step = dashBurstStep(this.phaseFrame);
       return step >= 0 ? burstPosition(this, step) : dashPosition(this);
@@ -684,6 +680,11 @@ export class Game {
   }
 
   jinraiCopyPosition(index: number): [number, number] { return [86 + index * 106, 132 + (index === 1 ? -8 : 10)]; }
+
+  bossTargets(): [number, number][] {
+    return this.phase?.pattern === 'jinraiClone' && this.phaseFrame >= 105
+      ? [0, 1, 2].map((index) => this.jinraiCopyPosition(index)) : [this.bossPosition()];
+  }
 
   private emitPattern(pattern: string): void {
     const t = this.phaseFrame - 105;
@@ -728,7 +729,7 @@ export class Game {
         // 予告のdelayを通過した最初の移動フレームで、斉射をまとめて鳴らす。
         if (this.phase && this.boss && this.lastBossShotFrame !== this.frame) {
           this.lastBossShotFrame = this.frame;
-          this.audio.play(this.boss === 'jinrai' && this.phase.kind === 'normal' ? 'jinraiShot' : 'enemyShot');
+          this.audio.play(this.boss === 'jinrai' && (this.phase.kind === 'normal' || this.phase.pattern === 'jinraiClone') ? 'jinraiShot' : 'enemyShot');
         }
       }
       if (b.motion === 'codexBox' && b.age >= b.releaseAt) {
@@ -905,7 +906,7 @@ export class Game {
     this.shots.forEach((s) => {
       if (s.homing && !this.held('ShiftLeft') && !this.held('ShiftRight')) {
         let target: [number, number] | undefined;
-        if (this.phase) target = this.bossPosition();
+        if (this.phase) target = this.bossTargets().reduce((nearest, point) => Math.hypot(point[0] - s.x, point[1] - s.y) < Math.hypot(nearest[0] - s.x, nearest[1] - s.y) ? point : nearest);
         else this.enemies.forEach((e) => { if (!target || Math.hypot(e.x - s.x, e.y - s.y) < Math.hypot(target[0] - s.x, target[1] - s.y)) target = [e.x, e.y]; });
         if (target) s.vx += Math.max(-0.3, Math.min(0.3, (target[0] - s.x) / 55));
         s.vx = Math.max(-3, Math.min(3, s.vx));
@@ -913,14 +914,8 @@ export class Game {
       s.x += s.vx; s.y += s.vy;
       if (s.y < -10 || s.x < -15 || s.x > FIELD.w + 15) { s.active = false; return; }
       if (this.phase && !(this.phase.pattern === 'jinraiDash' && burstVisibility(dashBurstStep(this.phaseFrame)) < 1)) {
-        const [bx, by] = this.bossPosition();
-        if (circlesHit(s.x, s.y, s.radius, bx, by, 20)) {
+        if (this.bossTargets().some(([bx, by]) => circlesHit(s.x, s.y, s.radius, bx, by, 20))) {
           if (this.phase.pattern !== 'final' && this.phase.pattern !== 'owlDawn') this.phaseHp -= s.damage;
-          if (this.phase.pattern === 'jinraiClone' && this.phaseFrame >= 147) {
-            this.jinraiRealCopy = (this.jinraiRealCopy + 1) % 3;
-            this.jinraiCopyHiddenUntil = this.phaseFrame + 12;
-            this.spark(bx, by, '#f9d3eb', 12);
-          }
           s.active = false; this.spark(s.x, s.y, '#ffe2ac', 1); return;
         }
       }

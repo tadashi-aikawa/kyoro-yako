@@ -104,7 +104,7 @@ it('5面のネオは最大3回だけ時間を延長し、体力を削れば先�
 it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ進む', () => {
   const game = new Game(); game.audio.volume = 0;
   game.startStage(4);
-  game.startBoss(false, 9);
+  game.startBoss(false, 10);
   game.skipPhase();
   while (game.collectionFrames > 0) game.update();
   for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');

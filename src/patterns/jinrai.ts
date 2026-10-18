@@ -1,6 +1,7 @@
 import type { Game } from '../game';
 import { SAKURA_PERIOD } from '../game';
-import { DIFFICULTY, density, FIELD } from '../rules';
+import { bulletSpeed, DIFFICULTY, density, FIELD } from '../rules';
+import { emitBossNormal } from './boss-normal';
 
 export const BURST_MOVE = 18;
 export const BURST_SHOTS = [48, 66, 84] as const;
@@ -37,18 +38,27 @@ export function emitJinraiPattern(game: Game, pattern: string, t: number): void 
     if (pattern === 'jinraiDash') { emitJinraiDash(game, level); return; }
     const [x, y] = game.bossPosition();
     if (pattern === 'jinraiClone') {
-      if (t === 0) for (let i = 0; i < 3; i++) {
-        const [cx, cy] = game.jinraiCopyPosition(i);
-        game.spark(cx, cy, '#ffcee9', 14);
+      if (t === 0) game.audio.play('ninpo');
+      for (const origin of game.bossTargets()) {
+        if (t === 0) game.spark(origin[0], origin[1], '#ffcee9', 14);
+        emitBossNormal(game, 'jinraiRapidFan', t, origin);
       }
-      if (t >= 42 && t % [112, 92, 78, 66][level] === 42) for (let i = 0; i < 3; i++) {
-        const [cx, cy] = game.jinraiCopyPosition(i);
-        const aim = Math.atan2(game.py - cy, game.px - cx);
-        for (let j = -1; j <= 1; j++) {
-          if (level === 0 && j !== 0) continue;
-          const angle = aim + j * 0.22;
-          game.spawnBullet(cx, cy, Math.cos(angle) * (0.75 + level * 0.12), Math.sin(angle) * (0.75 + level * 0.12), i === game.jinraiRealCopy ? 2 : 3, 'petal');
+      return;
+    }
+    if (pattern === 'jinraiFan') {
+      const beat = [132, 114, 98, 84][level];
+      const step = t % beat;
+      if (step === 0 || step === 18) {
+        const n = [9, 13, 17, 21][level];
+        const wave = Math.floor(t / beat);
+        const aim = Math.PI / 2 + Math.sin(wave * 0.9) * 0.3 + (step === 0 ? -0.14 : 0.14);
+        for (let i = 0; i < n; i++) {
+          const angle = aim + (i / (n - 1) - 0.5) * Math.PI * 0.85;
+          const velocity = bulletSpeed(game.difficulty, 2.1);
+          const b = game.spawnBullet(x, y, Math.cos(angle) * velocity, Math.sin(angle) * velocity, step === 0 ? 2 : 3, 'needle');
+          if (b) b.radius = 2.4;
         }
+        game.spark(x, y, '#e4c8ff', 8);
       }
       return;
     }
