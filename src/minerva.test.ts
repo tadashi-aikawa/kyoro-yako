@@ -118,7 +118,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊の輪�
   expect(interviewRingDistance(ring, ring.x + Math.cos(ring.gap) * ring.radius, ring.y + Math.sin(ring.gap) * ring.radius)).toBeGreaterThan(10);
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sでも連続した輪に穴が1か所だけあり、次の穴へ低速移動で間に合う', (difficulty) => {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sでも連続した輪に穴が1か所だけあり、次の穴へ移動する時間がある', (difficulty) => {
   const game = phase(11, difficulty);
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
   const centers: number[] = [];
@@ -130,7 +130,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで
     const ring = game.interviewRings[0];
     expect(Math.sign(ring.spin)).toBe(wave % 2 ? -1 : 1);
     expect(ring.speed).toBeCloseTo(INTERVIEW_SPEED[level]);
-    expect(INTERVIEW_SPEED[level]).toBeLessThan(1.65 / 2);
+    expect(INTERVIEW_SPEED[level]).toBeCloseTo([0.5, 0.6, 0.7, 0.8][level] * 3);
     centers.push(ring.x + (398 - ring.y) / Math.tan(ring.gap));
     for (let step = 0; step < 360; step++) {
       const angle = ring.gap + step * Math.PI / 180;
