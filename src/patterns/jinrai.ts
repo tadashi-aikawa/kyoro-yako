@@ -11,6 +11,9 @@ export const BURST_RETURN = 96;
 export const BURST_SPEED = 5.6;
 export const BURST_PETAL_RATIO = 0.92;
 const BURST_DURATION = 120;
+export const THUNDER_PERIOD = [180, 156, 138, 120] as const;
+export const THUNDER_WARNING = [78, 66, 60, 54] as const;
+export const THUNDER_LIFE = 18;
 // 開始15秒から8秒ごと。煙で消え、中央へ瞬間移動して三連発散する。
 export function dashBurstStep(frame: number): number { return frame >= 900 && (frame - 900) % 480 < BURST_DURATION ? (frame - 900) % 480 : -1; }
 export function burstVisibility(step: number): number {
@@ -90,7 +93,17 @@ export function emitJinraiPattern(game: Game, pattern: string, t: number): void 
       return;
     }
     if (pattern === 'jinraiThunder') {
-      if (t % [115, 100, 86, 74][level] === 0) game.jinraiMarks.push({ x: game.px, y: game.py, age: 0, warning: [60, 48, 42, 36][level] });
+      if (game.bombFrames > 0) return;
+      if (t % THUNDER_PERIOD[level] === 0) {
+        const wave = Math.floor(t / THUNDER_PERIOD[level]);
+        const offsets = [0, -1, 1, wave % 2 ? -2 : 2, wave % 2 ? 2 : -2];
+        for (const offset of offsets.slice(0, [2, 3, 4, 5][level])) {
+          const x = game.px + offset * [88, 80, 72, 64][level];
+          // 壁際でクランプすると予告線が重なる。自機位置の1本を必ず残し、場外の線だけ省く。
+          if (x < 9 || x > FIELD.w - 9) continue;
+          game.jinraiMarks.push({ x, y: game.py, age: 0, warning: THUNDER_WARNING[level] });
+        }
+      }
       return;
     }
     if (pattern === 'jinraiSakura') {
@@ -213,19 +226,15 @@ export function emitJinraiPattern(game: Game, pattern: string, t: number): void 
       const across = Math.abs(dx * Math.sin(laser.angle) - dy * Math.cos(laser.angle));
       if (along > 10 && along < 510 && across < 7 && game.invulnFrames <= 0 && !game.invincible && game.pendingHit < 0) { game.pendingHit = 0; game.hitDuringSpell = true; }
     }
+    let thundered = false;
     for (let i = game.jinraiMarks.length - 1; i >= 0; i--) {
       const mark = game.jinraiMarks[i];
       mark.age++;
       if (mark.age === mark.warning) {
-        game.audio.play('thunder');
-        const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
-        for (let j = 0; j < 8 + level * 2; j++) {
-          const angle = j * Math.PI * 2 / (8 + level * 2);
-          game.spawnBullet(mark.x, mark.y, Math.cos(angle) * (0.85 + level * 0.1), Math.sin(angle) * (0.85 + level * 0.1), 2, 'orb');
-        }
+        if (!thundered) { game.audio.play('thunder'); game.triggerBossCast(); thundered = true; }
         game.spark(mark.x, mark.y, '#ffe775', 18);
       }
-      if (mark.age >= mark.warning && mark.age < mark.warning + 18 && Math.abs(game.px - mark.x) < 6 && game.py <= mark.y + 8 && game.invulnFrames <= 0 && !game.invincible && game.pendingHit < 0) { game.pendingHit = 0; game.hitDuringSpell = true; }
-      if (mark.age > mark.warning + 18) game.jinraiMarks.splice(i, 1);
+      if (mark.age >= mark.warning && mark.age < mark.warning + THUNDER_LIFE && Math.abs(game.px - mark.x) < 6 && game.py <= mark.y + 8 && game.invulnFrames <= 0 && !game.invincible && game.pendingHit < 0) { game.pendingHit = 0; game.hitDuringSpell = true; }
+      if (mark.age >= mark.warning + THUNDER_LIFE) game.jinraiMarks.splice(i, 1);
     }
   }

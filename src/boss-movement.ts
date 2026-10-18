@@ -45,6 +45,8 @@ const MOVEMENTS: Record<string, Movement> = {
   neoEncore: patrol([[108, -12], [276, -12], [192, 16]], 96, 160),
   // チャッピーは長めに止まる。クロディーヌは整列・格子・対称の軌道を使う。
   codex: patrol([[116, -18], [116, 18], [268, 18], [268, -18]], 84, 180),
+  chappyParallel: patrol([[126, -16], [258, 16]], 84, 138),
+  chappyDelivery: curve(72, 18, 620, 'ellipse'),
   claudinePetalArc: curve(70, 12, 600, 'arc'),
   claudineQuietRings: curve(58, 12, 600, 'ellipse'),
   trim: patrol([[128, -24], [256, -24], [256, 12], [128, 12]], 72, 120),

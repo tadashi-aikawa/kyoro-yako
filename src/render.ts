@@ -2,6 +2,7 @@ import { bossSpriteId, createBossMotion, isCasting, updateBossMotion } from './b
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
 import { PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
+import { CHAPPY_PORTS, CHAPPY_THROW, PARALLEL_BEAT } from './patterns/chappy';
 import { claudineScene, complementBoundary, whiteSpaceCircle } from './patterns/claudine';
 import { FINALE_CHARGE, FINALE_CRESCENDO, finaleTime, rosePulse } from './patterns/claudine-finale';
 import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, GRID_REPLAY_PERIOD, gridLayoutAt, gridPoint, gridRows, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_NAMES, WEATHER_PERIOD, WEATHER_REPLAY_PERIOD, weatherAt } from './patterns/claudine-weather-grid';
@@ -568,11 +569,15 @@ export class Renderer {
     for (const mark of game.jinraiMarks) {
       if (mark.age < mark.warning) {
         this.magic(mark.x, mark.y, game.frame, '#ffe66c', 24 + 9 * mark.age / mark.warning, 0.8);
-        c.strokeStyle = '#ffe66c55'; c.lineWidth = 1;
+        c.fillStyle = '#ffe66c18'; c.fillRect(mark.x - 6, 0, 12, mark.y + 8);
+        c.strokeStyle = mark.age >= mark.warning - 18 ? '#fff0a5cc' : '#ffe66c88'; c.lineWidth = 1;
         c.beginPath(); c.moveTo(mark.x, 0); c.lineTo(mark.x, mark.y); c.stroke();
       } else {
-        c.strokeStyle = '#fff4aa'; c.lineWidth = 8; c.shadowColor = '#ffe565'; c.shadowBlur = 18;
-        c.beginPath(); c.moveTo(mark.x, 0); c.lineTo(mark.x, mark.y); c.stroke();
+        c.strokeStyle = '#ffe577'; c.lineWidth = 8; c.shadowColor = '#ffe565'; c.shadowBlur = 12;
+        c.beginPath(); c.moveTo(mark.x, 0);
+        for (let y = 24, i = 0; y < mark.y; y += 24, i++) c.lineTo(mark.x + (i % 2 ? -2 : 2), y);
+        c.lineTo(mark.x, mark.y + 8); c.stroke();
+        c.strokeStyle = '#fffdec'; c.lineWidth = 2; c.stroke();
         c.shadowBlur = 0;
       }
     }
@@ -691,11 +696,25 @@ export class Renderer {
     }
     if (b.motion === 'codexBox') {
       const c = this.ctx;
-      c.save(); c.fillStyle = '#e7d2a5'; c.strokeStyle = '#fff4d3'; c.lineWidth = 2;
-      c.fillRect(b.x - 17, b.y - 17, 34, 34); c.strokeRect(b.x - 17, b.y - 17, 34, 34);
-      c.beginPath(); c.moveTo(b.x - 17, b.y - 17); c.lineTo(b.x + 17, b.y + 17); c.moveTo(b.x + 17, b.y - 17); c.lineTo(b.x - 17, b.y + 17); c.stroke();
+      c.save(); c.translate(b.x, b.y); c.fillStyle = '#174b48'; c.strokeStyle = '#a5f5e6'; c.lineWidth = 2;
+      c.fillRect(-14, -12, 28, 24); c.strokeRect(-14, -12, 28, 24);
+      c.beginPath(); c.moveTo(-4, -6); c.lineTo(-9, 0); c.lineTo(-4, 6); c.moveTo(4, -6); c.lineTo(9, 0); c.lineTo(4, 6); c.stroke();
+      c.fillStyle = b.age < b.releaseAt ? '#a5f5e6' : '#ffe8a0';
+      c.fillRect(-12, 17, 24 * Math.min(1, b.age / b.releaseAt), 2);
       c.restore();
-      this.text(String(Math.max(1, Math.ceil(b.delay / (b.gridRow / 3)))), b.x, b.y + 4, 16, '#372339', 'center');
+      return;
+    }
+    if (b.motion === 'chappyBloom') {
+      const c = this.ctx;
+      const progress = Math.max(0, Math.min(1, (b.age - CHAPPY_THROW) / (b.releaseAt - CHAPPY_THROW)));
+      this.magic(b.x, b.y, b.age, '#a5f5e6', 10 + progress * 12, 0.7);
+      c.save(); c.fillStyle = '#fff0b4';
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4 + b.age * 0.025;
+        const radius = b.age < b.releaseAt ? 12 + (1 - progress) * 42 : 22 + (b.age - b.releaseAt) * 0.6;
+        c.beginPath(); c.arc(b.x + Math.cos(a) * radius, b.y + Math.sin(a) * radius, 2, 0, Math.PI * 2); c.fill();
+      }
+      c.restore();
       return;
     }
     if (b.motion === 'vanish' && b.age > b.fadeAt - 20 && b.age % 8 < 4) return;
@@ -798,6 +817,17 @@ export class Renderer {
       }
     }
     const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
+    if (pattern === 'chappyParallel' && t >= 0 && game.bombFrames <= 0) {
+      const beat = PARALLEL_BEAT[level];
+      const source = Math.floor(t / beat) % 2;
+      for (const [i, [x, y]] of CHAPPY_PORTS.entries()) {
+        const step = t % beat;
+        const afterglow = i === source ? Math.max(0, 1 - step / 18) * 0.5 : 0;
+        const warning = i !== source ? Math.max(0, (step - (beat - 36)) / 36) : 0;
+        const pulse = Math.max(afterglow, warning);
+        this.magic(x, y, game.phaseFrame * (i ? -1 : 1), i ? '#ffe6a1' : '#a5f5e6', 22 + pulse * 8, 0.35 + pulse * 0.45);
+      }
+    }
     if (pattern === 'vim' && t >= 0) {
       const scene = vimScene(t, level);
       if (game.vimAttack?.wave === scene.wave && scene.step < scene.warning) {

@@ -41,7 +41,8 @@ it('道中と中ボスの間も背景が進み、ポーズと会話では止ま�
   press(game, 'Escape'); const pausedDistance = game.sceneryDistance;
   for (let i = 0; i < 60; i++) game.update();
   expect(game.sceneryDistance).toBe(pausedDistance);
-  press(game, 'Escape'); game.skipPhase();
+  press(game, 'Escape');
+  while (game.phase) game.skipPhase();
   while (game.collectionFrames > 0) game.update();
   expect(game.scene).toBe('dialogue'); const dialogueDistance = game.sceneryDistance;
   for (let i = 0; i < 60; i++) game.update();

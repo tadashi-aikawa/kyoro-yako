@@ -27,8 +27,11 @@ it('全フェーズは面と種類の共通式から体力と制限時間を得�
       if (phase.kind !== 'survival') expect(phase.hp / STAGE_DPS[index]).toBeCloseTo(phase.kind === 'normal' ? 14 : 25, 0);
     }
     const mid = MID_PHASE[stage.mid];
-    expect(mid.hp).toBe(phaseHp(index + 1, 'midboss'));
-    expect(mid.duration).toBe(45);
+    if (stage.mid === 'chappy') expect([mid.hp, mid.duration]).toEqual([405, 28]);
+    else {
+      expect(mid.hp).toBe(phaseHp(index + 1, 'midboss'));
+      expect(mid.duration).toBe(45);
+    }
   }
 });
 
@@ -107,16 +110,17 @@ it('3面のボスは通常4回とスペル6枚を順に出す', () => {
   expect(STAGES[2].phases.filter((phase) => phase.spell)).toHaveLength(6);
 });
 
-it('箱は予告が終わると全方位へ開き、Easyの予告は長い', () => {
+it('投げた箱は順に下向きの扇を連射し、Easyの予告は長い', () => {
   const easy = start(3, 0, true, 'easy');
   const normal = start(3, 0, true);
   const easyBox = easy.bullets.objects.find((b) => b.active && b.motion === 'codexBox')!;
   const box = normal.bullets.objects.find((b) => b.active && b.motion === 'codexBox')!;
-  expect(easyBox.delay).toBeGreaterThan(box.delay);
-  for (let i = 0; i < 181; i++) normal.update();
+  expect(easyBox.releaseAt).toBeGreaterThan(box.releaseAt);
+  for (let i = 0; i < 185; i++) normal.update();
   expect(box.active).toBe(false);
-  expect(normal.message).toBe('完成しました。ご確認ください。');
-  expect(normal.bullets.objects.filter((b) => b.active && b.kind === 'orb').length).toBeGreaterThanOrEqual(11);
+  const orbs = normal.bullets.objects.filter((b) => b.active && b.kind === 'orb');
+  expect(orbs.length).toBeGreaterThanOrEqual(28);
+  expect(orbs.every((b) => b.vy > 0)).toBe(true);
 });
 
 it('削ぎ落としの壁は予告された列が消えてから降る', () => {

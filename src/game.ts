@@ -6,7 +6,7 @@ import { dialogue, ENDINGS, type Line, midDialogue } from './dialogue';
 import { ENEMY_ROOMS, enemyFireFrames } from './enemy-design';
 import { obsidiaPosition } from './obsidia-movement';
 import { emitBossNormal } from './patterns/boss-normal';
-import { emitChappy } from './patterns/chappy';
+import { emitChappy, updateChappySource } from './patterns/chappy';
 import { claudineScene, complementBoundary, emitClaudine, whiteSpaceCircle } from './patterns/claudine';
 import { reflectEnterShot } from './patterns/enter-reflect';
 import { emitEtokichi, emitGalaxyFlash, type GalaxyFlash, updateGalaxyFlash } from './patterns/etokichi';
@@ -24,7 +24,7 @@ import { type BossId, midPhases, NAMES, type Phase, STAGES } from './stages';
 import { readRecords } from './story';
 
 export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'stage' | 'dialogue' | 'clear' | 'pause' | 'gameover' | 'ending' | 'credits';
-export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'question' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'citation' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'linkNode' | 'linkBeam' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
+export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'question' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'citation' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'linkNode' | 'linkBeam' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'chappyBloom' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
 export interface JinraiLaser { x: number; y: number; angle: number; age: number; warning: number; life: number; speed: number; }
 export interface JinraiMark { x: number; y: number; age: number; warning: number; }
 export interface DawnOwl { x: number; y: number; targetX: number; targetY: number; age: number; warning: number; color: number; }
@@ -720,7 +720,7 @@ export class Game {
     else if (this.stage === 1 && !this.midboss) emitNeo(this, pattern, t);
     else if (this.stage === 2) emitObsidia(this, pattern, t);
     else if (pattern === 'neoEncore') emitNeoEncore(this, t);
-    else if (pattern === 'codex') emitChappy(this, pattern, t);
+    else if (this.boss === 'chappy') emitChappy(this, pattern, t);
     else if (this.boss === 'claudine') emitClaudine(this, pattern, t);
     else if (this.stage === 5) emitMinerva(this, pattern);
   }
@@ -739,6 +739,7 @@ export class Game {
 
   private clearBullets(): void {
     this.bullets.clear();
+    if (this.phase?.pattern === 'jinraiThunder') this.jinraiMarks.length = 0;
     this.vimAttack = undefined;
     this.interviewRings.length = 0;
     this.galaxyFlash = undefined;
@@ -764,8 +765,7 @@ export class Game {
           if (b.gridColumn === 0 && b.gridRow === 0) { this.triggerBossCast(); this.audio.play('laser'); }
         }
       }
-      if (b.motion === 'codexBox' && b.age <= 38) { b.x += b.vx; b.y += b.vy; }
-      if (b.motion === 'codexBox' && b.age === 38) { b.vx = 0; b.vy = 0; }
+      if (updateChappySource(this, b)) return;
       if (b.delay > 0) { b.delay--; return; }
       if (b.fadeAt > 0 && b.age >= b.fadeAt) {
         if (b.motion === 'jinraiHeart') this.spark(b.x, b.y, '#ffd3e5', 7);
@@ -781,16 +781,6 @@ export class Game {
           this.lastBossShotFrame = this.frame;
           this.audio.play(this.boss === 'jinrai' && (this.phase.kind === 'normal' || this.phase.pattern === 'jinraiClone') ? 'jinraiShot' : 'enemyShot');
         }
-      }
-      if (b.motion === 'codexBox' && b.age >= b.releaseAt) {
-        const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty);
-        const n = [8, 11, 14, 17][level];
-        for (let i = 0; i < n; i++) {
-          const angle = i * Math.PI * 2 / n;
-          this.spawnBullet(b.x, b.y, Math.cos(angle) * [0.95, 1.12, 1.28, 1.44][level], Math.sin(angle) * [0.95, 1.12, 1.28, 1.44][level], 2, 'orb');
-        }
-        this.message = '完成しました。ご確認ください。'; this.messageFrames = 75;
-        b.active = false; return;
       }
       if (b.motion === 'gridSnap') {
         if (b.age < b.releaseAt) { b.x += (b.targetX - b.x) * 0.2; b.y += (b.targetY - b.y) * 0.2; }

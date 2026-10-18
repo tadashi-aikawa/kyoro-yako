@@ -11,7 +11,7 @@ export const PHASE_LIMIT = { normal: 40, spell: 60, midboss: 45 } as const;
 export function phaseHp(stage: number, kind: PhaseKind): number {
   return kind === 'survival' ? 1 : Math.round(STAGE_DPS[stage - 1] * PHASE_SECONDS[kind]);
 }
-function phase(stage: number, name: string, kind: PhaseKind, pattern: string, duration = kind === 'survival' ? 60 : PHASE_LIMIT[kind]): Phase {
+function phase(stage: number, name: string, kind: PhaseKind, pattern: string, duration: number = kind === 'survival' ? 60 : PHASE_LIMIT[kind]): Phase {
   return { name, spell: kind !== 'normal', duration, hp: phaseHp(stage, kind), pattern, kind };
 }
 export const STAGES: Stage[] = [
@@ -94,13 +94,19 @@ export const MID_PHASE: Record<BossId, Phase> = {
   neo: phase(5, '「最後」と言ってからが長い', 'midboss', 'neoEncore'),
   obsidia: phase(2, '書棚の呼吸', 'midboss', 'bookshelf'),
   jinrai: phase(4, '宵雷の扇', 'midboss', 'jinraiFan'),
-  chappy: phase(3, 'Codexへの丸投げ', 'midboss', 'codex'),
+  // 丸投げは左右へ避ける時間が長い。3技合計を宣言・移動込みで40〜50秒に収める。
+  chappy: { ...phase(3, 'Codexへの丸投げ', 'midboss', 'codex', 28), hp: 405 },
   claudine: phase(3, '整列', 'midboss', 'space'),
   minerva: phase(5, '予備の仮説', 'midboss', 'sevenRings'),
 };
 export const ETOKICHI_FLASH = phase(1, 'エトキチギャラクシーフラッシュ', 'midboss', 'galaxyFlash');
+export const CHAPPY_PHASES: Phase[] = [
+  MID_PHASE.chappy,
+  { ...phase(3, '並列実行', 'midboss', 'chappyParallel', 28), hp: 583 },
+  { ...phase(3, '完成しました。ご確認ください。', 'midboss', 'chappyDelivery', 34), hp: 778 },
+];
 export function midPhases(boss: BossId): Phase[] {
-  return boss === 'etokichi' ? [MID_PHASE.etokichi, ETOKICHI_FLASH] : [MID_PHASE[boss]];
+  return boss === 'chappy' ? CHAPPY_PHASES : boss === 'etokichi' ? [MID_PHASE.etokichi, ETOKICHI_FLASH] : [MID_PHASE[boss]];
 }
 export const NAMES: Record<BossId, string> = {
   etokichi: 'エトキチ', neo: 'ネオ', obsidia: 'オブシディア', jinrai: '迅雷', claudine: 'クロディーヌ', chappy: 'チャッピー', minerva: 'ミネルヴァ',

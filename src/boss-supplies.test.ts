@@ -153,7 +153,7 @@ it('全ステージの戦闘最後に回収時間を設け、拾わなければ�
 });
 
 it('回収時間中は移動でき、ポーズで時計が止まり、再開後に回収して会話へ進む', () => {
-  const game = start(3, 0, true);
+  const game = start(3, midPhases('chappy').length - 1, true);
   game.bombs = 0;
   vi.mocked(Math.random).mockReturnValueOnce(0.1);
   game.skipPhase();

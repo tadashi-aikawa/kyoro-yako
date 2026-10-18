@@ -169,13 +169,14 @@ it('簪のレーザーは予告中に無害で、その後に回転する', () =
   expect(laser.angle).toBeGreaterThan(angle);
 });
 
-it('落雷は魔法陣の予告後に着弾点から小弾を出す', () => {
+it('落雷は3本の予告後に発生し、着弾点から小弾を出さない', () => {
   const game = phase(5);
   const mark = game.jinraiMarks[0];
   expect(mark).toBeDefined();
+  expect(game.jinraiMarks).toHaveLength(3);
   mark.age = mark.warning - 1;
   game.update();
-  expect(game.bullets.count).toBeGreaterThanOrEqual(8);
+  expect(game.bullets.count).toBe(0);
 });
 
 it('夜桜の舞は3色の小判定花びらを散らし、Normalで80〜150発を保つ', () => {
