@@ -1,3 +1,4 @@
+import { bossSpriteId, createBossMotion, updateBossMotion } from './boss-motion';
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
 import { PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
@@ -18,6 +19,7 @@ const PALETTE = ['#a674ff', '#6ddaf5', '#fbd768', '#ff9dbe'];
 
 export class Renderer {
   private readonly sprites = new Map<string, HTMLCanvasElement>();
+  private readonly bossMotion = createBossMotion();
   constructor(private readonly ctx: CanvasRenderingContext2D) {
     this.setPixelRatio(1);
   }
@@ -295,15 +297,17 @@ export class Renderer {
       if (game.phase.pattern === 'jinraiClone' && game.phaseFrame >= 105) {
         for (let i = 0; i < 3; i++) {
           const [cx, cy] = game.jinraiCopyPosition(i);
-          this.fieldCharacter(game, game.boss, cx, cy + Math.sin(game.frame * 0.045) * 2, 64, 0);
+          this.fieldCharacter(game, this.readySprite(game, bossSpriteId(game.boss, 'idle', game.frame + i * 7)), cx, cy + Math.sin(game.frame * 0.045) * 2, 64, 0);
           this.magic(cx, cy, game.frame, '#ffdc84', 25, 0.4);
         }
       } else {
         const bow = game.boss === 'claudine' && game.phase.pattern === 'final' ? bowProgress(game.phaseFrame - 105) : 0;
         const tilt = channeling || seal || sweepCharging ? 0 : Math.cos(game.phaseFrame * 0.012) * 0.045 + bow * 0.08;
+        const pose = updateBossMotion(this.bossMotion, `${game.boss}:${game.phase.name}`, game.frame, x);
+        const bossSprite = this.readySprite(game, bossSpriteId(game.boss, pose, game.frame));
         c.save(); c.translate(x, y); c.scale(1 + bow * 0.08, 1 - bow * 0.32); c.translate(-x, -y);
         if (seal) { c.shadowColor = '#ffe591'; c.shadowBlur = 8 + Math.min(20, (burst - BURST_MOVE) * 0.6); }
-        this.fieldCharacter(game, channeling ? 'minerva-prayer' : seal ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : game.boss, x, y + (channeling || seal || sweepCharging ? 0 : Math.sin(game.frame * 0.045) * 2) + bow * 10, 64, tilt, burstVisibility(burst));
+        this.fieldCharacter(game, channeling ? 'minerva-prayer' : seal ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || sweepCharging ? 0 : Math.sin(game.frame * 0.045) * 2) + bow * 10, 64, tilt, burstVisibility(burst));
         c.restore();
       }
       c.fillStyle = '#140c27aa'; c.fillRect(15, 6, 350, 13);
@@ -819,6 +823,12 @@ export class Renderer {
       c.fillStyle = '#d9eeff'; c.shadowColor = '#9de8ff'; c.shadowBlur = 8;
       c.beginPath(); c.arc(game.px + Math.cos(a) * 21, game.py + Math.sin(a) * 14, 3.4, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0;
     }
+  }
+
+  // 動きの絵が読み込めていなければ、ボスの元絵へ戻す
+  private readySprite(game: Game, id: string): string {
+    const sprite = game.images[`${id}-sprite`];
+    return sprite?.complete && sprite.naturalWidth > 0 ? id : (game.boss ?? id);
   }
 
   private fieldCharacter(game: Game, id: string, x: number, y: number, height: number, tilt: number, alpha = 1): void {

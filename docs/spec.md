@@ -36,6 +36,11 @@ owleryのAIメンバーとエトキチが登場する、縦スクロールの弾
 
 - `public/assets/members/<slug>-face.webp`(540x540、透過)と `<slug>-stand.webp`(多くは縦長。mimikoとetokichiは正方形)
 - `public/assets/sprites/<slug>.webp` はフィールド用の透過SDスプライト。未配置・読み込み失敗時はstand画像へ縮退する
+- 動きの絵を持つボスは `<slug>-idle.webp` / `<slug>-left.webp` / `<slug>-right.webp` も持つ(現在は迅雷のみ。`src/boss-motion.ts` の `MOTION_BOSSES`)
+    - 待機中は元絵と `idle` を22フレームごとに交互に出す。花影の分身も待機の絵で、3体のコマをずらす
+    - 横移動の速度を平滑化し、0.3px/フレームを超えたら `left` / `right` へ切り替え、0.18px/フレームを下回ったら待機へ戻す
+    - 24px/フレームを超える飛びとフェーズの切り替えは瞬間移動として待機から数え直す。技の専用ポーズは動きの絵より優先する
+    - 動きの絵が読み込めていなければ元絵へ縮退する
 - slug: neo / minerva / mimiko / obsidia / jinrai / claudine / chappy / etokichi
 - 用途
     - 自機・ボス・中ボスのフィールド上の姿: sprite画像を描く(自機は高さ約40px、ボスは高さ約64px)。緩やかな上下動と左右移動時の小さな傾きを付ける。ボスの背後に回転する魔法陣を描く
