@@ -2,6 +2,7 @@ import type { Game } from '../game';
 import { SAKURA_PERIOD } from '../game';
 import { bulletSpeed, DIFFICULTY, density, FIELD } from '../rules';
 import { emitBossNormal } from './boss-normal';
+import { CLONE_CHARGE, jinraiCloneScene } from './jinrai-clone';
 
 export const BURST_MOVE = 18;
 export const BURST_SHOTS = [48, 66, 84] as const;
@@ -38,10 +39,15 @@ export function emitJinraiPattern(game: Game, pattern: string, t: number): void 
     if (pattern === 'jinraiDash') { emitJinraiDash(game, level); return; }
     const [x, y] = game.bossPosition();
     if (pattern === 'jinraiClone') {
-      if (t === 0) game.audio.play('ninpo');
-      for (const origin of game.bossTargets()) {
-        if (t === 0) game.spark(origin[0], origin[1], '#ffcee9', 14);
-        emitBossNormal(game, 'jinraiRapidFan', t, origin);
+      const scene = jinraiCloneScene(game.phaseFrame, game.phase?.duration);
+      if (game.phaseFrame === scene.chargeStart) {
+        game.bullets.clear();
+        game.audio.play('prayerCharge');
+        for (const body of scene.bodies) game.spark(body.x, body.y, '#e2c9ff', 18);
+      }
+      if (game.phaseFrame === scene.chargeStart + CLONE_CHARGE) game.audio.play('ninpo');
+      if (scene.shotFrame >= 0) for (const origin of game.bossTargets()) {
+        emitBossNormal(game, 'jinraiRapidFan', scene.shotFrame, origin);
       }
       return;
     }

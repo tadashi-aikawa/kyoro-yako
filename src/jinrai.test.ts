@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { emitBossNormal, normalPeriod } from './patterns/boss-normal';
 import { emitJinraiPattern } from './patterns/jinrai';
+import { jinraiCloneScene } from './patterns/jinrai-clone';
 import { MID_PHASE, STAGES } from './stages';
 
 beforeEach(() => {
@@ -293,6 +294,7 @@ it('花影の3人は全難易度で通常攻撃と同じ針弾を同じタイミ
     const game = phase(8); game.difficulty = difficulty;
     const beat = normalPeriod(game, 84);
     for (let t = 0; t < beat * 2; t++) {
+      game.phaseFrame = 2010 + t;
       game.bullets.clear(); emitJinraiPattern(game, 'jinraiClone', t);
       const actual = game.bullets.objects.filter((b) => b.active).map((b) => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, radius: b.radius, kind: b.kind, color: b.color }));
       expect(actual.length % 3).toBe(0);
@@ -307,6 +309,7 @@ it('花影の3人は全難易度で通常攻撃と同じ針弾を同じタイミ
 
 it('花影はどの分身への命中も共有HPを減らし、被弾後も全員の位置が変わらない', () => {
   const game = phase(8);
+  game.phaseFrame = 2010;
   const positions = game.bossTargets();
   const hp = game.phaseHp;
   for (const [index, [x, y]] of positions.entries()) {
@@ -326,6 +329,7 @@ it('花影はどの分身への命中も共有HPを減らし、被弾後も全�
 
 it('ホーミングは最寄りの分身を狙い、次フェーズでは単身へ戻る', () => {
   const game = phase(8);
+  game.phaseFrame = 2010;
   const shot = game.shots.acquire()!;
   Object.assign(shot, { x: 72, y: 230, vx: 0, vy: -8, radius: 3, damage: 1, homing: true });
   game.update();
@@ -334,4 +338,47 @@ it('ホーミングは最寄りの分身を狙い、次フェーズでは単身�
   while (game.collectionFrames > 0) game.update();
   expect(game.phase?.pattern).toBe('jinraiPetal');
   expect(game.bossTargets()).toHaveLength(1);
+});
+
+it('花影は単身で5秒撃ち、印を結んで溜めたあと2秒かけて二身になる', () => {
+  const game = phase(8);
+  expect(game.bossTargets()).toEqual([[192, 124]]);
+  expect(game.bullets.count).toBe(14);
+  game.phaseFrame = 404; game.update();
+  expect(game.bullets.count).toBe(0);
+  expect(jinraiCloneScene(405).charging).toBe(true);
+  expect(game.bossTargets()).toHaveLength(1);
+  for (let frame = 406; frame < 615; frame++) {
+    game.update(); expect(game.bullets.count).toBe(0);
+  }
+  const halfway = jinraiCloneScene(555);
+  expect(halfway.bodies).toEqual([{ x: 154, y: 133, opacity: 1 }, { x: 230, y: 133, opacity: 0.5 }]);
+  game.update();
+  expect(game.bossTargets()).toEqual([[116, 142], [268, 142]]);
+  expect(game.bullets.count).toBe(28);
+});
+
+it('花影は残り30秒で二身の射撃を止め、再び溜めてから三身になる', () => {
+  const game = phase(8); game.phaseFrame = 1799; game.update();
+  expect(game.bossTargets()).toEqual([[116, 142], [268, 142]]);
+  expect(jinraiCloneScene(1800).charging).toBe(true);
+  expect(game.bullets.count).toBe(0);
+  for (let frame = 1801; frame < 2010; frame++) {
+    game.update(); expect(game.bullets.count).toBe(0);
+  }
+  expect(jinraiCloneScene(1950).bodies).toEqual([{ x: 101, y: 142, opacity: 1 }, { x: 192, y: 124, opacity: 0.5 }, { x: 283, y: 142, opacity: 1 }]);
+  game.update();
+  expect(game.bossTargets()).toEqual([[86, 142], [192, 124], [298, 142]]);
+  expect(game.bullets.count).toBe(42);
+});
+
+it('二身で祈っている間も両方への命中を受け付ける', () => {
+  const game = phase(8); game.phaseFrame = 1800;
+  const hp = game.phaseHp;
+  for (const [x, y] of game.bossTargets()) {
+    const shot = game.shots.acquire()!;
+    Object.assign(shot, { x, y, vx: 0, vy: 0, radius: 3, damage: 10, homing: false });
+  }
+  game.update();
+  expect(game.phaseHp).toBe(hp - 20);
 });

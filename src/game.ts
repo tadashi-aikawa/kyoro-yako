@@ -8,6 +8,7 @@ import { emitChappy } from './patterns/chappy';
 import { claudineScene, complementBoundary, emitClaudine, whiteSpaceCircle } from './patterns/claudine';
 import { emitEtokichi } from './patterns/etokichi';
 import { burstPosition, burstVisibility, dashBurstStep, dashPosition, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
+import { jinraiCloneScene } from './patterns/jinrai-clone';
 import { dawnPosition, emitMinerva, eyeX, updateDawnOwls } from './patterns/minerva';
 import { emitNeo, inBog } from './patterns/neo';
 import { emitNeoEncore, encoreBogTime } from './patterns/neo-encore';
@@ -645,7 +646,10 @@ export class Game {
     if (this.phase?.pattern === 'sweep') return sweepPosition(this.phaseFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty));
     if (this.phase?.pattern === 'owlDawn') return dawnPosition(this.phaseFrame);
     if (this.phase?.pattern === 'interview') return [this.minervaX, this.minervaY];
-    if (this.phase?.pattern === 'jinraiClone') return this.jinraiCopyPosition(1);
+    if (this.phase?.pattern === 'jinraiClone') {
+      const body = jinraiCloneScene(this.phaseFrame, this.phase.duration).bodies[0];
+      return [body.x, body.y];
+    }
     if (this.phase?.pattern === 'jinraiDash') {
       const step = dashBurstStep(this.phaseFrame);
       return step >= 0 ? burstPosition(this, step) : dashPosition(this);
@@ -685,11 +689,9 @@ export class Game {
     return this.midboss ? Number(this.phase.spell) : STAGES[this.stage - 1].phases.slice(this.phaseIndex + 1).filter((phase) => phase.spell).length;
   }
 
-  jinraiCopyPosition(index: number): [number, number] { return [86 + index * 106, 132 + (index === 1 ? -8 : 10)]; }
-
   bossTargets(): [number, number][] {
-    return this.phase?.pattern === 'jinraiClone' && this.phaseFrame >= 105
-      ? [0, 1, 2].map((index) => this.jinraiCopyPosition(index)) : [this.bossPosition()];
+    return this.phase?.pattern === 'jinraiClone'
+      ? jinraiCloneScene(this.phaseFrame, this.phase.duration).bodies.filter((body) => body.opacity > 0).map((body) => [body.x, body.y]) : [this.bossPosition()];
   }
 
   private emitPattern(pattern: string): void {

@@ -5,6 +5,7 @@ import { PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA
 import { bowProgress, claudineScene, complementBoundary, FAREWELL_RELEASE, flowerRadius, whiteSpaceCircle } from './patterns/claudine';
 import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, GRID_REPLAY_PERIOD, gridLayoutAt, gridPoint, gridRows, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_NAMES, WEATHER_PERIOD, WEATHER_REPLAY_PERIOD, weatherAt } from './patterns/claudine-weather-grid';
 import { BURST_MOVE, BURST_RETURN, BURST_SHOTS, burstVisibility, dashBurstStep } from './patterns/jinrai';
+import { jinraiCloneScene } from './patterns/jinrai-clone';
 import { DAWN_PERIOD, dawnLane, dawnPrayerStep, eyeX, HYPOTHESIS_COLUMNS, HYPOTHESIS_PERIOD, hypothesisBrightness, hypothesisSide, hypothesisX, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE } from './patterns/minerva';
 import { bogs } from './patterns/neo';
 import { encoreBogTime } from './patterns/neo-encore';
@@ -293,12 +294,23 @@ export class Renderer {
         }
         c.restore();
       }
-      if (!seal && (game.phase.pattern !== 'jinraiClone' || game.phaseFrame < 105)) this.magic(x, y, game.frame, stage.colors[2], 38, 0.7 * burstVisibility(burst));
-      if (game.phase.pattern === 'jinraiClone' && game.phaseFrame >= 105) {
-        for (let i = 0; i < 3; i++) {
-          const [cx, cy] = game.jinraiCopyPosition(i);
-          this.fieldCharacter(game, this.readySprite(game, bossSpriteId(game.boss, 'idle', game.frame + i * 7)), cx, cy + Math.sin(game.frame * 0.045) * 2, 64, 0);
-          this.magic(cx, cy, game.frame, '#ffdc84', 25, 0.4);
+      if (!seal && game.phase.pattern !== 'jinraiClone') this.magic(x, y, game.frame, stage.colors[2], 38, 0.7 * burstVisibility(burst));
+      if (game.phase.pattern === 'jinraiClone') {
+        const scene = jinraiCloneScene(game.phaseFrame, game.phase.duration);
+        const performingNinpo = scene.charging || scene.splitting;
+        for (const [index, body] of scene.bodies.entries()) {
+          if (body.opacity <= 0) continue;
+          c.save(); c.globalAlpha = body.opacity;
+          if (scene.charging) {
+            const radius = 60 - scene.chargeProgress * 25;
+            c.shadowColor = '#e8c7ff'; c.shadowBlur = 10 + scene.chargeProgress * 18;
+            this.magic(body.x, body.y, -game.frame * 0.6, '#e8c7ff', radius, 0.5);
+            this.magic(body.x, body.y, game.frame, '#fff4bd', 30 + scene.chargeProgress * 10, 0.6);
+          }
+          const breathing = scene.charging ? 1 + Math.sin(game.frame * 0.09) * 0.025 : 1;
+          this.fieldCharacter(game, performingNinpo ? 'jinrai-seal' : this.readySprite(game, bossSpriteId(game.boss, 'idle', game.frame + index * 7)), body.x, body.y + (performingNinpo ? 0 : Math.sin(game.frame * 0.045) * 2), 64 * breathing, 0, body.opacity);
+          this.magic(body.x, body.y, game.frame, '#ffdc84', 25, 0.4 * body.opacity);
+          c.restore();
         }
       } else {
         const bow = game.boss === 'claudine' && game.phase.pattern === 'final' ? bowProgress(game.phaseFrame - 105) : 0;
