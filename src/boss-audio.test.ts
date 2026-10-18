@@ -34,7 +34,7 @@ it('迅雷の通常攻撃は短い専用SEを斉射ごとに1回鳴らし、汎�
 it('花影の三身同時射撃は通常攻撃と同じ専用SEを1回だけ鳴らす', () => {
   const game = new Game(); game.invincible = true; game.startStage(4); game.startBoss(false, 8);
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
-  game.phaseFrame = 2009; game.update();
+  game.phaseFrame = 2609; game.update();
   expect(game.bullets.count).toBe(42);
   expect(play.mock.calls.filter(([sound]) => sound === 'jinraiShot')).toHaveLength(1);
   expect(play).not.toHaveBeenCalledWith('enemyShot');
@@ -45,11 +45,11 @@ it('花影は二度の溜めと分身の開始時だけ忍術の音を鳴らす'
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
   game.phaseFrame = 104; game.update();
   expect(play).not.toHaveBeenCalledWith('ninpo');
-  for (const frame of [404, 1799]) {
+  for (const frame of [404, 2399]) {
     game.phaseFrame = frame; game.update(); game.update();
   }
   expect(play.mock.calls.filter(([sound]) => sound === 'prayerCharge')).toHaveLength(2);
-  for (const frame of [494, 1889]) {
+  for (const frame of [494, 2489]) {
     game.phaseFrame = frame; game.update(); game.update();
   }
   expect(play.mock.calls.filter(([sound]) => sound === 'ninpo')).toHaveLength(2);

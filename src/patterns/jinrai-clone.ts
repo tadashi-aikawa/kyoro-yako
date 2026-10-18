@@ -39,9 +39,9 @@ function hop(spots: [number, number][], index: number, elapsed: number): { body:
   return { body: { x: toX, y: toY, opacity: Math.max(0, Math.min(1, (age - HOP_IN) / (HOP_SHOWN - HOP_IN))) }, firing: false, trail };
 }
 
-// 1人で5秒撃つ → 印を結ぶ → 2秒かけて二身へ。残り30秒で三身へ進む。
+// 1人で5秒撃つ → 印を結ぶ → 2秒かけて二身へ。残り20秒で三身へ進む。
 export function jinraiCloneScene(frame: number, duration = 60) {
-  const secondCharge = duration * 60 - 30 * 60;
+  const secondCharge = duration * 60 - 20 * 60;
   const chargeStart = frame < secondCharge ? CLONE_FIRST_CHARGE : secondCharge;
   const from = frame < secondCharge ? 1 : 2;
   const local = frame - chargeStart;
