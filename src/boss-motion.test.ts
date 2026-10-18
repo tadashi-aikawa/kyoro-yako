@@ -1,5 +1,7 @@
 import { expect, it } from 'vitest';
-import { bossSpriteId, createBossMotion, IDLE_STEP, MOTION_SPRITES, updateBossMotion } from './boss-motion';
+import { bossSpriteId, CAST_FRAMES, CAST_GAP, createBossMotion, IDLE_STEP, isCasting, MOTION_SPRITES, SPELL_CAST_FRAMES, updateBossMotion } from './boss-motion';
+import type { Game } from './game';
+import { normalBeat } from './patterns/boss-normal';
 import { STAGES } from './stages';
 
 function drive(xs: number[], key = 'jinrai:phase', start = 0) {
@@ -64,10 +66,37 @@ it('元絵を描き直したボスは待機の片方に描き直しを使う', (
   expect(bossSpriteId('etokichi', 'idle', 0)).toBe('etokichi');
 });
 
-it('中ボス・ボスの全員が待機と左右の絵を持ち、配置済みの画像を指す', () => {
+it('中ボス・ボスの全員が待機・左右・構えの絵を持ち、配置済みの画像を指す', () => {
   for (const stage of STAGES) for (const id of [stage.mid, stage.boss]) {
-    for (const pose of ['idle', 'left', 'right']) expect(MOTION_SPRITES).toContain(`${id}-${pose}`);
+    for (const pose of ['idle', 'left', 'right', 'cast']) expect(MOTION_SPRITES).toContain(`${id}-${pose}`);
   }
   const placed = Object.keys(import.meta.glob('/public/assets/sprites/*.webp'));
   for (const id of MOTION_SPRITES) expect(placed, id).toContain(`/public/assets/sprites/${id}.webp`);
+});
+
+it('スペルは宣言のカットインが明けて撃ち始める瞬間だけ構える', () => {
+  expect(isCasting('spell', 0, 0)).toBe(false);
+  expect(isCasting('spell', 105, 0)).toBe(true);
+  expect(isCasting('midboss', 105 + SPELL_CAST_FRAMES - 1, 0)).toBe(true);
+  expect(isCasting('spell', 105 + SPELL_CAST_FRAMES, 0)).toBe(false);
+  expect(isCasting('spell', 400, 0)).toBe(false);
+});
+
+it('通常攻撃は一斉射の頭で構え、周期が短い技でも間隔を空ける', () => {
+  expect(isCasting('normal', 50, 84)).toBe(false);
+  expect(isCasting('normal', 105, 84)).toBe(true);
+  expect(isCasting('normal', 105 + CAST_FRAMES, 84)).toBe(false);
+  expect(isCasting('normal', 105 + 84, 84)).toBe(true);
+  const frames = Array.from({ length: 600 }, (_, i) => 105 + i).filter((f) => isCasting('normal', f, 21));
+  expect(frames.length).toBeLessThan(600 * CAST_FRAMES / CAST_GAP + CAST_FRAMES);
+  expect(frames.every((f) => (f - 105) % 21 < CAST_FRAMES)).toBe(true);
+});
+
+it('構えは移動より優先し、全ての通常攻撃が一斉射の周期を持つ', () => {
+  expect(bossSpriteId('obsidia', 'cast', 3)).toBe('obsidia-cast');
+  for (const difficulty of ['easy', 'normal', 'hard', 'lunatic'] as const) {
+    for (const stage of STAGES) for (const phase of stage.phases.filter((p) => p.kind === 'normal')) {
+      expect(normalBeat({ difficulty } as Game, phase.pattern), phase.pattern).toBeGreaterThan(0);
+    }
+  }
 });

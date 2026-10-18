@@ -36,11 +36,16 @@ owleryのAIメンバーとエトキチが登場する、縦スクロールの弾
 
 - `public/assets/members/<slug>-face.webp`(540x540、透過)と `<slug>-stand.webp`(多くは縦長。mimikoとetokichiは正方形)
 - `public/assets/sprites/<slug>.webp` はフィールド用の透過SDスプライト。未配置・読み込み失敗時はstand画像へ縮退する
-- 中ボス・ボスに出る7体は `<slug>-idle.webp` / `<slug>-left.webp` / `<slug>-right.webp` も持つ(`src/boss-motion.ts` の `MOTION_BOSSES`)
+- 中ボス・ボスに出る7体は `<slug>-idle.webp` / `<slug>-left.webp` / `<slug>-right.webp` / `<slug>-cast.webp` も持つ(`src/boss-motion.ts` の `MOTION_BOSSES`)
+    - 構え(`cast`)は技の区切りで出す。弾が本人から出るかは問わない
+        - スペル・中ボスの技: 宣言のカットインがボスを覆うため、カットインが明けて撃ち始める瞬間(フェーズ開始105フレーム目)から40フレーム
+        - 通常攻撃: 一斉射の周期の頭から24フレーム
+    - 一斉射の周期が60フレームより短い通常攻撃は、60フレーム以上空く頭でだけ構える。周期は `normalBeat` が唯一の情報源
+    - 優先順: 技の専用ポーズ > 構え > 移動 > 待機
     - 待機中は元絵と `idle` を22フレームごとに交互に出す。花影の分身も待機の絵で、3体のコマをずらす
     - 元絵の白が半透明のボスは、待機で元絵の代わりに描き直した `<slug>-base.webp` を出す(`REDRAWN_BASES`)。元絵は自機・会話などほかの用途にそのまま使う
     - 横移動の速度を平滑化し、0.3px/フレームを超えたら `left` / `right` へ切り替え、0.18px/フレームを下回ったら待機へ戻す
-    - 24px/フレームを超える飛びとフェーズの切り替えは瞬間移動として待機から数え直す。技の専用ポーズは動きの絵より優先する
+    - 24px/フレームを超える飛びとフェーズの切り替えは瞬間移動として待機から数え直す
     - 動きの絵が読み込めていなければ元絵へ縮退する
 - slug: neo / minerva / mimiko / obsidia / jinrai / claudine / chappy / etokichi
 - 用途

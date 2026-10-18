@@ -5,12 +5,26 @@ export function normalPeriod(game: Game, frames: number): number {
   return Math.round(frames / Math.sqrt(DIFFICULTY[game.difficulty]));
 }
 
+const NORMAL_BEATS: Record<string, number> = {
+  neoTripleTap: 106, neoSyncopation: 104, obsidiaShelves: 30, obsidiaIndex: 60, claudinePetalArc: 52, claudineQuietRings: 64,
+  jinraiRapidFan: 84, jinraiRapidRings: 96,
+};
+
+// 通常攻撃の一斉射の周期。周期の頭(t % beat === 0)で必ず撃つ
+export function normalBeat(game: Game, pattern: string): number {
+  if (pattern === 'minervaStarFan' || pattern === 'minervaStarRings') {
+    // Easyの通過量上限とNormalの最多密度を両立するため、最終面だけ周期を比例で伸縮する。
+    return Math.round((pattern === 'minervaStarRings' ? 88 : 84) / DIFFICULTY[game.difficulty]);
+  }
+  return normalPeriod(game, NORMAL_BEATS[pattern] ?? 0);
+}
+
 // 通常攻撃は直線運動だけ。1斉射の弾間を保ち、発射のテンポで密度を増やす。
 export function emitBossNormal(game: Game, pattern: string, t: number, origin = game.bossPosition()): void {
   const [x, y] = origin;
   const count = (base: number, maximum: number) => Math.min(maximum, density(game.difficulty, base));
   const speed = (base: number) => bulletSpeed(game.difficulty, base);
-  const period = (frames: number) => normalPeriod(game, frames);
+  const beat = normalBeat(game, pattern);
   const shot = (cx: number, cy: number, vx: number, vy: number, color: number, kind: Bullet['kind']) => {
     const b = game.spawnBullet(cx, cy, vx, vy, color, kind);
     if (b) b.radius = kind === 'needle' ? 2.4 : 3;
@@ -31,7 +45,6 @@ export function emitBossNormal(game: Game, pattern: string, t: number, origin = 
 
   if (pattern === 'neoTripleTap' || pattern === 'neoSyncopation') {
     const syncopation = pattern === 'neoSyncopation';
-    const beat = period(syncopation ? 104 : 106);
     const step = t % beat;
     const tap = syncopation ? 10 : 8;
     if (step === 0 || step === tap || step === tap * 2) {
@@ -50,7 +63,6 @@ export function emitBossNormal(game: Game, pattern: string, t: number, origin = 
 
   if (pattern === 'obsidiaShelves' || pattern === 'obsidiaIndex') {
     const index = pattern === 'obsidiaIndex';
-    const beat = period(index ? 60 : 30);
     const step = t % beat;
     if (step !== 0 && !(index && step === Math.round(beat / 3))) return;
     const row = Math.floor(t / beat) * (index ? 2 : 1) + Number(step > 0);
@@ -63,7 +75,6 @@ export function emitBossNormal(game: Game, pattern: string, t: number, origin = 
 
   if (pattern === 'claudinePetalArc' || pattern === 'claudineQuietRings') {
     const rings = pattern === 'claudineQuietRings';
-    const beat = period(rings ? 64 : 52);
     if (t % beat !== 0) return;
     const wave = Math.floor(t / beat);
     const color = wave % 2 ? 1 : 3;
@@ -74,7 +85,6 @@ export function emitBossNormal(game: Game, pattern: string, t: number, origin = 
 
   if (pattern === 'jinraiRapidFan' || pattern === 'jinraiRapidRings') {
     const reverseRings = pattern === 'jinraiRapidRings';
-    const beat = period(reverseRings ? 96 : 84);
     const step = t % beat;
     const wave = Math.floor(t / beat);
     const volley = [0, 0.2, 0.4, 0.6].findIndex((fraction) => step === Math.round(beat * fraction));
@@ -86,8 +96,6 @@ export function emitBossNormal(game: Game, pattern: string, t: number, origin = 
 
   if (pattern === 'minervaStarFan' || pattern === 'minervaStarRings') {
     const layered = pattern === 'minervaStarRings';
-    // Easyの通過量上限とNormalの最多密度を両立するため、最終面だけ周期を比例で伸縮する。
-    const beat = Math.round((layered ? 88 : 84) / DIFFICULTY[game.difficulty]);
     const step = t % beat;
     const wave = Math.floor(t / beat);
     if (step === 0) fan(count(25, 25), Math.PI * 2 / 3, speed(1.65), wave % 2 ? 1 : 2, 'star');

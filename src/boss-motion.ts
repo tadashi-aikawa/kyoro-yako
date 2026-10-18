@@ -1,7 +1,13 @@
-export type BossPose = 'idle' | 'left' | 'right';
+export type BossPose = 'idle' | 'left' | 'right' | 'cast';
 
 export const MOTION_BOSSES = ['etokichi', 'neo', 'obsidia', 'jinrai', 'chappy', 'claudine', 'minerva'] as const;
-const MOTION_POSES = ['idle', 'left', 'right'] as const;
+const MOTION_POSES = ['idle', 'left', 'right', 'cast'] as const;
+export const CAST_FRAMES = 24;
+// スペルの構えはカットインの消え際と重なるので、通常攻撃より長く見せる
+export const SPELL_CAST_FRAMES = 40;
+// 一斉射の周期が短い技で構えっぱなしにならないよう、構えの間隔はこれ以上空ける
+export const CAST_GAP = 60;
+const PATTERN_START = 105;
 // 元絵の白が半透明のボスは、待機で交互に出す片方を描き直した元ポーズにする
 const REDRAWN_BASES: readonly string[] = ['neo', 'chappy'];
 export const MOTION_SPRITES = MOTION_BOSSES.flatMap((id) => [...MOTION_POSES, ...(REDRAWN_BASES.includes(id) ? ['base'] : [])].map((pose) => `${id}-${pose}`));
@@ -33,9 +39,19 @@ export function updateBossMotion(motion: BossMotion, key: string, frame: number,
   return motion.pose;
 }
 
+// 構えは技の区切りでだけ出す。弾が本人から出るかは問わない。
+// スペルは宣言のカットインがボスを覆うので、カットインが明けて撃ち始める瞬間に構える。通常攻撃は一斉射の頭
+export function isCasting(kind: string, phaseFrame: number, beat: number): boolean {
+  const t = phaseFrame - PATTERN_START;
+  if (t < 0) return false;
+  if (kind !== 'normal') return t < SPELL_CAST_FRAMES;
+  if (beat <= 0) return false;
+  return t % (beat * Math.ceil(CAST_GAP / beat)) < CAST_FRAMES;
+}
+
 export function hasMotionSprites(id: string): boolean { return (MOTION_BOSSES as readonly string[]).includes(id); }
 
-// 待機は元絵と待機絵を交互に出す。移動中は向きの絵を出す
+// 構えは移動より優先する。待機は元絵と待機絵を交互に出し、移動中は向きの絵を出す
 export function bossSpriteId(id: string, pose: BossPose, frame: number): string {
   if (!hasMotionSprites(id)) return id;
   if (pose !== 'idle') return `${id}-${pose}`;

@@ -1,7 +1,8 @@
-import { bossSpriteId, createBossMotion, updateBossMotion } from './boss-motion';
+import { bossSpriteId, createBossMotion, isCasting, updateBossMotion } from './boss-motion';
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
 import { PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
+import { normalBeat } from './patterns/boss-normal';
 import { bowProgress, claudineScene, complementBoundary, FAREWELL_RELEASE, flowerRadius, whiteSpaceCircle } from './patterns/claudine';
 import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, GRID_REPLAY_PERIOD, gridLayoutAt, gridPoint, gridRows, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_NAMES, WEATHER_PERIOD, WEATHER_REPLAY_PERIOD, weatherAt } from './patterns/claudine-weather-grid';
 import { BURST_MOVE, BURST_RETURN, BURST_SHOTS, burstVisibility, dashBurstStep } from './patterns/jinrai';
@@ -332,7 +333,8 @@ export class Renderer {
         const bow = game.boss === 'claudine' && game.phase.pattern === 'final' ? bowProgress(game.phaseFrame - 105) : 0;
         const tilt = channeling || seal || sweepCharging ? 0 : Math.cos(game.phaseFrame * 0.012) * 0.045 + bow * 0.08;
         const pose = updateBossMotion(this.bossMotion, `${game.boss}:${game.phase.name}`, game.frame, x);
-        const bossSprite = this.readySprite(game, bossSpriteId(game.boss, pose, game.frame));
+        const casting = isCasting(game.phase.kind, game.phaseFrame, game.phase.kind === 'normal' ? normalBeat(game, game.phase.pattern) : 0);
+        const bossSprite = this.readySprite(game, bossSpriteId(game.boss, casting ? 'cast' : pose, game.frame));
         c.save(); c.translate(x, y); c.scale(1 + bow * 0.08, 1 - bow * 0.32); c.translate(-x, -y);
         if (seal) { c.shadowColor = '#ffe591'; c.shadowBlur = 8 + Math.min(20, (burst - BURST_MOVE) * 0.6); }
         this.fieldCharacter(game, channeling ? 'minerva-prayer' : seal ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || sweepCharging ? 0 : Math.sin(game.frame * 0.045) * 2) + bow * 10, 64, tilt, burstVisibility(burst));
