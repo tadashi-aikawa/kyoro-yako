@@ -399,6 +399,7 @@ export class Renderer {
     this.player(game);
     const thunder = thunderScene(game);
     if (thunder) {
+      this.focusMarker(game);
       c.fillStyle = `rgba(2,4,16,${thunder.darkness})`; c.fillRect(0, 0, FIELD.w, FIELD.h);
       if (thunder.flash > 0) { c.fillStyle = `rgba(241,245,255,${thunder.flash})`; c.fillRect(0, 0, FIELD.w, FIELD.h); }
     }
@@ -421,7 +422,7 @@ export class Renderer {
       c.globalAlpha = 1;
     }
     if (game.flash > 0) { c.fillStyle = `rgba(255,255,255,${game.flash / 50})`; c.fillRect(0, 0, FIELD.w, FIELD.h); }
-    this.focusMarker(game);
+    if (!thunder) this.focusMarker(game);
     c.restore();
     c.strokeStyle = '#b5a8d4'; c.lineWidth = 2; c.strokeRect(FIELD.x, FIELD.y, FIELD.w, FIELD.h);
   }
@@ -582,10 +583,9 @@ export class Renderer {
       const path = thunderPath(bolt), head = path[path.length - 1];
       const fade = Math.max(0, bolt.age - thunderGround(bolt) - THUNDER_HOLD) / THUNDER_FADE;
       c.save(); c.globalAlpha = 1 - fade; c.lineJoin = 'miter'; c.lineCap = 'butt';
-      c.strokeStyle = '#b9b8ff'; c.shadowColor = '#c4caff'; c.shadowBlur = 14; c.lineWidth = bolt.width;
+      c.strokeStyle = '#ffe600'; c.shadowColor = '#ffdf00'; c.shadowBlur = 14; c.lineWidth = bolt.width;
       c.beginPath(); path.forEach(([x, y], i) => { if (i === 0) c.moveTo(x, y); else c.lineTo(x, y); }); c.stroke();
-      c.shadowBlur = 0; c.strokeStyle = '#fffbea'; c.lineWidth = 2; c.stroke();
-      c.strokeStyle = '#fffbea'; c.lineWidth = 2;
+      c.shadowBlur = 0; c.strokeStyle = '#fff8b0'; c.lineWidth = 2; c.stroke();
       c.beginPath(); c.moveTo(head[0] - 3, head[1] - 7); c.lineTo(head[0], head[1]); c.lineTo(head[0] + 2, head[1] - 4); c.stroke(); c.restore();
     }
   }

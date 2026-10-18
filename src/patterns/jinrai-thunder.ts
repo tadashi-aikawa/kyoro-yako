@@ -55,8 +55,10 @@ export function thunderScene(game: Game): { step: number; charging: boolean; fla
   if (game.phase?.pattern !== 'jinraiThunder' || !game.jinraiThunderstorm) return undefined;
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
   const step = game.phaseFrame - 105 - game.jinraiThunderstorm.cycle * THUNDER_PERIOD[level];
-  const flash = Math.max(0, ...[18, 36].map((at) => step >= at && step < at + 6 ? (1 - (step - at) / 6) * 0.28 : 0));
-  return { step, charging: step < THUNDER_CALL, flash, darkness: Math.min(0.38, step / 24 * 0.38) * Math.max(0, 1 - Math.max(0, step - THUNDER_CALL) / 36) };
+  const pulse = Math.max(0, ...[18, 36].map((at) => step >= at && step < at + 6 ? 1 - (step - at) / 6 : 0));
+  // 閃光の瞬間だけ暗転を解き、自機と迅雷の位置を見せる。
+  const darkness = Math.min(0.94, step / 24 * 0.94) * (1 - pulse) * Math.max(0, 1 - Math.max(0, step - THUNDER_CALL) / 36);
+  return { step, charging: step < THUNDER_CALL, flash: pulse * 0.28, darkness };
 }
 
 export function emitThunder(game: Game, t: number): void {
