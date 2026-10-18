@@ -4,7 +4,6 @@ export const STAR_FLIGHT_PERIOD = 480;
 export const STAR_FLIGHT_TIME = 288;
 export const STAR_FLIGHT_STAGGER = 24;
 export const STAR_TRAIL_WARNING = 48;
-export const STAR_TRAIL_LIFE = 144;
 export const STAR_TRAIL_SPACING = [12, 10, 8, 7] as const;
 export const STAR_TRAIL_SPEED = [0.95, 1.15, 1.35, 1.5] as const;
 
@@ -59,7 +58,7 @@ export function updateStarFlightSource(game: Game, owl: Bullet): boolean {
   for (const side of [-1, 1]) {
     const feather = game.spawnBullet(x, y, normalX * STAR_TRAIL_SPEED[level] * side, normalY * STAR_TRAIL_SPEED[level] * side, owl.color, 'petal');
     if (feather) Object.assign(feather, { motion: 'starTrail', radius: 3.2,
-      delay: STAR_TRAIL_WARNING, releaseAt: STAR_TRAIL_WARNING, fadeAt: STAR_TRAIL_LIFE,
+      delay: STAR_TRAIL_WARNING, releaseAt: STAR_TRAIL_WARNING,
       targetX: previous[0], targetY: previous[1], sway: side, gridRow: Math.floor(elapsed / spacing), launchSoundPending: false });
   }
   return true;

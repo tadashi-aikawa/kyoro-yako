@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { type Bullet, Game } from './game';
-import { STAR_FLIGHT_PERIOD, STAR_FLIGHT_STAGGER, STAR_FLIGHT_TIME, STAR_TRAIL_LIFE, STAR_TRAIL_WARNING, starFlightPoint } from './patterns/minerva-flight';
-import { bulletContact } from './rules';
+import { STAR_FLIGHT_PERIOD, STAR_FLIGHT_STAGGER, STAR_FLIGHT_TIME, STAR_TRAIL_WARNING, starFlightPoint } from './patterns/minerva-flight';
+import { bulletContact, FIELD } from './rules';
 
 const levels = ['easy', 'normal', 'hard', 'lunatic'] as const;
 const listeners = new Map<string, (event: { code: string; repeat: boolean; preventDefault: () => void }) => void>();
@@ -47,13 +47,23 @@ it('光の軌跡は48フレーム無害で静止し、その後の羽は接触�
   expect(game.hitDuringSpell).toBe(true); expect(sound).toHaveBeenCalledWith('turn');
 });
 
-it('羽は予告時間を含め2.4秒で消え、次の飛行までに弾がない切れ目を残す', () => {
+it('羽は2.4秒を越えて残り、画面外へ自然に出てから消える', () => {
   const game = flight(); game.phaseFrame = 104; game.update();
-  const feather = of(game, 'starTrail')[0];
-  while (feather.age < STAR_TRAIL_LIFE - 1) game.update();
-  expect(feather.active).toBe(true); game.update(); expect(feather.active).toBe(false);
+  const feather = of(game, 'starTrail').find((b) => b.sway > 0)!;
+  game.bullets.forEach((b) => { if (b !== feather) b.active = false; });
+  while (feather.age < 145) game.update();
+  expect(feather.active).toBe(true); expect(feather.fadeAt).toBe(0);
+  while (feather.active && feather.age < 1000) game.update();
+  expect(feather.active).toBe(false);
+  expect(feather.x < -25 || feather.x > FIELD.w + 25 || feather.y < -30 || feather.y > FIELD.h + 25).toBe(true);
+});
+
+it('次の飛行が始まっても、画面内の前の周期の羽は残る', () => {
+  const game = flight();
   while (game.phaseFrame < 105 + STAR_FLIGHT_PERIOD - 1) game.update();
-  expect(game.bullets.count).toBe(0); game.update(); expect(of(game, 'starOwl')).toHaveLength(1);
+  const previous = of(game, 'starTrail'); expect(previous.length).toBeGreaterThan(0);
+  game.update(); expect(of(game, 'starOwl')).toHaveLength(1);
+  expect(previous.some((b) => b.active && b.motion === 'starTrail' && b.age > 1)).toBe(true);
 });
 
 it('後半の次の旋回から2羽が手元を出て、24フレームずらして異なる道を飛ぶ', () => {
@@ -66,7 +76,7 @@ it('後半の次の旋回から2羽が手元を出て、24フレームずらし�
   const [x, y] = game.bossPosition(); expect([owls[1].x, owls[1].y]).toEqual([x + 16, y - 6]);
   expect(owls[1].sway).toBe(-owls[0].sway);
   while (game.phaseFrame < 2025 + STAR_FLIGHT_PERIOD - 1) game.update();
-  expect(game.bullets.count).toBe(0);
+  expect(of(game, 'starOwl')).toHaveLength(0); expect(of(game, 'starTrail').length).toBeGreaterThan(0);
 });
 
 it.each(levels)('%sで飛行は自機に追従せず、発射原点が固定され、下端にも羽が届き、弾数は有界', (difficulty) => {
@@ -76,7 +86,9 @@ it.each(levels)('%sで飛行は自機に追従せず、発射原点が固定さ�
   const previous = new Map<Bullet, [number, number]>();
   const probes = [24, 108, 192, 276, 360].map((x) => [x, 398]); const hits = probes.map(() => false);
   for (let i = 0; i < 3599; i++) {
+    const before = of(game, 'starTrail');
     game.update(); other.update();
+    for (const b of before) if (!b.active) expect(b.x < -25 || b.x > FIELD.w + 25 || b.y < -30 || b.y > FIELD.h + 25).toBe(true);
     expect(of(game, 'starOwl').map((b) => [b.x, b.y])).toEqual(of(other, 'starOwl').map((b) => [b.x, b.y]));
     for (const owl of of(game, 'starOwl')) {
       if (!origins.has(owl)) origins.set(owl, [owl.targetX, owl.targetY]);
@@ -87,12 +99,14 @@ it.each(levels)('%sで飛行は自機に追従せず、発射原点が固定さ�
       previous.set(owl, [owl.x, owl.y]);
     }
     maxBullets = Math.max(maxBullets, game.bullets.count); maxOwls = Math.max(maxOwls, of(game, 'starOwl').length);
-    for (const b of of(game, 'starTrail')) if (b.delay === 0) {
+    for (const b of of(game, 'starTrail')) {
+      expect(Math.hypot(b.vx, b.vy)).toBeGreaterThan(0);
+      if (b.delay > 0) continue;
       deepest = Math.max(deepest, b.y);
       probes.forEach(([x, y], index) => { if (bulletContact(x, y, b.x, b.y, b.radius, false) === 'hit') hits[index] = true; });
     }
   }
-  expect(maxOwls).toBe(2); expect(maxBullets).toBeLessThan(120); expect(deepest).toBeGreaterThan(398);
+  expect(maxOwls).toBe(2); expect(maxBullets).toBeLessThan(160); expect(deepest).toBeGreaterThan(398);
   expect(hits.some(Boolean)).toBe(true);
   const path = Array.from({ length: STAR_FLIGHT_TIME }, (_, age) => starFlightPoint(age, 192, 126, 1, 0));
   expect(Math.max(...path.map(([x]) => x)) - Math.min(...path.map(([x]) => x))).toBeGreaterThan(240);

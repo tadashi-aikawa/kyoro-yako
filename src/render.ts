@@ -11,7 +11,7 @@ import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_CHARGE, KISS_FADE, KISS_ORIGIN, KISS_POSE_END, kissEdgeWarning, kissStep } from './patterns/jinrai-kiss';
 import { THUNDER_FADE, THUNDER_HOLD, thunderGround, thunderPath, thunderScene } from './patterns/jinrai-thunder';
 import { DAWN_PERIOD, dawnLane, dawnPrayerStep, eyeX, HYPOTHESIS_COLUMNS, HYPOTHESIS_PERIOD, hypothesisBrightness, hypothesisSide, hypothesisX, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE } from './patterns/minerva';
-import { STAR_FLIGHT_TIME, STAR_TRAIL_LIFE, STAR_TRAIL_WARNING } from './patterns/minerva-flight';
+import { STAR_FLIGHT_TIME, STAR_TRAIL_WARNING } from './patterns/minerva-flight';
 import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-ring';
 import { bogs, enterScene, KEY_ROWS, keyPosition, vimScene } from './patterns/neo';
 import { encoreBogTime } from './patterns/neo-encore';
@@ -772,8 +772,6 @@ export class Renderer {
       c.globalAlpha = 0.45 + progress * 0.35; c.lineWidth = 1.4; c.stroke();
       c.fillStyle = '#fff4d9'; c.beginPath(); c.arc(b.x, b.y, 2.1, 0, Math.PI * 2); c.fill();
     } else {
-      // 消去の直前も輪郭を残し、見えない接触判定にしない。
-      c.globalAlpha = Math.max(0.65, Math.min(1, (STAR_TRAIL_LIFE - b.age) / 18));
       c.translate(b.x, b.y); c.rotate(Math.atan2(b.vy, b.vx) + Math.PI / 2);
       c.fillStyle = color; c.beginPath(); c.moveTo(0, -7);
       c.quadraticCurveTo(5, -1, 1, 5); c.lineTo(0, 7); c.lineTo(-1, 4);
