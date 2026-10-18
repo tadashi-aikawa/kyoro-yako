@@ -171,8 +171,14 @@ export function emitMinerva(game: Game, pattern: string): void {
       if (b) { b.motion = 'citation'; b.gridRow = 0; b.releaseAt = warning; b.radius = 6; }
     }
   }
-  if (pattern === 'interview' && t % INTERVIEW_PERIOD[level] === 0) {
-    const wave = Math.floor(t / INTERVIEW_PERIOD[level]);
+  const interviewThreshold = ((game.phase?.duration ?? 60) - 30) * 60;
+  const interviewLate = game.phaseFrame > interviewThreshold;
+  const interviewPeriod = INTERVIEW_PERIOD[level] / (interviewLate ? 2 : 1);
+  if (pattern === 'interview' && t % interviewPeriod === 0) {
+    // 切替前に飛ばした半周期を引き、回転方向・穴の向き・色の順番を引き継ぐ。
+    const skipped = interviewLate
+      ? Math.floor((interviewThreshold - 105) / interviewPeriod) - Math.floor((interviewThreshold - 105) / INTERVIEW_PERIOD[level]) : 0;
+    const wave = Math.floor(t / interviewPeriod) - skipped;
     // 下側の画面内へ穴を向ける。輪ごとに左右を変え、下端での撃ち続けを通さない。
     const gap = Math.atan2(420 - y, 192 + Math.sin(wave * 1.05 + 0.6) * 135 - x);
     // 数百発を重ねず、描画・更新・当たり判定を輪1本で扱う。

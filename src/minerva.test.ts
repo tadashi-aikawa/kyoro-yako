@@ -119,11 +119,11 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊の輪�
   expect(interviewRingDistance(ring, ring.x + Math.cos(ring.gap) * ring.radius, ring.y + Math.sin(ring.gap) * ring.radius)).toBeGreaterThan(10);
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sでも連続した輪に穴が1か所だけあり、次の穴へ移動する時間がある', (difficulty) => {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sでも連続した輪に穴が1か所だけあり、序盤は次の穴へ移動する時間がある', (difficulty) => {
   const game = phase(11, difficulty);
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
   const centers: number[] = [];
-  for (let wave = 0; wave < 8; wave++) {
+  for (let wave = 0; 105 + wave * INTERVIEW_PERIOD[level] <= 1800; wave++) {
     game.interviewRings.length = 0; game.phaseFrame = 105 + wave * INTERVIEW_PERIOD[level];
     emitMinerva(game, 'interview');
     expect(game.bullets.count).toBe(0);
@@ -144,6 +144,26 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで
   expect(Math.max(...centers) - Math.min(...centers)).toBeGreaterThan(120);
   for (let i = 1; i < centers.length; i++) {
     expect(Math.abs(centers[i] - centers[i - 1]) / 1.65 + 30).toBeLessThan(INTERVIEW_PERIOD[level]);
+  }
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで残り30秒未満から放出間隔を半分にし、回転方向の交互を保つ', (difficulty) => {
+  const game = phase(11, difficulty);
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
+  const period = INTERVIEW_PERIOD[level];
+  let wave = 0;
+  for (let frame = 105; frame < 3600; frame++) {
+    game.phaseFrame = frame; game.interviewRings.length = 0;
+    emitMinerva(game, 'interview');
+    const expected = (frame - 105) % (frame > 1800 ? period / 2 : period) === 0;
+    expect(game.interviewRings).toHaveLength(expected ? 1 : 0);
+    if (!expected) continue;
+    const ring = game.interviewRings[0];
+    expect(Math.sign(ring.spin)).toBe(wave % 2 ? -1 : 1);
+    expect(ring.color).toBe(wave % 4);
+    expect(ring.speed).toBe(INTERVIEW_SPEED[level]);
+    expect(ring.delay).toBe(MINERVA_WARNING[level]);
+    wave++;
   }
 });
 
