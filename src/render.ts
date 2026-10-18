@@ -10,7 +10,7 @@ import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_CHARGE, KISS_FADE, KISS_ORIGIN, KISS_POSE_END, kissEdgeWarning, kissStep } from './patterns/jinrai-kiss';
 import { DAWN_PERIOD, dawnLane, dawnPrayerStep, eyeX, HYPOTHESIS_COLUMNS, HYPOTHESIS_PERIOD, hypothesisBrightness, hypothesisSide, hypothesisX, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE } from './patterns/minerva';
 import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-ring';
-import { bogs, enterScene, KEY_ROWS, keyPosition, VIM_MOVE, vimScene } from './patterns/neo';
+import { bogs, enterScene, KEY_ROWS, keyPosition, VIM_LINE_HEIGHT, vimLineY, vimScene } from './patterns/neo';
 import { encoreBogTime } from './patterns/neo-encore';
 import { SWEEP_CHARGE, SWEEP_MOVE, SWEEP_PERIOD, SWEEP_SHOTS, sweepStep, sweepTarget, tags } from './patterns/obsidia';
 import { FIELD, MAX_POWER } from './rules';
@@ -660,7 +660,8 @@ export class Renderer {
       c.shadowColor = PALETTE[b.color]; c.shadowBlur = b.delay > 0 ? 5 : 3;
       c.fillStyle = PALETTE[b.color]; c.strokeStyle = '#fff5db'; c.lineWidth = 1;
       c.beginPath(); c.roundRect(b.x - 9, b.y - 8, 18, 16, 2); c.fill(); c.stroke();
-      c.shadowBlur = 0; this.text(b.keyLabel, b.x, b.y + 3, b.keyLabel.length > 1 ? 8 : 10, '#221d39', 'center');
+      const label = b.motion === 'vim' && b.gridColumn === 0 ? `${b.gridRow + 1}` : b.keyLabel;
+      c.shadowBlur = 0; this.text(label, b.x, b.y + 3, label.length > 1 ? 8 : 10, '#221d39', 'center');
       c.restore(); return;
     }
     const edge = kissEdgeWarning(b);
@@ -799,24 +800,36 @@ export class Renderer {
     }
     const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
     if (pattern === 'vim' && t >= 0) {
-      const { command, step, warning, dx, dy } = vimScene(t, level);
-      const descriptions = { h: 'h ←', j: 'j ↓', k: 'k ↑', l: 'l →', dd: 'dd' };
-      if (step < warning + VIM_MOVE) {
-        this.text(descriptions[command], 192, 254, 24, '#fff0b7', 'center');
-        this.text('-- NORMAL --', 192, 274, 11, '#bfc9a0', 'center');
-      }
-      if (step < warning) {
-        game.bullets.forEach((b) => {
-          if (b.motion !== 'vim' || b.delay <= 0) return;
-          c.strokeStyle = command === 'dd' && b.gridRow === 1 ? '#ffb6d8' : '#a2d8e866';
-          c.lineWidth = 1;
-          if (command === 'dd' && b.gridRow === 1) {
-            c.beginPath(); c.moveTo(b.x - 9, b.y); c.lineTo(b.x + 9, b.y); c.stroke();
-          } else {
-            c.strokeRect(b.x + dx - 9, b.y + dy - 8, 18, 16);
-            c.beginPath(); c.moveTo(b.x, b.y); c.lineTo(b.x + dx, b.y + dy); c.stroke();
+      const scene = vimScene(t, level);
+      const keys = game.bullets.objects.filter((b) => b.active && b.motion === 'vim' && b.dashWave === scene.wave);
+      // 表示も実際に残る弾に従わせ、ボムで消した編集画面を残さない。
+      if (keys.length && scene.step < scene.launchAt) {
+        const selecting = scene.step >= scene.yankAt && scene.step < scene.editAt;
+        const rowY = vimLineY(scene.cursorRow);
+        c.fillStyle = selecting ? scene.remove ? '#d56d982b' : '#78d8e82b' : '#fff0b712';
+        c.fillRect(15, rowY - 11, 366, selecting && scene.remove ? VIM_LINE_HEIGHT * scene.remove - 2 : 22);
+        c.strokeStyle = selecting && scene.remove ? '#ffa8cd' : '#fff0b7'; c.lineWidth = 1;
+        c.strokeRect(16, rowY - 10, 363, 20);
+        c.fillStyle = '#fff0b7'; c.fillRect(24, rowY - 7, 3, 14);
+        if (selecting && scene.copies) {
+          c.strokeStyle = '#88e5f699'; c.setLineDash([3, 3]);
+          for (let i = 0; i < scene.copies; i++) c.strokeRect(21, vimLineY(scene.line + i) - 10, 357, 20);
+          c.setLineDash([]);
+        }
+        c.fillStyle = '#111729e8'; c.fillRect(58, 337, 268, 43);
+        c.font = 'bold 26px ui-monospace, monospace'; c.textAlign = 'left';
+        const widths = scene.tokens.map((token) => c.measureText(token).width);
+        let x = 192 - widths.reduce((sum, w) => sum + w, 0) / 2;
+        for (const [i, token] of scene.tokens.entries()) {
+          c.fillStyle = scene.token < 0 || i === scene.token ? '#fff0b7' : '#8a96aa';
+          c.fillText(token, x, 361);
+          if (i === scene.token) {
+            c.fillStyle = '#fff0b7'; c.fillRect(x, 365, widths[i], 2);
           }
-        });
+          x += widths[i];
+        }
+        this.text('-- NORMAL --', 192, 377, 9, '#bfc9a0', 'center');
+        if (scene.step >= scene.launchAt - 24) this.text('▼', 302, 359, 14, '#fff0b7', 'center');
       }
     }
     if (pattern === 'dotfiles' && t >= -[120, 95, 75, 60][level]) {

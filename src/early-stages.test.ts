@@ -66,7 +66,8 @@ it('キーバインドは光るキーだけが予告後に落ち、Vimのキー�
   expect(keys[0].y).toBeGreaterThan(y);
   const vim = start(1, 3);
   const caps = vim.bullets.objects.filter((b) => b.active && b.motion === 'vim');
-  expect(caps).toHaveLength(30);
+  expect(new Set(caps.map((b) => b.gridRow)).size).toBe(7);
+  expect(caps.length).toBeGreaterThan(90);
   expect(caps.every((b) => b.delay > 0)).toBe(true);
 });
 
