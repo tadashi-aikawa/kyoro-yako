@@ -631,10 +631,11 @@ export class Game {
   }
 
   private supplyPhaseItems(): void {
-    const kinds: ItemKind[] = Array<ItemKind>(10).fill('small');
-    // 小P10個は毎回出し、追加資源だけを抽選する。ライフとボムは同時には出さない。
+    const multiplier = this.stage >= 4 && !this.midboss ? 2 : 1;
+    const kinds: ItemKind[] = Array<ItemKind>(10 * multiplier).fill('small');
+    // 後半の本ボスはP量と追加品の確率を倍増する。ライフとボムは同時には出さない。
     const roll = Math.random();
-    const bonus: ItemKind | undefined = roll < 0.02 ? 'life' : roll < 0.32 ? 'bomb' : undefined;
+    const bonus: ItemKind | undefined = roll < 0.02 * multiplier ? 'life' : roll < 0.32 * multiplier ? 'bomb' : undefined;
     // 追加品がいつも同じ区画へ出ないよう、散布順のランダムな位置へ挿入する。
     if (bonus) kinds.splice(Math.floor(Math.random() * (kinds.length + 1)), 0, bonus);
     kinds.forEach((kind, index) => { this.scatterItem(kind, index, kinds.length); });

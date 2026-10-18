@@ -236,3 +236,26 @@ it('抽選されたライフは拾ったときだけ残機が増える', () => {
   game.px = life.x; game.py = life.y; game.update();
   expect(game.lives).toBe(3);
 });
+
+it.each([4, 5])('%s面の本ボスは小P20個を出し、追加品の確率も倍増する', (stage) => {
+  for (const [roll, bonus] of [
+    [0, 'life'], [0.039999, 'life'], [0.04, 'bomb'],
+    [0.639999, 'bomb'], [0.64, undefined], [0.999999, undefined],
+  ] as const) {
+    const game = start(stage);
+    vi.mocked(Math.random).mockReturnValueOnce(roll);
+    game.skipPhase();
+    const drops = supplies(game);
+    expect(drops.filter((item) => item.kind === 'small')).toHaveLength(20);
+    expect(drops.filter((item) => item.kind !== 'small').map((item) => item.kind)).toEqual(bonus ? [bonus] : []);
+    expect(drops.every((item) => item.manual && !item.auto)).toBe(true);
+  }
+});
+
+it.each([1, 2, 3, 4, 5])('%s面の中ボスは従来の補充量と確率を保つ', (stage) => {
+  const game = start(stage, 0, true);
+  vi.mocked(Math.random).mockReturnValueOnce(0.5);
+  game.skipPhase();
+  expect(supplies(game)).toHaveLength(10);
+  expect(supplies(game).every((item) => item.kind === 'small')).toBe(true);
+});
