@@ -7,6 +7,8 @@ import { CLONE_CHARGE, jinraiCloneScene } from './jinrai-clone';
 export const BURST_MOVE = 18;
 export const BURST_SHOTS = [48, 66, 84] as const;
 export const BURST_RETURN = 96;
+export const BURST_SPEED = 5.6;
+export const BURST_PETAL_RATIO = 0.92;
 const BURST_DURATION = 120;
 // 開始15秒から8秒ごと。煙で消え、中央へ瞬間移動して三連発散する。
 export function dashBurstStep(frame: number): number { return frame >= 900 && (frame - 900) % 480 < BURST_DURATION ? (frame - 900) % 480 : -1; }
@@ -146,12 +148,13 @@ export function emitJinraiPattern(game: Game, pattern: string, t: number): void 
         game.spark(192, 224, '#fff3b0', 32);
         const n = [24, 32, 40, 48][level];
         const offset = (burst - BURST_SHOTS[0]) * 0.02 + Math.floor((game.phaseFrame - 900) / 480) * 0.3;
+        // 通常攻撃(5.1×unit)より気持ち速く。花びらも通常攻撃を下回らない速さで後を追う。
+        const speed = bulletSpeed(game.difficulty, BURST_SPEED);
         for (let i = 0; i < n; i++) {
           if (i % (n / 4) === 0) continue;
           const angle = offset + i * Math.PI * 2 / n;
-          const speed = 1.35 + level * 0.18;
           game.spawnBullet(192, 224, Math.cos(angle) * speed, Math.sin(angle) * speed, 2, 'needle');
-          const petal = game.spawnBullet(192, 224, Math.cos(angle + 0.08) * speed * 0.65, Math.sin(angle + 0.08) * speed * 0.65, 3 + i % 3, 'petal');
+          const petal = game.spawnBullet(192, 224, Math.cos(angle + 0.08) * speed * BURST_PETAL_RATIO, Math.sin(angle + 0.08) * speed * BURST_PETAL_RATIO, 3 + i % 3, 'petal');
           if (petal) petal.radius = 2.5;
         }
       }

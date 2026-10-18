@@ -3,6 +3,7 @@ import { Game } from './game';
 import { emitBossNormal, normalPeriod } from './patterns/boss-normal';
 import { emitJinraiPattern } from './patterns/jinrai';
 import { jinraiCloneScene } from './patterns/jinrai-clone';
+import { bulletSpeed } from './rules';
 import { MID_PHASE, STAGES } from './stages';
 
 beforeEach(() => {
@@ -188,6 +189,18 @@ it('一閃は15秒後に煙で消えて中央へ瞬間移動し、雷と花び�
   expect(game.jinraiDashTick).toBe(0);
   while (game.phaseFrame < 1380) game.update();
   expect(game.bossXY.every(Number.isFinite)).toBe(true);
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('一閃の発散は針も花びらも通常攻撃より気持ち速い: %s', (difficulty) => {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true;
+  game.difficulty = difficulty; game.startStage(4); game.startBoss(false, 10);
+  while (game.phaseFrame < 948) game.update();
+  const speeds = (kind: string) => game.bullets.objects.filter((b) => b.active && b.age === 1 && b.kind === kind).map((b) => Math.hypot(b.vx, b.vy));
+  const normal = bulletSpeed(difficulty, 5.1);
+  for (const kind of ['needle', 'petal']) {
+    expect(Math.min(...speeds(kind)), kind).toBeGreaterThan(normal);
+    expect(Math.max(...speeds(kind)), kind).toBeLessThan(normal * 1.15);
+  }
 });
 
 it('忍術で消えている間はショットが本体のいた場所を通り抜ける', () => {
