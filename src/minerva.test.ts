@@ -27,8 +27,8 @@ it('5面は通常5回とスペル8枚を設計順に持ち、全番号に直行�
     expect(game.phaseIndex).toBe(index);
   }
   expect(phases.map((p) => p.pattern)).toEqual([
-    'dawnFan', 'sevenRings', 'dawnSpiral', 'question', 'dawnFan', 'hypothesis',
-    'dawnSpiral', 'owlEye', 'dawnFan', 'recall', 'citation', 'interview', 'owlDawn',
+    'minervaStarFan', 'sevenRings', 'minervaStarRings', 'question', 'minervaStarFan', 'hypothesis',
+    'minervaStarRings', 'owlEye', 'minervaStarFan', 'recall', 'citation', 'interview', 'owlDawn',
   ]);
 });
 

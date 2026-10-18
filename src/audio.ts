@@ -1,5 +1,5 @@
 export type Sound = 'shot' | 'hit' | 'graze' | 'kill' | 'bomb' | 'declare' | 'capture' | 'item' | 'extend'
-  | 'enemyShot' | 'laser' | 'thunder' | 'thunderBurst' | 'ninpo' | 'slash' | 'wind' | 'turn' | 'split' | 'sweepCharge' | 'sweepBurst' | 'prayerCharge';
+  | 'enemyShot' | 'jinraiShot' | 'laser' | 'thunder' | 'thunderBurst' | 'ninpo' | 'slash' | 'wind' | 'turn' | 'split' | 'sweepCharge' | 'sweepBurst' | 'prayerCharge';
 // 周波数・秒数・波形・終端周波数・音量・最短間隔。
 // 常時鳴る自機ショットを抑え、敵の発射と仕掛けの切り替わりを聞き取れる比率にする。
 const tones: Record<Sound, [number, number, OscillatorType, number, number, number]> = {
@@ -8,6 +8,7 @@ const tones: Record<Sound, [number, number, OscillatorType, number, number, numb
   bomb: [125, 0.7, 'sawtooth', 40, 0.12, 0.025], declare: [220, 0.7, 'triangle', 880, 0.16, 0.3],
   capture: [880, 0.6, 'triangle', 1188, 0.12, 0.025], item: [950, 0.06, 'sine', 1283, 0.12, 0.025],
   extend: [660, 0.5, 'triangle', 891, 0.12, 0.025], enemyShot: [520, 0.08, 'triangle', 190, 0.2, 0.11],
+  jinraiShot: [1700, 0.055, 'sawtooth', 130, 0.28, 0.055],
   laser: [180, 0.45, 'sawtooth', 960, 0.18, 0.3], thunder: [90, 0.5, 'sawtooth', 40, 0.24, 0.25],
   slash: [1500, 0.2, 'triangle', 120, 0.22, 0.18], wind: [280, 0.65, 'sine', 700, 0.2, 0.5],
   turn: [760, 0.18, 'sine', 240, 0.22, 0.16], split: [1200, 0.1, 'triangle', 540, 0.15, 0.12],
@@ -55,13 +56,13 @@ export class AudioBank {
         overtone.connect(mix).connect(gain);
         overtone.onended = () => { overtone.disconnect(); mix.disconnect(); };
         overtone.start(now); overtone.stop(now + duration);
-      } else gain.gain.linearRampToValueAtTime(this.volume * peak, now + 0.005);
+      } else gain.gain.linearRampToValueAtTime(this.volume * peak, now + (sound === 'jinraiShot' ? 0.0015 : 0.005));
       gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
       oscillator.connect(gain).connect(this.context.destination);
       oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
       oscillator.start(now);
       oscillator.stop(now + duration);
-      if (sound === 'thunder' || sound === 'thunderBurst' || sound === 'ninpo' || sound === 'slash' || sound === 'wind' || sound === 'declare' || sound === 'sweepBurst') this.noise(now, sound === 'thunderBurst' ? 0.55 : duration, sound);
+      if (sound === 'thunder' || sound === 'thunderBurst' || sound === 'ninpo' || sound === 'slash' || sound === 'wind' || sound === 'declare' || sound === 'sweepBurst' || sound === 'jinraiShot') this.noise(now, sound === 'thunderBurst' ? 0.55 : duration, sound);
     } catch { /* audio is optional when browser blocks it */ }
   }
 
@@ -78,7 +79,7 @@ export class AudioBank {
     filter.frequency.exponentialRampToValueAtTime(sound === 'wind' ? 3200 : 160, now + duration);
     const gain = context.createGain();
     gain.gain.setValueAtTime(0.001, now);
-    gain.gain.linearRampToValueAtTime(this.volume * (sound === 'declare' ? 0.14 : sound === 'thunderBurst' ? 0.3 : 0.22), now + (sound === 'wind' ? 0.15 : 0.008));
+    gain.gain.linearRampToValueAtTime(this.volume * (sound === 'declare' ? 0.14 : sound === 'thunderBurst' ? 0.3 : 0.22), now + (sound === 'wind' ? 0.15 : sound === 'jinraiShot' ? 0.002 : 0.008));
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
     source.connect(filter).connect(gain).connect(context.destination);
     source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); };

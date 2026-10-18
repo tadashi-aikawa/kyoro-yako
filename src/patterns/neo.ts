@@ -1,5 +1,4 @@
 import type { Game } from '../game';
-import { DIFFICULTY, density } from '../rules';
 
 const levelOf = (game: Game) => ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
 export function bogs(t: number): [number, number, number][] {
@@ -14,22 +13,6 @@ export function inBog(x: number, y: number, t: number): boolean {
 export function emitNeo(game: Game, pattern: string, t: number): void {
   const level = levelOf(game);
   const [x, y] = game.bossPosition();
-  const unit = 0.9 + (DIFFICULTY[game.difficulty] - 1) * 0.18;
-  const interval = (n: number) => Math.max(4, Math.round(n / DIFFICULTY[game.difficulty]));
-  if (pattern === 'gateFan' && t % interval(58) === 0) {
-    const aim = Math.atan2(game.py - y, game.px - x);
-    for (let i = -2; i <= 2; i++) game.spawnBullet(x, y, Math.cos(aim + i * 0.2) * 1.15 * unit, Math.sin(aim + i * 0.2) * 1.15 * unit, 2);
-    const n = density(game.difficulty, 18);
-    for (let i = 0; i < n; i++) {
-      if (i === n - 1 || i === n - 2) continue;
-      const a = t * 0.009 + i * Math.PI * 2 / n;
-      game.spawnBullet(x, y, Math.cos(a) * 0.72 * unit, Math.sin(a) * 0.72 * unit, 1, 'star');
-    }
-  }
-  if (pattern === 'gateSpiral' && t % interval(10) === 0) for (let i = 0; i < 3; i++) {
-    const a = t * 0.035 + i * Math.PI * 2 / 3;
-    game.spawnBullet(x, y, Math.cos(a) * 1.15 * unit, Math.sin(a) * 1.15 * unit, 2, 'star');
-  }
   if (pattern === 'keyRain' && t % [190, 170, 150, 130][level] === 0) {
     const row = Math.floor(t / [190, 170, 150, 130][level]) % 3;
     const columns = [9, 10, 11, 12][level];

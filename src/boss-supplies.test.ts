@@ -74,19 +74,22 @@ it('喰らいボムではPowerを失わず、被弾時の回収品も出ない',
   expect(supplies(game)).toHaveLength(0);
 });
 
-it('フェーズ補充は直接加算せず、2フェーズ目のPとボムを離して出す', () => {
+it('補充は小P10個を広く散布し、抽選されたボムも手で拾う', () => {
   const game = start(1, 1);
   game.bombs = 0;
+  vi.mocked(Math.random).mockReturnValueOnce(0.1);
   game.phaseHp = 0;
   game.update();
   const drops = supplies(game);
-  expect(drops.map((item) => item.kind)).toEqual(['large', 'bomb']);
+  expect(drops.filter((item) => item.kind === 'small')).toHaveLength(10);
+  const bomb = drops.find((item) => item.kind === 'bomb')!;
+  expect(bomb).toBeDefined();
   expect(drops.every((item) => !item.auto)).toBe(true);
-  expect(Math.abs(drops[0].x - drops[1].x)).toBeGreaterThan(100);
+  expect(Math.max(...drops.map((i) => i.x)) - Math.min(...drops.map((i) => i.x))).toBeGreaterThan(250);
   run(game, 104);
   expect(game.power).toBe(0);
   expect(game.bombs).toBe(0);
-  game.px = drops[1].x; game.py = drops[1].y;
+  game.px = bomb.x; game.py = bomb.y;
   game.update();
   expect(game.bombs).toBe(1);
 });
@@ -94,9 +97,10 @@ it('フェーズ補充は直接加算せず、2フェーズ目のPとボムを�
 it.each([0.05, 0.5, 0.95])('補充位置は乱数%sで変わり、フィールド内に留まる', (random) => {
   vi.mocked(Math.random).mockReturnValue(random);
   const game = start(1, 1);
+  vi.mocked(Math.random).mockReturnValueOnce(0.5);
   game.skipPhase();
   const drops = supplies(game);
-  expect(drops[0].x).toBeCloseTo(24 + ((0.2 + random * 0.6) / 2) * 336);
+  expect(drops[0].x).toBeCloseTo(24 + ((0.2 + random * 0.6) / 5) * 336);
   game.px = 12; game.py = 439;
   run(game, 104);
   expect(supplies(game).every((item) => item.x >= 12 && item.x <= 372)).toBe(true);
@@ -108,17 +112,20 @@ it('時間切れでも手動回収の補充品を出す', () => {
   game.phaseFrame = game.phase!.duration * 60 - 1;
   game.update();
   expect(game.phaseIndex).toBe(2);
-  expect(supplies(game).map((item) => item.kind)).toEqual(['large', 'bomb']);
+  expect(supplies(game)).toHaveLength(10);
+  expect(supplies(game).every((item) => item.kind === 'small')).toBe(true);
   expect(game.power).toBe(0);
   expect(game.bombs).toBe(0);
 });
 
 it('弾消しで点アイテムがプールを埋めても補充品を優先する', () => {
   const game = start(1, 1);
+  vi.mocked(Math.random).mockReturnValueOnce(0.1);
   for (let i = 0; i < 2600; i++) game.spawnBullet(192, 120, 0, 0, 0, 'orb');
   game.phaseHp = 0;
   game.update();
-  expect(supplies(game).map((item) => item.kind)).toEqual(['large', 'bomb']);
+  expect(supplies(game).filter((item) => item.kind === 'small')).toHaveLength(10);
+  expect(supplies(game).some((item) => item.kind === 'bomb')).toBe(true);
 });
 
 it('全ステージの戦闘最後に回収時間を設け、拾わなければ補充しない', () => {
@@ -148,6 +155,7 @@ it('全ステージの戦闘最後に回収時間を設け、拾わなければ�
 it('回収時間中は移動でき、ポーズで時計が止まり、再開後に回収して会話へ進む', () => {
   const game = start(3, 0, true);
   game.bombs = 0;
+  vi.mocked(Math.random).mockReturnValueOnce(0.1);
   game.skipPhase();
   listeners.keydown({ code: 'Escape', repeat: false, preventDefault: () => {} });
   game.update();
@@ -161,7 +169,7 @@ it('回収時間中は移動でき、ポーズで時計が止まり、再開後�
   for (const target of supplies(game)) {
     game.px = target.x; game.py = target.y; game.update();
   }
-  expect(game.power).toBe(1);
+  expect(game.power).toBe(0.5);
   expect(game.bombs).toBe(1);
   run(game, game.collectionFrames);
   expect(game.scene).toBe('dialogue');
@@ -191,17 +199,40 @@ it('5面中ボスの時間延長は戦闘終了まで補充を増やさない', 
   }
   game.phaseFrame = game.phase!.duration * 60 - 1;
   game.update();
-  expect(supplies(game)).toHaveLength(2);
+  expect(supplies(game)).toHaveLength(10);
   expect(game.collectionFrames).toBe(180);
 });
 
 it('拾ってもPower4・ボム8を超えず、被弾でもボム備蓄を失わない', () => {
   const game = start(3, 0, true);
   game.power = 4; game.bombs = 8;
+  vi.mocked(Math.random).mockReturnValueOnce(0.1);
   game.skipPhase();
   for (const target of supplies(game)) { game.px = target.x; game.py = target.y; game.update(); }
   expect(game.power).toBe(4); expect(game.bombs).toBe(8);
   game.startBoss(false, 1);
   hit(game, 4);
   expect(game.bombs).toBe(8);
+});
+
+it.each([
+  [0, 'life'], [0.019999, 'life'], [0.02, 'bomb'],
+  [0.319999, 'bomb'], [0.32, undefined], [0.999999, undefined],
+] as const)('追加品の抽選値%sは%sを出し、小P10個は維持する', (roll, bonus) => {
+  const game = start();
+  vi.mocked(Math.random).mockReturnValueOnce(roll);
+  game.skipPhase();
+  const drops = supplies(game);
+  expect(drops.filter((item) => item.kind === 'small')).toHaveLength(10);
+  expect(drops.filter((item) => item.kind !== 'small').map((item) => item.kind)).toEqual(bonus ? [bonus] : []);
+});
+
+it('抽選されたライフは拾ったときだけ残機が増える', () => {
+  const game = start();
+  vi.mocked(Math.random).mockReturnValueOnce(0.01);
+  game.skipPhase();
+  expect(game.lives).toBe(2);
+  const life = supplies(game).find((item) => item.kind === 'life')!;
+  game.px = life.x; game.py = life.y; game.update();
+  expect(game.lives).toBe(3);
 });

@@ -1,6 +1,5 @@
 import type { Bullet, Game } from '../game';
 import { circlesHit, DIFFICULTY, density } from '../rules';
-import { emitCommon } from './common';
 
 export const MINERVA_WARNING = [90, 70, 55, 42] as const;
 export const HYPOTHESIS_PERIOD = [210, 185, 165, 145] as const;
@@ -87,14 +86,6 @@ export function emitMinerva(game: Game, pattern: string): void {
       game.spawnBullet(cx, cy, Math.cos(angle) * speed, Math.sin(angle) * speed, color, kind);
     }
   };
-  if (pattern === 'dawnFan') {
-    emitCommon(game, 'fan');
-    if (t % interval(28) === 0) ring(x, y, count(14), 1.4 * unit, 2, t * 0.033, 0, 'star');
-  }
-  if (pattern === 'dawnSpiral') {
-    emitCommon(game, 'spiral');
-    if (t % interval(44) === 0) ring(x, y, count(24), 1.12 * unit, 1, t * -0.018, 0, 'petal');
-  }
   if (pattern === 'sevenRings' && t % interval(330) === 0) {
     for (let layer = 0; layer < 7; layer++) {
       const radius = 76 + layer * 18;

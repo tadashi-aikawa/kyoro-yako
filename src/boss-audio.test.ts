@@ -13,13 +13,22 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 it('発射SEは斉射の弾数によらず1フレーム1回で、道中には混ざらない', () => {
   const game = new Game();
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
-  game.startStage(4);
+  game.startStage(3);
   game.spawnBullet(192, 80, 0, 1, 0);
   expect(play).not.toHaveBeenCalled();
   game.startBoss(false, 0);
   for (let i = 0; i < 100; i++) game.spawnBullet(192, 80, 0, 1, 0);
   game.update();
   expect(play.mock.calls.filter(([sound]) => sound === 'enemyShot')).toHaveLength(1);
+});
+
+it('迅雷の通常攻撃は短い専用SEを斉射ごとに1回鳴らし、汎用SEと重ねない', () => {
+  const game = new Game(); game.invincible = true; game.startStage(4); game.startBoss(false, 0);
+  const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
+  game.phaseFrame = 104; game.update();
+  expect(game.bullets.count).toBeGreaterThan(1);
+  expect(play.mock.calls.filter(([sound]) => sound === 'jinraiShot')).toHaveLength(1);
+  expect(play).not.toHaveBeenCalledWith('enemyShot');
 });
 
 it('発射SEは予告中に鳴らず、インタビューの輪が動き始める時に鳴る', () => {

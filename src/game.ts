@@ -2,9 +2,9 @@ import { AudioBank } from './audio';
 import { type BgmCue, BgmPlayer } from './bgm';
 import { dialogue, ENDINGS, type Line, midDialogue } from './dialogue';
 import { ENEMY_ROOMS, enemyFireFrames } from './enemy-design';
+import { emitBossNormal } from './patterns/boss-normal';
 import { emitChappy } from './patterns/chappy';
 import { claudineScene, complementBoundary, emitClaudine, whiteSpaceCircle } from './patterns/claudine';
-import { emitCommon } from './patterns/common';
 import { emitEtokichi } from './patterns/etokichi';
 import { burstPosition, burstVisibility, dashBurstStep, dashPosition, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
 import { dawnPosition, emitMinerva, eyeX, updateDawnOwls } from './patterns/minerva';
@@ -595,9 +595,12 @@ export class Game {
   }
 
   private supplyPhaseItems(): void {
-    const kinds: ItemKind[] = ['large'];
-    // ボムは2フェーズに1個。時間切れでも補充し、低Powerで倒せない状態からも立て直せるようにする。
-    if (this.midboss || this.phaseIndex % 2 === 1) kinds.push('bomb');
+    const kinds: ItemKind[] = Array<ItemKind>(10).fill('small');
+    // 小P10個は毎回出し、追加資源だけを抽選する。ライフとボムは同時には出さない。
+    const roll = Math.random();
+    const bonus: ItemKind | undefined = roll < 0.02 ? 'life' : roll < 0.32 ? 'bomb' : undefined;
+    // 追加品がいつも同じ区画へ出ないよう、散布順のランダムな位置へ挿入する。
+    if (bonus) kinds.splice(Math.floor(Math.random() * (kinds.length + 1)), 0, bonus);
     kinds.forEach((kind, index) => { this.scatterItem(kind, index, kinds.length); });
   }
 
@@ -684,13 +687,13 @@ export class Game {
 
   private emitPattern(pattern: string): void {
     const t = this.phaseFrame - 105;
-    if (pattern.startsWith('jinrai')) emitJinraiPattern(this, pattern, t);
+    if (this.phase?.kind === 'normal') emitBossNormal(this, pattern, t);
+    else if (pattern.startsWith('jinrai')) emitJinraiPattern(this, pattern, t);
     else if (pattern === 'etoile') emitEtokichi(this, t);
     else if (this.stage === 1 && !this.midboss) emitNeo(this, pattern, t);
-    else if (this.stage === 2 && !['fan', 'spiral'].includes(pattern)) emitObsidia(this, pattern, t);
+    else if (this.stage === 2) emitObsidia(this, pattern, t);
     else if (pattern === 'neoEncore') emitNeoEncore(this, t);
     else if (pattern === 'codex') emitChappy(this, pattern, t);
-    else if (['fan', 'spiral'].includes(pattern)) emitCommon(this, pattern);
     else if (this.boss === 'claudine') emitClaudine(this, pattern, t);
     else if (this.stage === 5) emitMinerva(this, pattern);
   }
@@ -724,7 +727,8 @@ export class Game {
         b.launchSoundPending = false;
         // 予告のdelayを通過した最初の移動フレームで、斉射をまとめて鳴らす。
         if (this.phase && this.boss && this.lastBossShotFrame !== this.frame) {
-          this.lastBossShotFrame = this.frame; this.audio.play('enemyShot');
+          this.lastBossShotFrame = this.frame;
+          this.audio.play(this.boss === 'jinrai' && this.phase.kind === 'normal' ? 'jinraiShot' : 'enemyShot');
         }
       }
       if (b.motion === 'codexBox' && b.age >= b.releaseAt) {

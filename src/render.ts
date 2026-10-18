@@ -318,7 +318,7 @@ export class Renderer {
     game.enemies.forEach((enemy) => { this.enemy(game, enemy); });
     game.clones.forEach((clone) => { this.clone(clone, game.frame); });
     game.items.forEach((item) => { this.item(item); });
-    this.jinraiTelegraphs(game);
+    this.jinraiSpellTelegraphs(game);
     this.stageTelegraphs(game);
     this.minervaTelegraphs(game);
     for (const owl of game.dawnOwls) {
@@ -362,10 +362,10 @@ export class Renderer {
     c.restore();
   }
 
-  private jinraiTelegraphs(game: Game): void {
-    const c = this.ctx;
+  private jinraiSpellTelegraphs(game: Game): void {
     const pattern = game.phase?.pattern;
-    if (!pattern?.startsWith('jinrai')) return;
+    if (!pattern?.startsWith('jinrai') || game.phase?.kind === 'normal') return;
+    const c = this.ctx;
     const t = game.phaseFrame - 105;
     if (pattern === 'jinraiSakura' && t >= SAKURA_PERIOD) {
       const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);

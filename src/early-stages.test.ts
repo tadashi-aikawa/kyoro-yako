@@ -103,7 +103,7 @@ it('書棚は背表紙の予告後に突き出し、リングの点滅弾は消�
 });
 
 it('3面のボスは通常4回とスペル6枚を順に出す', () => {
-  expect(STAGES[2].phases.map((phase) => phase.pattern)).toEqual(['fan', 'trim', 'spiral', 'type', 'fan', 'grid', 'spiral', 'complement', 'whiteSpace', 'final']);
+  expect(STAGES[2].phases.map((phase) => phase.pattern)).toEqual(['claudinePetalArc', 'trim', 'claudineQuietRings', 'type', 'claudinePetalArc', 'grid', 'claudineQuietRings', 'complement', 'whiteSpace', 'final']);
   expect(STAGES[2].phases.filter((phase) => phase.spell)).toHaveLength(6);
 });
 
