@@ -29,7 +29,7 @@ it('5面は通常5回とスペル8枚を設計順に持ち、全番号に直行�
   }
   expect(phases.map((p) => p.pattern)).toEqual([
     'minervaStarFan', 'sevenRings', 'minervaStarRings', 'question', 'minervaStarFan', 'hypothesis',
-    'minervaStarRings', 'owlEye', 'minervaStarFan', 'recall', 'citation', 'interview', 'owlDawn',
+    'minervaStarRings', 'owlEye', 'minervaStarFan', 'recall', 'starFlight', 'interview', 'owlDawn',
   ]);
 });
 
@@ -59,23 +59,6 @@ it('視線は左右へ等速で往復し、当たる弾だけ停止する', () =
   game.phaseFrame = 224;
   game.update();
   expect(watched.y).toBeGreaterThan(200);
-});
-
-it('孫引きは2回だけ二分裂して三代目で止まる', () => {
-  const game = phase(10);
-  game.phaseFrame = 104; game.update();
-  const parent = game.bullets.objects.find((b) => b.active && b.motion === 'citation')!;
-  parent.age = parent.releaseAt - 1;
-  game.update();
-  const children = game.bullets.objects.filter((b) => b.active && b.motion === 'citation' && b.gridRow === 1);
-  expect(children).toHaveLength(2);
-  children[0].age = children[0].releaseAt - 1;
-  game.update();
-  const grandchildren = game.bullets.objects.filter((b) => b.active && b.motion === 'citation' && b.gridRow === 2);
-  expect(grandchildren).toHaveLength(2);
-  grandchildren[0].age = grandchildren[0].releaseAt - 1;
-  game.update();
-  expect(game.bullets.objects.filter((b) => b.active && b.motion === 'citation' && b.gridRow === 3)).toHaveLength(0);
 });
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('問いの回廊は%sで発射間に上下左右へ動き、自機には追従せず、出した輪は動かさない', (difficulty) => {

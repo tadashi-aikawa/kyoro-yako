@@ -1,0 +1,120 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { type Bullet, Game } from './game';
+import { STAR_FLIGHT_PERIOD, STAR_FLIGHT_STAGGER, STAR_FLIGHT_TIME, STAR_TRAIL_LIFE, STAR_TRAIL_WARNING, starFlightPoint } from './patterns/minerva-flight';
+import { bulletContact } from './rules';
+
+const levels = ['easy', 'normal', 'hard', 'lunatic'] as const;
+const listeners = new Map<string, (event: { code: string; repeat: boolean; preventDefault: () => void }) => void>();
+beforeEach(() => {
+  listeners.clear();
+  vi.stubGlobal('location', { search: '' });
+  vi.stubGlobal('window', { addEventListener: (type: string, listener: (event: { code: string; repeat: boolean; preventDefault: () => void }) => void) => listeners.set(type, listener) });
+  vi.stubGlobal('Image', class { src = ''; complete = true; naturalWidth = 0; });
+});
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+function flight(difficulty: Game['difficulty'] = 'normal'): Game {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true;
+  game.difficulty = difficulty; game.startStage(5); game.startBoss(false, 10);
+  return game;
+}
+function of(game: Game, motion: Bullet['motion']): Bullet[] { return game.bullets.objects.filter((b) => b.active && b.motion === motion); }
+function key(code: string): void { listeners.get('keydown')!({ code, repeat: false, preventDefault: () => {} }); }
+
+it('梟の星渡りへ改名し、手元から出るフクロウ本体は接触しても無害', () => {
+  const game = flight(); game.phaseFrame = 104; game.invincible = false; game.invulnFrames = 0;
+  const [x, y] = game.bossPosition(); game.px = x + 16; game.py = y - 6;
+  game.update();
+  expect(game.phase?.name).toBe('梟の星渡り');
+  expect(of(game, 'starOwl')).toHaveLength(1);
+  expect(of(game, 'starTrail')).toHaveLength(2);
+  expect(game.pendingHit).toBe(-1); expect(game.graze).toBe(0);
+});
+
+it('光の軌跡は48フレーム無害で静止し、その後の羽は接触する。発射音は予告後にだけ鳴る', () => {
+  const game = flight(); game.phaseFrame = 104; game.update();
+  const feather = of(game, 'starTrail').find((b) => b.sway > 0)!;
+  game.bullets.forEach((b) => { if (b !== feather) b.active = false; });
+  const origin = [feather.x, feather.y];
+  const sound = vi.spyOn(game.audio, 'play');
+  game.invincible = false; game.invulnFrames = 0; game.px = feather.x; game.py = feather.y;
+  for (let i = 1; i < STAR_TRAIL_WARNING; i++) {
+    game.update(); expect([feather.x, feather.y]).toEqual(origin); expect(game.pendingHit).toBe(-1);
+  }
+  expect(sound).not.toHaveBeenCalled();
+  game.update();
+  expect([feather.x, feather.y]).not.toEqual(origin);
+  expect(game.hitDuringSpell).toBe(true); expect(sound).toHaveBeenCalledWith('turn');
+});
+
+it('羽は予告時間を含め2.4秒で消え、次の飛行までに弾がない切れ目を残す', () => {
+  const game = flight(); game.phaseFrame = 104; game.update();
+  const feather = of(game, 'starTrail')[0];
+  while (feather.age < STAR_TRAIL_LIFE - 1) game.update();
+  expect(feather.active).toBe(true); game.update(); expect(feather.active).toBe(false);
+  while (game.phaseFrame < 105 + STAR_FLIGHT_PERIOD - 1) game.update();
+  expect(game.bullets.count).toBe(0); game.update(); expect(of(game, 'starOwl')).toHaveLength(1);
+});
+
+it('後半の次の旋回から2羽が手元を出て、24フレームずらして異なる道を飛ぶ', () => {
+  const game = flight();
+  while (game.phaseFrame < 1800) game.update();
+  expect(of(game, 'starOwl').every((b) => b.gridColumn === 0)).toBe(true);
+  while (game.phaseFrame < 2025 + STAR_FLIGHT_STAGGER - 1) game.update();
+  expect(of(game, 'starOwl')).toHaveLength(1); game.update();
+  const owls = of(game, 'starOwl'); expect(owls).toHaveLength(2);
+  const [x, y] = game.bossPosition(); expect([owls[1].x, owls[1].y]).toEqual([x + 16, y - 6]);
+  expect(owls[1].sway).toBe(-owls[0].sway);
+  while (game.phaseFrame < 2025 + STAR_FLIGHT_PERIOD - 1) game.update();
+  expect(game.bullets.count).toBe(0);
+});
+
+it.each(levels)('%sで飛行は自機に追従せず、発射原点が固定され、下端にも羽が届き、弾数は有界', (difficulty) => {
+  const game = flight(difficulty), other = flight(difficulty); other.px = 12; other.py = 20;
+  let maxBullets = 0, maxOwls = 0, deepest = 0;
+  const origins = new Map<Bullet, [number, number]>();
+  const previous = new Map<Bullet, [number, number]>();
+  const probes = [24, 108, 192, 276, 360].map((x) => [x, 398]); const hits = probes.map(() => false);
+  for (let i = 0; i < 3599; i++) {
+    game.update(); other.update();
+    expect(of(game, 'starOwl').map((b) => [b.x, b.y])).toEqual(of(other, 'starOwl').map((b) => [b.x, b.y]));
+    for (const owl of of(game, 'starOwl')) {
+      if (!origins.has(owl)) origins.set(owl, [owl.targetX, owl.targetY]);
+      expect([owl.targetX, owl.targetY]).toEqual(origins.get(owl));
+      expect(owl.x).toBeGreaterThan(24); expect(owl.x).toBeLessThan(360);
+      const last = previous.get(owl);
+      if (last) expect(Math.hypot(owl.x - last[0], owl.y - last[1])).toBeGreaterThan(0.1);
+      previous.set(owl, [owl.x, owl.y]);
+    }
+    maxBullets = Math.max(maxBullets, game.bullets.count); maxOwls = Math.max(maxOwls, of(game, 'starOwl').length);
+    for (const b of of(game, 'starTrail')) if (b.delay === 0) {
+      deepest = Math.max(deepest, b.y);
+      probes.forEach(([x, y], index) => { if (bulletContact(x, y, b.x, b.y, b.radius, false) === 'hit') hits[index] = true; });
+    }
+  }
+  expect(maxOwls).toBe(2); expect(maxBullets).toBeLessThan(120); expect(deepest).toBeGreaterThan(398);
+  expect(hits.some(Boolean)).toBe(true);
+  const path = Array.from({ length: STAR_FLIGHT_TIME }, (_, age) => starFlightPoint(age, 192, 126, 1, 0));
+  expect(Math.max(...path.map(([x]) => x)) - Math.min(...path.map(([x]) => x))).toBeGreaterThan(240);
+  expect(Math.max(...path.map(([, y]) => y)) - Math.min(...path.map(([, y]) => y))).toBeGreaterThan(200);
+});
+
+it('ボムでフクロウと軌跡が消え、ボム中の周期は飛ばし、終了後の次周期で再開する', () => {
+  const game = flight(); game.phaseFrame = 104; game.update();
+  key('KeyX'); game.update(); game.keys.delete('KeyX');
+  expect(game.bombFrames).toBeGreaterThan(0); expect(game.bullets.count).toBe(0);
+  game.phaseFrame = 104; game.update(); expect(game.bullets.count).toBe(0);
+  game.bombFrames = 0; game.update(); expect(game.bullets.count).toBe(0);
+  game.phaseFrame = 105 + STAR_FLIGHT_PERIOD - 1; game.update(); expect(of(game, 'starOwl')).toHaveLength(1);
+});
+
+it('ポーズで羽ばたきと予告が止まり、技切替・ステージ開始で発射源ごと消える', () => {
+  const game = flight(); game.phaseFrame = 104; game.update();
+  const before = game.bullets.objects.filter((b) => b.active).map((b) => [b.age, b.x, b.y, b.delay]);
+  key('Escape'); game.update(); game.keys.delete('Escape');
+  expect(game.scene).toBe('pause'); for (let i = 0; i < 60; i++) game.update();
+  expect(game.bullets.objects.filter((b) => b.active).map((b) => [b.age, b.x, b.y, b.delay])).toEqual(before);
+  game.scene = 'stage'; game.skipPhase(); expect(game.bullets.count).toBe(0);
+  game.startBoss(false, 10); game.phaseFrame = 104; game.update(); expect(game.bullets.count).toBeGreaterThan(0);
+  game.startStage(1); expect(game.bullets.count).toBe(0);
+});

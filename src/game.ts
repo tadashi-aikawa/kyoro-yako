@@ -16,6 +16,7 @@ import { jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_FADE, updateJinraiHeart } from './patterns/jinrai-kiss';
 import { type Thunderbolt, type Thunderstorm, thunderPosition } from './patterns/jinrai-thunder';
 import { dawnPosition, emitMinerva, eyeX, interviewPosition, updateDawnOwls } from './patterns/minerva';
+import { updateStarFlightSource } from './patterns/minerva-flight';
 import { type InterviewRing, interviewRingBlocksShot, updateInterviewRings } from './patterns/minerva-ring';
 import { emitNeo, inBog, updateVimBullet, type VimAttack } from './patterns/neo';
 import { emitNeoEncore, encoreBogTime } from './patterns/neo-encore';
@@ -26,7 +27,7 @@ import { type BossId, midPhases, NAMES, type Phase, STAGES } from './stages';
 import { readRecords } from './story';
 
 export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'stage' | 'dialogue' | 'clear' | 'pause' | 'gameover' | 'ending' | 'credits';
-export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'question' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'citation' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'linkNode' | 'linkBeam' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'chappyBloom' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
+export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'question' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'starOwl' | 'starTrail' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'linkNode' | 'linkBeam' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'chappyBloom' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
 export interface JinraiLaser { x: number; y: number; angle: number; age: number; warning: number; life: number; speed: number; }
 export interface DawnOwl { x: number; y: number; targetX: number; targetY: number; age: number; warning: number; color: number; }
 export interface Shot { active: boolean; x: number; y: number; vx: number; vy: number; damage: number; radius: number; homing: boolean; }
@@ -771,6 +772,7 @@ export class Game {
         }
       }
       if (updateChappySource(this, b)) return;
+      if (updateStarFlightSource(this, b)) return;
       if (b.delay > 0) { b.delay--; return; }
       if (b.fadeAt > 0 && b.age >= b.fadeAt) {
         if (b.motion === 'jinraiHeart') this.spark(b.x, b.y, '#ffd3e5', 7);
@@ -778,6 +780,7 @@ export class Game {
       }
       if (b.motion === 'jinraiHeart') updateJinraiHeart(b, this.px, this.py);
       if (b.motion === 'vim') updateVimBullet(b);
+      if (b.motion === 'starTrail' && b.age === b.releaseAt + 1 && b.gridRow % 8 === 0 && b.sway > 0) this.audio.play('turn');
       if (b.launchSoundPending) {
         b.launchSoundPending = false;
         this.triggerBossCast();
@@ -857,17 +860,6 @@ export class Game {
           b.motion = 'normal'; b.vx = Math.sin(b.swayPhase) * 0.35;
           b.vy = [1.25, 1.65, 1.95, 2.25][['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty)];
         }
-      }
-      if (b.motion === 'citation' && b.age === b.releaseAt && b.gridRow < 2) {
-        this.audio.play('split');
-        const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty);
-        for (const side of [-1, 1]) {
-          const angle = Math.atan2(b.vy, b.vx) + side * [0.4, 0.46, 0.52][b.gridRow];
-          const speed = [1.35, 1.8, 2.15, 2.5][level] + b.gridRow * 0.2;
-          const child = this.spawnBullet(b.x, b.y, Math.cos(angle) * speed, Math.sin(angle) * speed, side < 0 ? 1 : 3, b.gridRow === 0 ? 'orb' : 'petal');
-          if (child) { child.motion = 'citation'; child.gridRow = b.gridRow + 1; child.releaseAt = [70, 55, 44, 36][level]; child.radius = b.gridRow === 0 ? 4 : 3; }
-        }
-        b.active = false; return;
       }
       if (b.motion === 'jinraiSakura') {
         const gustFrame = windFrame - SAKURA_WARNING[sakuraLevel];

@@ -1,5 +1,6 @@
 import type { Bullet, Game } from '../game';
 import { circlesHit, DIFFICULTY, density } from '../rules';
+import { emitStarFlight } from './minerva-flight';
 
 export const MINERVA_WARNING = [90, 70, 55, 42] as const;
 export const HYPOTHESIS_PERIOD = [210, 185, 165, 145] as const;
@@ -164,13 +165,7 @@ export function emitMinerva(game: Game, pattern: string): void {
       if (b) { b.motion = 'recall'; b.targetX = x; b.targetY = y; b.releaseAt = [126, 105, 95, 87][level]; b.gridRow = [84, 66, 56, 48][level]; }
     }
   }
-  if (pattern === 'citation' && t % [145, 112, 92, 78][level] === 0) {
-    const n = [6, 9, 12, 15][level];
-    for (let i = 0; i < n; i++) {
-      const b = game.spawnBullet(18 + (i + 0.5) * 348 / n, 46, 0, [0.9, 1.15, 1.4, 1.65][level], 2, 'star');
-      if (b) { b.motion = 'citation'; b.gridRow = 0; b.releaseAt = warning; b.radius = 6; }
-    }
-  }
+  if (pattern === 'starFlight') emitStarFlight(game);
   const interviewThreshold = ((game.phase?.duration ?? 60) - 30) * 60;
   const interviewLate = game.phaseFrame > interviewThreshold;
   const interviewPeriod = INTERVIEW_PERIOD[level] / (interviewLate ? 2 : 1);

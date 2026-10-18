@@ -84,7 +84,7 @@ const MOVEMENTS: Record<string, Movement> = {
   hypothesis: patrol([[136, -16], [248, -16]], 84, 150),
   owlEye: curve(64, 12, 720, 'eight'),
   recall: patrol([[140, -10], [244, -10]], 100, 200, true),
-  citation: patrol([[112, -12], [192, 12], [272, -12]], 108, 120),
+  starFlight: patrol([[112, -12], [192, 12], [272, -12]], 108, 120),
 };
 
 export function enterBossX(time: number): number { return MOVEMENTS.enter(time)[0]; }

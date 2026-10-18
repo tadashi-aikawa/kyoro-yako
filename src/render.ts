@@ -11,6 +11,7 @@ import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_CHARGE, KISS_FADE, KISS_ORIGIN, KISS_POSE_END, kissEdgeWarning, kissStep } from './patterns/jinrai-kiss';
 import { THUNDER_FADE, THUNDER_HOLD, thunderGround, thunderPath, thunderScene } from './patterns/jinrai-thunder';
 import { DAWN_PERIOD, dawnLane, dawnPrayerStep, eyeX, HYPOTHESIS_COLUMNS, HYPOTHESIS_PERIOD, hypothesisBrightness, hypothesisSide, hypothesisX, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE } from './patterns/minerva';
+import { STAR_FLIGHT_TIME, STAR_TRAIL_LIFE, STAR_TRAIL_WARNING } from './patterns/minerva-flight';
 import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-ring';
 import { bogs, enterScene, KEY_ROWS, keyPosition, vimScene } from './patterns/neo';
 import { encoreBogTime } from './patterns/neo-encore';
@@ -633,8 +634,8 @@ export class Renderer {
     c.restore();
   }
 
-  private owl(enemy: Pick<Enemy, 'x' | 'y' | 'color'>, frame: number): void {
-    const c = this.ctx; c.save(); c.translate(enemy.x, enemy.y);
+  private owl(enemy: Pick<Enemy, 'x' | 'y' | 'color'>, frame: number, angle = 0): void {
+    const c = this.ctx; c.save(); c.translate(enemy.x, enemy.y); c.rotate(angle);
     c.fillStyle = ['#9ab1ec', '#e0a6d5', '#e6ca95'][enemy.color];
     c.beginPath(); c.ellipse(0, 0, 12, 14, 0, 0, Math.PI * 2); c.fill();
     c.beginPath(); c.moveTo(-9, -8); c.lineTo(-12, -17); c.lineTo(-3, -12); c.moveTo(9, -8); c.lineTo(12, -17); c.lineTo(3, -12); c.fill();
@@ -666,6 +667,16 @@ export class Renderer {
   }
 
   private bullet(b: Bullet): void {
+    if (b.motion === 'starOwl') {
+      const c = this.ctx;
+      c.save();
+      // 実体のある終符のフクロウとは、淡い体と外周の光輪で区別する。
+      c.globalAlpha = Math.min(0.75, (STAR_FLIGHT_TIME - b.age + 1) / 18);
+      this.magic(b.x, b.y, b.age, b.color === 2 ? '#fff0b2' : '#c7e3ff', 22, 0.6);
+      this.owl(b, b.age * 1.5, b.rotation);
+      c.restore(); return;
+    }
+    if (b.motion === 'starTrail') { this.starTrail(b); return; }
     if (b.kind === 'keycap' && b.keyLabel) {
       const c = this.ctx;
       c.save(); c.globalAlpha = b.delay > 0 ? 0.55 + Math.sin(b.age * 0.13) * 0.2 : 1;
@@ -726,7 +737,6 @@ export class Renderer {
     }
     if (b.motion === 'vanish' && b.age > b.fadeAt - 20 && b.age % 8 < 4) return;
     if (b.motion === 'trim' && b.age > b.fadeAt - 36 && b.age % 8 < 4) return;
-    if (b.motion === 'citation' && b.gridRow < 2 && b.age >= b.releaseAt - 24 && b.age % 8 < 4) return;
     const heartFade = b.motion === 'jinraiHeart' ? Math.max(0, (b.age - b.fadeAt + KISS_FADE) / KISS_FADE) : 0;
     if (heartFade > 0 && b.age % 10 < 4) return;
     const variant = b.motion === 'typographyRain' ? 1 + b.gridColumn * RAIN_FONTS.length + b.gridRow
@@ -747,6 +757,30 @@ export class Renderer {
       if (b.delay > 0 || heartFade > 0) c.globalAlpha = 1;
       if (b.motion === 'vanish') this.text('×', b.x, b.y + 1, 13, '#fff2b8', 'center');
     }
+  }
+
+  private starTrail(b: Bullet): void {
+    const c = this.ctx;
+    const color = b.color === 2 ? '#ffe0a0' : '#b6d6ff';
+    c.save();
+    if (b.delay > 0) {
+      if (b.sway < 0) { c.restore(); return; }
+      const progress = 1 - b.delay / STAR_TRAIL_WARNING;
+      c.strokeStyle = color; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(b.targetX, b.targetY); c.lineTo(b.x, b.y);
+      c.globalAlpha = 0.12 + progress * 0.12; c.lineWidth = 6; c.stroke();
+      c.globalAlpha = 0.45 + progress * 0.35; c.lineWidth = 1.4; c.stroke();
+      c.fillStyle = '#fff4d9'; c.beginPath(); c.arc(b.x, b.y, 2.1, 0, Math.PI * 2); c.fill();
+    } else {
+      // 消去の直前も輪郭を残し、見えない接触判定にしない。
+      c.globalAlpha = Math.max(0.65, Math.min(1, (STAR_TRAIL_LIFE - b.age) / 18));
+      c.translate(b.x, b.y); c.rotate(Math.atan2(b.vy, b.vx) + Math.PI / 2);
+      c.fillStyle = color; c.beginPath(); c.moveTo(0, -7);
+      c.quadraticCurveTo(5, -1, 1, 5); c.lineTo(0, 7); c.lineTo(-1, 4);
+      c.quadraticCurveTo(-4, 0, 0, -7); c.fill();
+      c.strokeStyle = '#fffaf0'; c.lineWidth = 1; c.beginPath(); c.moveTo(0, -4); c.lineTo(0, 6); c.stroke();
+    }
+    c.restore();
   }
 
   private claudineFinaleBackdrop(game: Game): void {
@@ -1000,13 +1034,6 @@ export class Renderer {
       if (b.motion !== 'recall' || b.age < b.gridRow - warning * 0.55 || b.age >= b.gridRow) return;
       c.strokeStyle = '#fff0bf88'; c.lineWidth = 1.5;
       c.beginPath(); c.moveTo(b.x, b.y); c.lineTo(b.targetX, b.targetY); c.stroke();
-    });
-    if (pattern === 'citation') game.bullets.forEach((b) => {
-      if (b.motion !== 'citation' || b.gridRow >= 2 || b.releaseAt - b.age > warning || b.age >= b.releaseAt) return;
-      c.strokeStyle = '#ffe4ab88'; c.lineWidth = 1;
-      for (const side of [-1, 1]) {
-        c.beginPath(); c.moveTo(b.x, b.y); c.lineTo(b.x + side * 19, b.y + 32); c.stroke();
-      }
     });
     if (pattern === 'interview' && t >= 0) {
       const [x, y] = game.bossXY;
