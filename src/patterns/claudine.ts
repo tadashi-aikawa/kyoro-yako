@@ -1,4 +1,5 @@
 import type { Game } from '../game';
+import { emitClaudineFinale, finaleTime } from './claudine-finale';
 import { emitChangingGrid, emitTypographyRain } from './claudine-weather-grid';
 
 const levelOf = (game: Game) => ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
@@ -6,21 +7,9 @@ const warn = [90, 70, 55, 42];
 
 export function claudineScene(game: Game): string | undefined {
   if (game.phase?.pattern !== 'final') return game.phase?.pattern;
-  return ['trim', 'type', 'grid', 'complement', 'whiteSpace', 'bow'][Math.floor(Math.max(0, game.phaseFrame - 105) / 600)];
+  if (finaleTime(game) >= 0) return 'rose';
+  return ['trim', 'type', 'grid', 'complement', 'whiteSpace'][Math.floor(Math.max(0, game.phaseFrame - 105) / 600)];
 }
-
-export const FAREWELL_RELEASE = [[3090, 3275], [3075, 3275], [3060, 3275], [3045, 3275]] as const;
-
-export function bowProgress(t: number): number {
-  if (t < 3000) return 0;
-  const smooth = (x: number) => x * x * (3 - 2 * x);
-  if (t < 3120) return smooth((t - 3000) / 120);
-  if (t < 3270) return 1;
-  if (t < 3400) return 1 - smooth((t - 3270) / 130);
-  return 0;
-}
-
-export function flowerRadius(angle: number): number { return 52 + 17 * Math.cos(6 * angle); }
 
 export function whiteSpaceCircle(t: number): [number, number, number] {
   return [192 + Math.sin(t * 0.008) * 90, 302 + Math.sin(t * 0.005) * 54, 55 + Math.sin(t * 0.006) * 9];
@@ -32,27 +21,13 @@ export function emitClaudine(game: Game, pattern: string, t: number): void {
   const level = levelOf(game);
   const lite = pattern === 'final';
   const scene = lite ? claudineScene(game) : pattern;
+  if (scene === 'rose') { emitClaudineFinale(game, finaleTime(game)); return; }
   if (lite && t > 0 && t % 600 === 0) game.bullets.clear();
   if (!scene) return;
   const local = lite ? t % 600 : t;
   const warning = warn[level] + (lite ? 18 : 0);
   if (scene === 'type') { emitTypographyRain(game, local, lite); return; }
   if (scene === 'grid') { emitChangingGrid(game, local, lite); return; }
-  if (scene === 'bow') {
-    const releases: readonly number[] = FAREWELL_RELEASE[level];
-    const wave = releases.indexOf(t);
-    if (wave < 0) return;
-    const [x, y] = game.bossPosition();
-    const perPetal = [3, 4, 5, 6][level];
-    const speed = [1.42, 1.45, 1.48, 1.51][level];
-    for (let petal = 0; petal < 6; petal++) for (let i = 0; i < perPetal; i++) {
-      const angle = petal * Math.PI / 3 + (i + 1) * Math.PI / 3 / (perPetal + 2) + wave * 0.08;
-      const radius = flowerRadius(angle);
-      const b = game.spawnBullet(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius, Math.cos(angle) * speed, Math.sin(angle) * speed, 3 + (petal + wave) % 3, 'petal');
-      if (b) { b.motion = 'farewellFlower'; b.radius = 3; b.gridRow = wave; }
-    }
-    return;
-  }
   if (scene === 'trim' && local % (lite ? 210 : [190, 170, 150, 135][level]) === 0) {
     const wave = Math.floor(local / (lite ? 210 : [190, 170, 150, 135][level]));
     const columns = lite ? 23 : [23, 27, 30, 34][level];

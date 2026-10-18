@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
-import { bowProgress, FAREWELL_RELEASE } from './patterns/claudine';
+import { claudineScene } from './patterns/claudine';
+import { FINALE_CHARGE, FINALE_START, ROSE_COUNT, ROSE_PERIOD } from './patterns/claudine-finale';
 import { MID_PHASE, PHASE_LIMIT, phaseHp, STAGE_DPS, STAGES } from './stages';
 
 beforeEach(() => {
@@ -155,40 +156,62 @@ it('補色の境界で弾の色と速さが変わり、余白の円から弾が�
   expect(bullet.active).toBe(false);
 });
 
-it('耐久は5つの仕掛けを10秒ずつ切り替える', () => {
+it('耐久は5つの仕掛けを再演し、残り10秒で締めへ切り替える', () => {
   const game = start(3, 9);
   for (const [segment, motion] of ['trim', 'typographyRain', 'layoutGrid', 'complement', 'whiteSpace'].entries()) {
     game.phaseFrame = 104 + segment * 600;
     game.update();
     expect(game.bullets.objects.some((b) => b.active && b.motion === motion), `segment ${segment}`).toBe(true);
   }
-  game.phaseFrame = 3104;
+  game.phaseFrame = FINALE_START - 1;
   game.update();
   expect(game.bullets.count).toBe(0);
 });
 
-it('別符の締めは会釈中に花形の輪を2回放ち、時間切れ前に画面外へ出す', () => {
-  expect(bowProgress(3000)).toBe(0);
-  expect(bowProgress(3120)).toBe(1);
-  expect(bowProgress(3400)).toBe(0);
+it('残り10秒で旧弾を消し、1秒の構えから薔薇と自機狙いを撃ち続ける', () => {
   for (const difficulty of ['easy', 'normal', 'hard', 'lunatic'] as const) {
     const game = start(3, 9, false, difficulty);
-    game.phaseFrame = 3104;
+    game.phaseFrame = FINALE_START - 2;
+    expect(claudineScene(game)).toBe('whiteSpace');
+    game.update();
+    game.spawnBullet(game.px, game.py - 100, 0, 1, 0);
+    game.message = 'EXTEND!'; game.messageFrames = 90;
+    game.update();
+    expect(claudineScene(game)).toBe('rose');
+    expect(game.messageFrames).toBe(89);
+    expect(game.bullets.count).toBe(0);
+    for (let i = 1; i < FINALE_CHARGE; i++) game.update();
+    expect(game.bullets.count).toBe(0);
     game.update();
     const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
-    const expected = [18, 24, 30, 36][level];
-    const releases: readonly number[] = FAREWELL_RELEASE[level];
-    let lastVisible = 0;
-    for (let t = 3001; t <= 3494; t++) {
-      game.update();
-      if (game.bullets.objects.some((b) => b.active && b.motion === 'farewellFlower' && b.x >= 0 && b.x <= 384 && b.y >= 0 && b.y <= 448)) lastVisible = t;
-      const wave = releases.indexOf(t);
-      if (wave < 0) continue;
-      expect(game.bullets.objects.filter((b) => b.active && b.motion === 'farewellFlower' && b.gridRow === wave)).toHaveLength(expected);
+    const roses = game.bullets.objects.filter((b) => b.active && b.motion === 'farewellRose');
+    expect(roses).toHaveLength(ROSE_COUNT[level]);
+    for (let i = 0; i < ROSE_PERIOD[level] / 2; i++) game.update();
+    const fan = game.bullets.objects.filter((b) => b.active && b.motion === 'farewellLance');
+    expect(fan).toHaveLength([5, 7, 9, 11][level]);
+    const center = fan[(fan.length - 1) / 2];
+    expect(Math.atan2(center.vy, center.vx)).toBeCloseTo(Math.atan2(game.py - game.bossXY[1], game.px - game.bossXY[0]));
+    const velocity = [center.vx, center.vy];
+    game.px = 30; game.update();
+    expect([center.vx, center.vy]).toEqual(velocity);
+    // 旧来の600f区切りで新技の弾が消えない。
+    while (game.phaseFrame < 3105) game.update();
+    expect(roses.some((b) => b.active)).toBe(true);
+    let maxCount = 0;
+    while (game.phaseFrame < 3599) {
+      game.update(); maxCount = Math.max(maxCount, game.bullets.count);
+      const fired = game.bullets.objects.filter((b) => b.active && b.age === 1);
+      expect(fired.some((b) => b.motion === 'farewellRose') && fired.some((b) => b.motion === 'farewellLance')).toBe(false);
     }
-    const visible = game.bullets.objects.filter((b) => b.active && b.motion === 'farewellFlower' && b.x >= 0 && b.x <= 384 && b.y >= 0 && b.y <= 448);
-    expect(lastVisible, difficulty).toBeGreaterThan(3440);
-    expect(visible, difficulty).toHaveLength(0);
+    expect(game.bullets.objects.some((b) => b.active && b.age <= ROSE_PERIOD[level] && b.motion === 'farewellRose')).toBe(true);
+    expect(maxCount).toBeLessThan(350);
+    expect(game.phase?.pattern).toBe('final');
+    game.update();
+    expect(game.phase).toBeUndefined();
+    expect(game.collectionFrames).toBe(180);
+    expect(game.bullets.count).toBe(0);
+    for (let i = 0; i < 180; i++) game.update();
+    expect(game.scene).toBe('dialogue');
   }
 });
 

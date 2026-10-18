@@ -2,7 +2,8 @@ import { bossSpriteId, createBossMotion, isCasting, updateBossMotion } from './b
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
 import { PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
-import { bowProgress, claudineScene, complementBoundary, FAREWELL_RELEASE, flowerRadius, whiteSpaceCircle } from './patterns/claudine';
+import { claudineScene, complementBoundary, whiteSpaceCircle } from './patterns/claudine';
+import { FINALE_CHARGE, FINALE_CRESCENDO, finaleTime, rosePulse } from './patterns/claudine-finale';
 import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, GRID_REPLAY_PERIOD, gridLayoutAt, gridPoint, gridRows, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_NAMES, WEATHER_PERIOD, WEATHER_REPLAY_PERIOD, weatherAt } from './patterns/claudine-weather-grid';
 import { BURST_MOVE, BURST_RETURN, BURST_SHOTS, burstVisibility, dashBurstStep } from './patterns/jinrai';
 import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
@@ -275,6 +276,7 @@ export class Renderer {
       c.fillStyle = '#06031977'; c.fillRect(0, 0, FIELD.w, FIELD.h);
       this.magic(192, 80, game.frame, stage.colors[2], 130, 0.25);
     }
+    this.claudineFinaleBackdrop(game);
     if (game.phase && game.boss) {
       const [x, y] = game.bossXY;
       const burst = game.phase.pattern === 'jinraiDash' ? dashBurstStep(game.phaseFrame) : -1;
@@ -349,17 +351,18 @@ export class Renderer {
           c.restore();
         }
       } else {
-        const bow = game.boss === 'claudine' && game.phase.pattern === 'final' ? bowProgress(game.phaseFrame - 105) : 0;
+        const rose = finaleTime(game);
         const kiss = game.phase.pattern === 'jinraiKiss' ? kissStep(game.phaseFrame - 105, game.difficulty) : -1;
         const kissing = kiss >= 0 && kiss < KISS_POSE_END;
-        const tilt = channeling || seal || sweepCharging || kissing ? 0 : Math.cos(game.phaseFrame * 0.012) * 0.045 + bow * 0.08;
+        const tilt = channeling || seal || sweepCharging || kissing || rose >= 0 ? 0 : Math.cos(game.phaseFrame * 0.012) * 0.045;
         const pose = updateBossMotion(this.bossMotion, `${game.boss}:${game.phase.name}`, game.frame, x);
         const casting = isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
-        const spriteId = kissing ? 'jinrai-kiss' : bossSpriteId(game.boss, casting ? 'cast' : pose, game.frame);
+        const spriteId = rose >= FINALE_CHARGE ? 'claudine-finale' : kissing ? 'jinrai-kiss' : bossSpriteId(game.boss, rose >= 0 || casting ? 'cast' : pose, game.frame);
         const bossSprite = this.readySprite(game, spriteId);
-        c.save(); c.translate(x, y); c.scale(1 + bow * 0.08, 1 - bow * 0.32); c.translate(-x, -y);
+        c.save();
         if (seal) { c.shadowColor = '#ffe591'; c.shadowBlur = 8 + Math.min(20, (burst - BURST_MOVE) * 0.6); }
-        this.fieldCharacter(game, channeling ? 'minerva-prayer' : seal ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || sweepCharging || kissing ? 0 : Math.sin(game.frame * 0.045) * 2) + bow * 10, 64, tilt, burstVisibility(burst));
+        const roseSize = rose < 0 ? 64 : 74 + (rose >= FINALE_CHARGE ? rosePulse(rose, ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty)) * 3 : 0);
+        this.fieldCharacter(game, channeling ? 'minerva-prayer' : seal ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || sweepCharging || kissing || rose >= 0 ? 0 : Math.sin(game.frame * 0.045) * 2), roseSize, tilt, burstVisibility(burst));
         c.restore();
       }
       c.fillStyle = '#140c27aa'; c.fillRect(15, 6, 350, 13);
@@ -661,13 +664,68 @@ export class Renderer {
         const size = b.radius / 3;
         c.save(); c.translate(b.x, b.y); c.rotate(b.rotation);
         c.drawImage(sprite, -14 * size, -14 * size, 28 * size, 28 * size); c.restore();
-      } else if (b.motion === 'jinraiSakura') {
+      } else if (b.motion === 'jinraiSakura' || b.motion === 'farewellRose' || b.motion === 'farewellLance') {
         c.save(); c.translate(b.x, b.y); c.rotate(b.rotation);
         c.drawImage(sprite, -14, -14, 28, 28); c.restore();
       } else c.drawImage(sprite, b.x - 14, b.y - 14, 28, 28);
       if (b.delay > 0 || heartFade > 0) c.globalAlpha = 1;
       if (b.motion === 'vanish') this.text('×', b.x, b.y + 1, 13, '#fff2b8', 'center');
     }
+  }
+
+  private claudineFinaleBackdrop(game: Game): void {
+    const t = finaleTime(game);
+    if (t < 0) return;
+    const c = this.ctx;
+    const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
+    const charge = Math.min(1, t / FINALE_CHARGE);
+    const pulse = rosePulse(t, level);
+    const [x, y] = game.bossXY;
+    c.save();
+    c.fillStyle = `rgba(19, 4, 14, ${0.65 * Math.min(1, t / 24)})`;
+    c.fillRect(0, 0, FIELD.w, FIELD.h);
+    // 発射する薔薇を背景にも描く。細い金の輪郭は弾より暗くし、自機周辺を覆わない。
+    c.strokeStyle = '#ba8b65'; c.lineWidth = 0.8;
+    for (let layer = 0; layer < 3; layer++) {
+      c.globalAlpha = (0.12 + pulse * 0.08) * charge;
+      c.beginPath();
+      for (let i = 0; i <= 180; i++) {
+        const angle = i * Math.PI / 90;
+        const radius = (75 + layer * 34) * (0.76 + Math.cos(6 * angle) * 0.24);
+        const turn = (layer % 2 ? -1 : 1) * t * 0.002;
+        const px = x + Math.cos(angle + turn) * radius;
+        const py = y + Math.sin(angle + turn) * radius;
+        if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
+      }
+      c.closePath(); c.stroke();
+    }
+    c.globalAlpha = 0.3 + pulse * 0.35; c.strokeStyle = '#edc697'; c.lineWidth = 1.2;
+    const radius = t < FINALE_CHARGE ? 100 - charge * 65 : 35 + (1 - pulse) * 55;
+    c.beginPath(); c.arc(x, y, radius, -t * 0.01, Math.PI * 1.5 - t * 0.01); c.stroke();
+    const impact = t >= FINALE_CRESCENDO ? t - FINALE_CRESCENDO : t - FINALE_CHARGE;
+    if (impact >= 0 && impact < 40) {
+      const fade = 1 - impact / 40;
+      c.globalAlpha = fade * 0.1; c.fillStyle = '#ffe1c4'; c.fillRect(0, 0, FIELD.w, FIELD.h);
+      c.globalAlpha = fade * 0.7; c.strokeStyle = '#ffe5bd'; c.lineWidth = 1.5;
+      c.beginPath(); c.arc(x, y, 28 + impact * 8, 0, Math.PI * 2); c.stroke();
+    }
+    if (t < FINALE_CHARGE) {
+      const alpha = Math.min(1, t / 12, (FINALE_CHARGE - t) / 14);
+      c.globalAlpha = alpha;
+      this.fieldCharacter(game, this.readySprite(game, 'claudine-finale'), 292 - charge * 22, 230, 205, -0.04, alpha);
+      if (game.messageFrames <= 0) this.text('では、遠慮なく。', 28, 224, 18, '#f5dfb9');
+      c.fillStyle = '#eed0a3';
+      for (let i = 0; i < 18; i++) {
+        const angle = i * Math.PI / 9 + t * 0.025;
+        const r = 115 - (t * 1.7 + i * 7) % 90;
+        c.beginPath(); c.arc(x + Math.cos(angle) * r, y + Math.sin(angle) * r, 1.2, 0, Math.PI * 2); c.fill();
+      }
+    }
+    if (t >= FINALE_CRESCENDO) {
+      c.globalAlpha = 0.18; c.strokeStyle = '#e6a7bb'; c.lineWidth = 1;
+      c.strokeRect(7, 42, FIELD.w - 14, FIELD.h - 49);
+    }
+    c.restore();
   }
 
   private stageTelegraphs(game: Game): void {
@@ -752,19 +810,6 @@ export class Renderer {
       c.fillStyle = '#fff7d22a'; c.strokeStyle = '#fff7d2cc'; c.lineWidth = 2;
       c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); c.stroke();
       this.text('余白', x, y + 4, 14, '#fff6da', 'center');
-    }
-    if (pattern === 'bow' && t >= 3000 && FAREWELL_RELEASE[level].some((release) => release > t)) {
-      const [x, y] = game.bossXY;
-      c.strokeStyle = '#ffe4ee99'; c.fillStyle = '#ffa8d319'; c.lineWidth = 2;
-      c.beginPath();
-      for (let i = 0; i <= 72; i++) {
-        const angle = i * Math.PI * 2 / 72;
-        const radius = flowerRadius(angle);
-        const px = x + Math.cos(angle) * radius;
-        const py = y + Math.sin(angle) * radius;
-        if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
-      }
-      c.closePath(); c.fill(); c.stroke();
     }
     if (pattern === 'tags' && t >= -[100, 80, 65, 50][level]) {
       tags(t).forEach(([x, y], i) => { this.magic(x, y, game.frame, ['#b286f5', '#75d7ff', '#ffe08e'][i], 29, 0.5); });

@@ -1,5 +1,5 @@
 export type Sound = 'shot' | 'hit' | 'graze' | 'kill' | 'bomb' | 'declare' | 'capture' | 'item' | 'extend'
-  | 'enemyShot' | 'jinraiShot' | 'laser' | 'thunder' | 'thunderBurst' | 'ninpo' | 'slash' | 'wind' | 'turn' | 'split' | 'sweepCharge' | 'sweepBurst' | 'prayerCharge';
+  | 'enemyShot' | 'jinraiShot' | 'laser' | 'thunder' | 'thunderBurst' | 'ninpo' | 'slash' | 'wind' | 'turn' | 'split' | 'sweepCharge' | 'sweepBurst' | 'prayerCharge' | 'roseCharge' | 'roseBloom';
 // 周波数・秒数・波形・終端周波数・音量・最短間隔。
 // 常時鳴る自機ショットを抑え、敵の発射と仕掛けの切り替わりを聞き取れる比率にする。
 const tones: Record<Sound, [number, number, OscillatorType, number, number, number]> = {
@@ -15,6 +15,8 @@ const tones: Record<Sound, [number, number, OscillatorType, number, number, numb
   ninpo: [1600, 0.18, 'triangle', 180, 0.2, 0.16], thunderBurst: [2100, 0.27, 'sawtooth', 65, 0.25, 0.25],
   sweepCharge: [160, 0.85, 'sine', 980, 0.18, 0.5], sweepBurst: [1800, 0.38, 'sawtooth', 70, 0.26, 0.16],
   prayerCharge: [96, 1.2, 'triangle', 150, 0.26, 0.9],
+  roseCharge: [196, 0.95, 'sine', 1568, 0.24, 0.9],
+  roseBloom: [1047, 0.28, 'triangle', 262, 0.21, 0.2],
 };
 
 export class AudioBank {

@@ -1,3 +1,4 @@
+import { FINALE_START } from './patterns/claudine-finale';
 import type { Phase } from './stages';
 
 type Point = readonly [number, number];
@@ -73,12 +74,14 @@ const MOVEMENTS: Record<string, Movement> = {
 };
 
 function finale(time: number): Point {
-  if (time >= 3000) return CENTER; // お辞儀と花の放射は中央で静止して行う。
+  const finaleStart = FINALE_START - 105;
+  if (time >= finaleStart) return CENTER;
   const scene = ['trim', 'type', 'grid', 'complement', 'whiteSpace'][Math.floor(time / 600)];
   const local = time % 600;
   const [x, y] = MOVEMENTS[scene](local);
-  // 再演する技の切り替わりでは中央へ戻す。終わりの一礼へも位置を連続させる。
-  const envelope = smooth(Math.min(1, local / 90, (600 - local) / 90));
+  // 再演の切替と、残り10秒の構えへの移行で中央へ戻す。
+  const end = Math.min(600, finaleStart - Math.floor(time / 600) * 600);
+  const envelope = smooth(Math.min(1, local / 90, (end - local) / 90));
   return [192 + (x - 192) * envelope, y * envelope];
 }
 

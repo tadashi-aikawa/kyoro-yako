@@ -101,7 +101,7 @@ it('迅雷はレーザーが生きている間は止まり、次の発射前だ�
   }
 });
 
-it('クロディーヌの再演は技の境目で飛ばず、一礼と花の放射中は中央に止まる', () => {
+it('クロディーヌの再演は技の境目で飛ばず、最後10秒の薔薇は中央で放つ', () => {
   const game = start(3, 9);
   for (const time of [600, 1200, 1800, 2400, 3000]) {
     game.phaseFrame = 104 + time;
@@ -109,7 +109,11 @@ it('クロディーヌの再演は技の境目で飛ばず、一礼と花の放�
     game.update();
     expect(Math.hypot(game.bossXY[0] - before[0], game.bossXY[1] - before[1])).toBeLessThan(1);
   }
-  for (const frame of [3105, 3195, 3380, 3500]) {
+  game.phaseFrame = 2999;
+  const before = game.bossPosition();
+  game.update();
+  expect(Math.hypot(game.bossXY[0] - before[0], game.bossXY[1] - before[1])).toBeLessThan(1);
+  for (const frame of [3000, 3060, 3105, 3195, 3380, 3500]) {
     game.phaseFrame = frame;
     expect(game.bossPosition()).toEqual([192, 132]);
   }
