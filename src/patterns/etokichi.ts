@@ -6,9 +6,19 @@ export const GALAXY_FIRE = 90;
 
 export function emitGalaxyFlash(game: Game, t: number): void {
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
-  if (t % GALAXY_PERIOD !== 0) return;
+  const dawn = game.phase?.pattern === 'galaxyFlashDawn';
+  // 強化版は固定照準の光線に星の輪を重ねる。予告後に照準を動かさない。
+  if (dawn && t % 75 === 0) {
+    const [x, y] = game.bossPosition();
+    const count = [18, 24, 30, 36][level];
+    for (let i = 0; i < count; i++) {
+      const angle = (i + t / 300) * Math.PI * 2 / count;
+      game.spawnBullet(x, y, Math.cos(angle) * 1.15, Math.sin(angle) * 1.15, i % 2 ? 0 : 2, 'star');
+    }
+  }
+  if (t % (dawn ? 300 : GALAXY_PERIOD) !== 0) return;
   const [x, y] = game.bossPosition();
-  game.galaxyFlash = { x, y, angle: Math.atan2(Math.max(90, game.py - y), game.px - x), age: 0, warning: [108, 90, 76, 64][level], width: [32, 40, 48, 56][level] };
+  game.galaxyFlash = { x, y, angle: Math.atan2(Math.max(90, game.py - y), game.px - x), age: 0, warning: (dawn ? [90, 78, 66, 54] : [108, 90, 76, 64])[level], width: (dawn ? [48, 56, 64, 72] : [32, 40, 48, 56])[level] };
   game.audio.play('prayerCharge');
 }
 
@@ -21,7 +31,8 @@ export function updateGalaxyFlash(game: Game): void {
   if (beam.age === beam.warning + 1) {
     game.triggerBossCast(); game.audio.play('laser'); game.flash = 8;
     const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
-    const count = [10, 14, 18, 22][level];
+    const dawn = game.phase?.pattern === 'galaxyFlashDawn';
+    const count = [10, 14, 18, 22][level] + (dawn ? 8 : 0);
     for (let i = 0; i < count; i++) {
       const a = (i + 0.5) * Math.PI * 2 / count;
       game.spawnBullet(beam.x, beam.y, Math.cos(a) * (0.85 + level * 0.15), Math.sin(a) * (0.85 + level * 0.15), i % 2 ? 0 : 1, 'star');

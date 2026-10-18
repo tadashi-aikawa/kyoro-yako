@@ -10,6 +10,7 @@ import { emitChappy, updateChappySource } from './patterns/chappy';
 import { claudineScene, complementBoundary, emitClaudine, whiteSpaceCircle } from './patterns/claudine';
 import { reflectEnterShot } from './patterns/enter-reflect';
 import { emitEtokichi, emitGalaxyFlash, type GalaxyFlash, updateGalaxyFlash } from './patterns/etokichi';
+import { emitEtokichiDawn } from './patterns/etokichi-dawn';
 import { burstPosition, burstVisibility, dashBurstStep, dashPosition, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
 import { jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_FADE, updateJinraiHeart } from './patterns/jinrai-kiss';
@@ -25,7 +26,7 @@ import { type BossId, midPhases, NAMES, type Phase, STAGES } from './stages';
 import { readRecords } from './story';
 
 export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'stage' | 'dialogue' | 'clear' | 'pause' | 'gameover' | 'ending' | 'credits';
-export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'question' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'citation' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'linkNode' | 'linkBeam' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'chappyBloom' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
+export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'question' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'citation' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'linkNode' | 'linkBeam' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'chappyBloom' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
 export interface JinraiLaser { x: number; y: number; angle: number; age: number; warning: number; life: number; speed: number; }
 export interface DawnOwl { x: number; y: number; targetX: number; targetY: number; age: number; warning: number; color: number; }
 export interface Shot { active: boolean; x: number; y: number; vx: number; vy: number; damage: number; radius: number; homing: boolean; }
@@ -449,7 +450,8 @@ export class Game {
 
   private updateWaves(): void {
     const t = this.stageFrame;
-    const bossAt = this.stage === 5 ? 6000 - this.midbossElapsedFrames : 4900;
+    // 追加2技の標準所要時間を足し、普段の道中後半を保つ。長引いた場合も登場を逃さない。
+    const bossAt = this.stage === 5 ? Math.max(2900, 8370 - this.midbossElapsedFrames) : 4900;
     if (t === 2450) { this.startMidboss(); return; }
     if (t === bossAt) {
       this.startConversation(STAGES[this.stage - 1].boss, 'before', 'boss');
@@ -528,7 +530,7 @@ export class Game {
     this.clearBullets(); this.enemies.clear(); this.shots.clear(); this.clones.clear();
     this.boss = mid;
     this.midboss = true;
-    this.lines = midDialogue(this.player, mid);
+    this.lines = midDialogue(this.player, mid, this.stage);
     this.lineIndex = 0;
     this.afterDialogue = 'mid';
     this.scene = 'dialogue';
@@ -539,7 +541,7 @@ export class Game {
     this.collectionFrames = 0;
     this.midboss = mid;
     this.boss = mid ? STAGES[this.stage - 1].mid : STAGES[this.stage - 1].boss;
-    const phases = mid ? midPhases(this.boss) : STAGES[this.stage - 1].phases;
+    const phases = mid ? midPhases(this.boss, this.stage) : STAGES[this.stage - 1].phases;
     this.phaseIndex = Math.max(0, Math.min(index, phases.length - 1));
     this.beginPhase(phases[this.phaseIndex]);
   }
@@ -599,7 +601,7 @@ export class Game {
     });
     this.clearBullets(); this.clones.clear();
     this.flash = 8;
-    const next = (this.midboss ? midPhases(this.boss!) : STAGES[this.stage - 1].phases)[this.phaseIndex + 1];
+    const next = (this.midboss ? midPhases(this.boss!, this.stage) : STAGES[this.stage - 1].phases)[this.phaseIndex + 1];
     if (next) { this.phaseIndex++; this.beginPhase(next); }
     else {
       if (!this.midboss) this.phaseIndex++;
@@ -617,10 +619,10 @@ export class Game {
   private leaveBossFight(): void {
     if (this.midboss) {
       if (this.boss === 'chappy') this.startConversation('chappy', 'after', 'stage');
-      else if (this.boss === 'neo' && this.stage === 5) {
+      else if (this.boss === 'etokichi' && this.stage === 5) {
         this.lines = [
-          { who: 'neo', text: '最後！ ……と言いたいけど、続きは上で聞いてね！' },
-          { who: 'mimiko', text: '続きが長いのも、ちゃんと書いておくの。' },
+          { who: 'etokichi', text: 'ここまで来たら、もう大丈夫だねー。ぼくの返事も「行く」だよ、キチ！' },
+          { who: 'mimiko', text: 'ふわっ。門からここまで、星がつないでくれたのね。約束の続きを届けるの。' },
         ];
         this.lineIndex = 0;
         this.afterDialogue = 'stage';
@@ -705,7 +707,7 @@ export class Game {
 
   get remainingSpells(): number {
     if (!this.phase) return 0;
-    return this.midboss ? midPhases(this.boss!).slice(this.phaseIndex).filter((phase) => phase.spell).length : STAGES[this.stage - 1].phases.slice(this.phaseIndex + 1).filter((phase) => phase.spell).length;
+    return this.midboss ? midPhases(this.boss!, this.stage).slice(this.phaseIndex).filter((phase) => phase.spell).length : STAGES[this.stage - 1].phases.slice(this.phaseIndex + 1).filter((phase) => phase.spell).length;
   }
 
   bossTargets(): [number, number][] {
@@ -718,7 +720,8 @@ export class Game {
     if (this.phase?.kind === 'normal') emitBossNormal(this, pattern, t);
     else if (pattern.startsWith('jinrai')) emitJinraiPattern(this, pattern, t);
     else if (pattern === 'etoile') emitEtokichi(this, t);
-    else if (pattern === 'galaxyFlash') emitGalaxyFlash(this, t);
+    else if (pattern === 'galaxyFlash' || pattern === 'galaxyFlashDawn') emitGalaxyFlash(this, t);
+    else if (pattern.startsWith('etokichi')) emitEtokichiDawn(this, pattern, t);
     else if (this.stage === 1 && !this.midboss) emitNeo(this, pattern, t);
     else if (this.stage === 2) emitObsidia(this, pattern, t);
     else if (pattern === 'neoEncore') emitNeoEncore(this, t);
@@ -797,6 +800,12 @@ export class Game {
         } else b.color = b.age >= b.releaseAt - [70, 56, 44, 34][['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty)] ? 1 : 2;
       }
       if (b.motion === 'etoileFall') b.vy += 0.012;
+      if (b.motion === 'etokichiRing') {
+        const vx = b.vx * Math.cos(b.spin) - b.vy * Math.sin(b.spin);
+        b.vy = b.vx * Math.sin(b.spin) + b.vy * Math.cos(b.spin);
+        b.vx = vx;
+        if (b.age >= b.releaseAt) b.motion = 'normal';
+      }
       if (b.motion === 'bookshelf' && b.age === b.releaseAt) {
         b.vx *= -1;
         const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty);

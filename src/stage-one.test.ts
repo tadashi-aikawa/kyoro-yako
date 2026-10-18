@@ -196,14 +196,6 @@ it('Vimはポーズで止まり、ボム後のコピー射撃を中止して次�
   game.skipPhase(); expect(active(game)).toHaveLength(0); expect(game.vimAttack).toBeUndefined();
 });
 
-it('5面の再演でもコマンドを予告し、3jで3回発射する', () => {
-  const game = new Game(); game.audio.volume = 0; game.invincible = true;
-  game.startStage(5); game.startBoss(true, 0); game.encoreCount = 2;
-  game.phaseFrame = 104; game.update();
-  expect(active(game)).toHaveLength(0); run(game, vimScene(0, 1).warning + 40);
-  expect(active(game)).toHaveLength(27);
-});
-
 it('被弾が確定したらコピー射撃を中止する', () => {
   const game = start(3), wave = VIM_COMMANDS.indexOf('yy3p');
   game.phaseFrame = 104 + wave * VIM_PERIOD; game.update(); run(game, vimScene(wave * VIM_PERIOD, 1).warning);

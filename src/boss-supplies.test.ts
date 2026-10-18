@@ -131,7 +131,7 @@ it('弾消しで点アイテムがプールを埋めても補充品を優先す�
 it('全ステージの戦闘最後に回収時間を設け、拾わなければ補充しない', () => {
   for (let stage = 1; stage <= STAGES.length; stage++) {
     for (const mid of [true, false]) {
-      const game = start(stage, mid ? midPhases(STAGES[stage - 1].mid).length - 1 : STAGES[stage - 1].phases.length - 1, mid);
+      const game = start(stage, mid ? midPhases(STAGES[stage - 1].mid, stage).length - 1 : STAGES[stage - 1].phases.length - 1, mid);
       game.bombs = 0;
       game.power = 3;
       game.px = 12; game.py = 439;
@@ -189,18 +189,16 @@ it('本ボスの回収時間中もボスBGMを維持する', () => {
   expect(game.bgm.cue).toBe('boss-jinrai');
 });
 
-it('5面中ボスの時間延長は戦闘終了まで補充を増やさない', () => {
+it('5面エトキチは各技の時間切れで補充し、3技目だけ回収待ちへ進む', () => {
   const game = start(5, 0, true);
   game.invincible = true;
   for (let i = 0; i < 3; i++) {
+    game.items.clear();
     game.phaseFrame = game.phase!.duration * 60 - 1;
     game.update();
-    expect(supplies(game)).toHaveLength(0);
+    expect(supplies(game)).toHaveLength(10);
+    expect(game.collectionFrames).toBe(i === 2 ? 180 : 0);
   }
-  game.phaseFrame = game.phase!.duration * 60 - 1;
-  game.update();
-  expect(supplies(game)).toHaveLength(10);
-  expect(game.collectionFrames).toBe(180);
 });
 
 it('拾ってもPower5・ボム8を超えず、被弾でもボム備蓄を失わない', () => {

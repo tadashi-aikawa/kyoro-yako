@@ -33,10 +33,20 @@ function curve(width: number, height: number, period: number, shape: 'arc' | 'el
   };
 }
 
+function pentagram(time: number): Point {
+  const points: Point[] = [[192, -34], [240, 28], [114, -11], [270, -11], [144, 28]];
+  const segment = Math.floor(time / 120);
+  const from = segment === 0 ? CENTER : points[(segment - 1) % 5];
+  return moveBetween(from, points[segment % 5], time % 120 / 60);
+}
+
 const MOVEMENTS: Record<string, Movement> = {
   // エトキチはゆっくり止まり、ネオは短い位置替えやショートカットを繰り返す。
   etoile: patrol([[242, -12], [142, -12]], 84, 180),
   galaxyFlash: patrol([[126, -20], [258, 12], [192, -16]], 84, 276, true),
+  etokichiStarRing: curve(82, 18, 660, 'ellipse'),
+  etokichiPentagramNova: pentagram,
+  galaxyFlashDawn: patrol([[116, -20], [268, 12], [192, -16]], 84, 216, true),
   neoTripleTap: patrol([[126, 0], [252, 20]], 72, 100),
   neoSyncopation: patrol([[112, 18], [192, -8], [272, 18]], 64, 66),
   keyRain: patrol([[112, -14], [272, -14]], 84, 160),

@@ -3,7 +3,7 @@ import { Game } from './game';
 import { claudineScene } from './patterns/claudine';
 import { FINALE_CHARGE, FINALE_START, ROSE_COUNT, ROSE_PERIOD } from './patterns/claudine-finale';
 import { vimScene } from './patterns/neo';
-import { MID_PHASE, PHASE_LIMIT, phaseHp, STAGE_DPS, STAGES } from './stages';
+import { midPhases, PHASE_LIMIT, phaseHp, STAGE_DPS, STAGES } from './stages';
 
 beforeEach(() => {
   vi.stubGlobal('location', { search: '' });
@@ -26,7 +26,7 @@ it('全フェーズは面と種類の共通式から体力と制限時間を得�
       expect(phase.duration).toBe(phase.kind === 'survival' ? 60 : PHASE_LIMIT[phase.kind]);
       if (phase.kind !== 'survival') expect(phase.hp / STAGE_DPS[index]).toBeCloseTo(phase.kind === 'normal' ? 14 : 25, 0);
     }
-    const mid = MID_PHASE[stage.mid];
+    const mid = midPhases(stage.mid, index + 1)[0];
     if (stage.mid === 'chappy') expect([mid.hp, mid.duration]).toEqual([405, 28]);
     else {
       expect(mid.hp).toBe(phaseHp(index + 1, 'midboss'));
@@ -218,19 +218,18 @@ it('残り10秒で旧弾を消し、1秒の構えから薔薇と自機狙いを�
   }
 });
 
-it('5面ネオの延長は1面の3つの仕掛けを順に使い、★は1つのまま', () => {
+it('5面中ボスはエトキチの3技を使い、ネオのキーやVimを再演しない', () => {
   const game = start(5, 0, true);
-  expect(game.remainingSpells).toBe(1);
-  for (const [extension, motion] of ['keyDrop', 'vim', 'normal'].entries()) {
-    game.encoreCount = extension + 1;
+  for (let index = 0; index < 3; index++) {
+    expect(game.remainingSpells).toBe(3 - index);
     game.phaseFrame = 104;
-    game.bullets.clear();
     game.update();
-    if (extension === 1) expect(game.vimAttack).toBeDefined();
-    else expect(game.bullets.objects.some((b) => b.active && b.motion === motion), `extension ${extension + 1}`).toBe(true);
-    expect(game.remainingSpells).toBe(1);
+    expect(game.bullets.count).toBeGreaterThan(0);
+    expect(game.vimAttack).toBeUndefined();
+    expect(game.keyboardWord).toBe('');
+    expect(game.bullets.objects.some((b) => b.active && b.keyLabel)).toBe(false);
+    game.skipPhase();
   }
-  game.skipPhase();
   expect(game.remainingSpells).toBe(0);
 });
 

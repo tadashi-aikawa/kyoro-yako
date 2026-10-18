@@ -80,7 +80,11 @@ export function dialogue(_player: PlayerId, boss: BossId, moment: 'before' | 'af
   return lines[boss][moment];
 }
 
-export function midDialogue(player: PlayerId, boss: BossId): Line[] {
+export function midDialogue(player: PlayerId, boss: BossId, stage = 1): Line[] {
+  if (boss === 'etokichi' && stage === 5) return [
+    { who: 'etokichi', text: '先回りして待ってたよー。天文台の星を集めたから、今度は本気だよ、キチ！' },
+    { who: player, text: '門のときより、ずっとまぶしいの。あたしも、ここまで集めた記録で応えるのね。' },
+  ];
   if (boss === 'chappy' || boss === 'etokichi') return dialogue(player, boss, 'before');
   if (boss === 'neo') return [
     { who: 'neo', text: '最後にもう一つだけ！ 下の灯り、全部戻ったよ！ わたしの返事も持っていって！' },

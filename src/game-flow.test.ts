@@ -81,38 +81,32 @@ it('5面までのデバッグ入口とBGM名を使い、旧自機を受け付け
   expect(new Game().scene).toBe('ending');
 });
 
-it('5面のネオは最大3回だけ時間を延長し、体力を削れば先に退場する', () => {
+it.each(['defeat', 'timeout'] as const)('5面エトキチは%sで3技を順に終え、会話後にミネルヴァへ進む', (ending) => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   game.startStage(5); game.startBoss(true, 0);
   game.update();
-  expect(game.debugState).toMatchObject({ boss: 'ネオ', bossRole: 'midboss', bgm: 'stage-dawn' });
-  for (let extension = 1; extension <= 3; extension++) {
-    game.phaseFrame = game.phase!.duration * 60 - 1;
+  expect(game.debugState).toMatchObject({ boss: 'エトキチ', bossRole: 'midboss', bgm: 'stage-dawn' });
+  for (let index = 0; index < 3; index++) {
+    expect(game.remainingSpells).toBe(3 - index);
+    expect(game.phaseIndex).toBe(index);
+    if (ending === 'defeat') game.phaseHp = 0;
+    else game.phaseFrame = game.phase!.duration * 60 - 1;
     game.update();
-    expect(game.encoreCount).toBe(extension);
-    expect(game.message).toBe('最後にもう一つだけ！');
-    expect(game.scene).toBe('stage');
+    expect(game.encoreCount).toBe(0);
+    if (index < 2) expect(game.collectionFrames).toBe(0);
   }
-  game.phaseFrame = game.phase!.duration * 60 - 1;
-  game.update();
+  expect(game.remainingSpells).toBe(0);
+  expect(game.collectionFrames).toBe(180);
   while (game.collectionFrames > 0) game.update();
   expect(game.scene).toBe('dialogue');
-  expect(game.encoreCount).toBe(3);
+  expect(game.lines[0].who).toBe('etokichi');
   for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
-  game.midbossElapsedFrames = 2568;
-  game.stageFrame = 6000 - game.midbossElapsedFrames - 1;
+  game.midbossElapsedFrames = ending === 'timeout' ? 8100 : 4000;
+  game.stageFrame = ending === 'timeout' ? 2899 : 4369;
   game.update();
   expect(game.scene).toBe('dialogue');
   expect(game.afterDialogue).toBe('boss');
   expect(game.bgm.cue).toBe('boss-minerva');
-
-  const early = new Game(); early.audio.volume = 0;
-  early.startStage(5); early.startBoss(true, 0);
-  early.phaseHp = 0;
-  early.update();
-  while (early.collectionFrames > 0) early.update();
-  expect(early.scene).toBe('dialogue');
-  expect(early.encoreCount).toBe(0);
 });
 
 it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ進む', () => {

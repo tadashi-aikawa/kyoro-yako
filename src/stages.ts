@@ -71,7 +71,7 @@ export const STAGES: Stage[] = [
     ],
   },
   {
-    title: '暁の天文台 〜 Owl of Minerva', boss: 'minerva', mid: 'neo', bgm: 'stage-dawn', colors: ['#642e4d', '#b86c67', '#ffe4ab'],
+    title: '暁の天文台 〜 Owl of Minerva', boss: 'minerva', mid: 'etokichi', bgm: 'stage-dawn', colors: ['#642e4d', '#b86c67', '#ffe4ab'],
     phases: [
       phase(5, '通常攻撃・仮説の星図', 'normal', 'minervaStarFan'),
       phase(5, '七重の調査網', 'spell', 'sevenRings'),
@@ -100,12 +100,18 @@ export const MID_PHASE: Record<BossId, Phase> = {
   minerva: phase(5, '予備の仮説', 'midboss', 'sevenRings'),
 };
 export const ETOKICHI_FLASH = phase(1, 'エトキチギャラクシーフラッシュ', 'midboss', 'galaxyFlash');
+export const ETOKICHI_DAWN_PHASES: Phase[] = [
+  phase(5, 'スターリング', 'midboss', 'etokichiStarRing'),
+  phase(5, 'エトキチ・ペンタグラムノヴァ', 'midboss', 'etokichiPentagramNova'),
+  phase(5, 'エトキチギャラクシーフラッシュ', 'midboss', 'galaxyFlashDawn'),
+];
 export const CHAPPY_PHASES: Phase[] = [
   MID_PHASE.chappy,
   { ...phase(3, '並列実行', 'midboss', 'chappyParallel', 28), hp: 583 },
   { ...phase(3, '完成しました。ご確認ください。', 'midboss', 'chappyDelivery', 34), hp: 778 },
 ];
-export function midPhases(boss: BossId): Phase[] {
+export function midPhases(boss: BossId, stage = 1): Phase[] {
+  if (boss === 'etokichi' && stage === 5) return ETOKICHI_DAWN_PHASES;
   return boss === 'chappy' ? CHAPPY_PHASES : boss === 'etokichi' ? [MID_PHASE.etokichi, ETOKICHI_FLASH] : [MID_PHASE[boss]];
 }
 export const NAMES: Record<BossId, string> = {

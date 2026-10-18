@@ -20,14 +20,14 @@ function start(stage: number, index: number, mid = false): Game {
 it('確認済みの2面と専用移動を除く全中ボス・全ボスの技に新しい移動がある', () => {
   for (const [index, stage] of STAGES.entries()) {
     if (index === 1) continue;
-    for (const phase of [...midPhases(stage.mid), ...stage.phases]) {
+    for (const phase of [...midPhases(stage.mid, index + 1), ...stage.phases]) {
       expect(hasBossMovement(phase.pattern), phase.pattern).toBe(!SPECIAL.has(phase.pattern));
     }
   }
 });
 
 it('新しい全軌道は画面上部に収まり、周期をまたいでも位置が飛ばない', () => {
-  for (const phase of [...STAGES.flatMap((stage) => midPhases(stage.mid)), ...STAGES.flatMap((stage) => stage.phases)]) {
+  for (const phase of [...STAGES.flatMap((stage, index) => midPhases(stage.mid, index + 1)), ...STAGES.flatMap((stage) => stage.phases)]) {
     if (!hasBossMovement(phase.pattern)) continue;
     let previous = patternPosition(phase, 0, [280, 150])!;
     const xs: number[] = [], ys: number[] = [], speeds: number[] = [];
@@ -119,15 +119,12 @@ it('クロディーヌの再演は技の境目で飛ばず、最後10秒の薔�
   }
 });
 
-it('5面ネオの3回の延長は位置を飛ばさず、移動時計を引き継ぐ', () => {
-  const game = start(5, 0, true);
-  for (let encore = 1; encore <= 3; encore++) {
-    game.phaseFrame = game.phase!.duration * 60 - 1;
-    const before = game.bossPosition();
+it('5面エトキチは光線の予告から発射終了まで止まる', () => {
+  const game = start(5, 2, true);
+  let origin = game.bossPosition();
+  for (let frame = 0; frame < 1000; frame++) {
     game.update();
-    expect(game.encoreCount).toBe(encore);
-    expect(Math.hypot(game.bossXY[0] - before[0], game.bossXY[1] - before[1])).toBeLessThan(4);
-    game.update();
-    expect(game.bossPosition().every(Number.isFinite)).toBe(true);
+    if (game.galaxyFlash?.age === 1) origin = game.bossPosition();
+    if (game.galaxyFlash) expect(game.bossPosition()).toEqual(origin);
   }
 });
