@@ -13,7 +13,7 @@ import { SWEEP_CHARGE, SWEEP_MOVE, SWEEP_PERIOD, SWEEP_SHOTS, sweepStep, sweepTa
 import { FIELD } from './rules';
 import { drawScenery } from './stage-scenery';
 import { NAMES, STAGES } from './stages';
-import { GAME_READING, GAME_TITLE, RECORDS } from './story';
+import { GAME_TITLE, RECORDS } from './story';
 import { wrapDialogue } from './text-layout';
 
 const PALETTE = ['#a674ff', '#6ddaf5', '#fbd768', '#ff9dbe'];
@@ -21,6 +21,7 @@ const PALETTE = ['#a674ff', '#6ddaf5', '#fbd768', '#ff9dbe'];
 export class Renderer {
   private readonly sprites = new Map<string, HTMLCanvasElement>();
   private readonly bossMotion = createBossMotion();
+  private readonly titleArt = Object.assign(new Image(), { src: `${import.meta.env.BASE_URL}assets/title/key-visual.webp` });
   constructor(private readonly ctx: CanvasRenderingContext2D) {
     this.setPixelRatio(1);
   }
@@ -92,42 +93,44 @@ export class Renderer {
 
   private drawTitle(game: Game): void {
     const c = this.ctx;
-    this.uiText('夜をつなぐ、五つの頁。', 40, 38, 12, '#b2cbbf');
-    this.text(GAME_TITLE, 40, 100, 52, '#f6e8c6');
-    this.uiText(GAME_READING, 42, 155, 12, '#b0a9ca');
-    this.uiText('消えた約束を、朝へ届けて。', 42, 184, 16, '#e7e2ee');
-    this.uiText('みみこと梟楼を登る、弾幕シューティング。', 42, 207, 11, '#a6a7ba');
-    const entries = [
-      ['夜の記録をはじめる', '1階の門から、夜明けの天文台へ'],
-      ['練習する', '訪れた階でもう一度手合わせ'],
-      ['音の設定', '効果音とBGMの音量'],
-      ['遊び方', '移動・ショット・ボムの操作'],
-      ['集めた記録を読む', `みみこの冒険ノート  ${game.collectedRecords.length} / 5 頁`],
-    ];
-    entries.forEach(([title, detail], i) => {
-      const y = 231 + i * 40; const selected = i === game.menu;
-      this.card(36, y, 306, 37, selected ? '#ddd6b9' : '#171d31', selected ? '#ddd6b9' : '#343849');
-      this.uiText(title, 51, y + 12, 13, selected ? '#222c30' : '#ddd9e6');
-      this.uiText(detail, 51, y + 27, 9, selected ? '#53615d' : '#969cad');
-      if (selected) this.uiText('→', 321, y + 18, 18, '#263e37', 'right');
+    const art = this.titleArt;
+    if (art.complete && art.naturalWidth) {
+      const scale = Math.max(640 / art.naturalWidth, 480 / art.naturalHeight);
+      const w = art.naturalWidth * scale; const h = art.naturalHeight * scale;
+      c.drawImage(art, (640 - w) / 2, (480 - h) / 2, w, h);
+    }
+    // 題字とメニューの下だけ夜を深くする。
+    const veil = c.createLinearGradient(0, 0, 380, 0);
+    veil.addColorStop(0, 'rgba(5,8,22,0.82)'); veil.addColorStop(0.55, 'rgba(5,8,22,0.45)'); veil.addColorStop(1, 'rgba(5,8,22,0)');
+    c.fillStyle = veil; c.fillRect(0, 0, 380, 480);
+    this.stars(game.frame, 640, 480, 0.16);
+
+    c.save();
+    c.font = '52px "Hiragino Mincho ProN", "Yu Mincho", serif';
+    c.letterSpacing = '8px';
+    c.textAlign = 'left'; c.textBaseline = 'middle';
+    const gold = c.createLinearGradient(0, 86, 0, 138);
+    gold.addColorStop(0, '#fff6dc'); gold.addColorStop(0.55, '#ead39a'); gold.addColorStop(1, '#b8945a');
+    c.shadowColor = 'rgba(240,210,140,0.45)'; c.shadowBlur = 18;
+    c.fillStyle = gold; c.fillText(GAME_TITLE, 50, 112);
+    c.restore();
+    const rule = c.createLinearGradient(52, 0, 270, 0);
+    rule.addColorStop(0, 'rgba(234,211,154,0.7)'); rule.addColorStop(1, 'rgba(234,211,154,0)');
+    c.fillStyle = rule; c.fillRect(52, 150, 218, 1);
+
+    const entries = ['はじめる', '練習', '音の設定', '遊び方', '冒険ノート'];
+    entries.forEach((label, i) => {
+      const y = 262 + i * 34; const selected = i === game.menu;
+      if (selected) {
+        const glow = c.createLinearGradient(44, 0, 250, 0);
+        glow.addColorStop(0, 'rgba(234,211,154,0)'); glow.addColorStop(0.15, 'rgba(234,211,154,0.18)'); glow.addColorStop(1, 'rgba(234,211,154,0)');
+        c.fillStyle = glow; c.fillRect(44, y - 13, 206, 26);
+        const pulse = 0.75 + Math.sin(game.frame * 0.08) * 0.25;
+        c.fillStyle = `rgba(246,232,198,${pulse})`;
+        c.beginPath(); c.moveTo(56, y - 4); c.lineTo(60, y); c.lineTo(56, y + 4); c.lineTo(52, y); c.closePath(); c.fill();
+      }
+      this.text(label, 72, y, 17, selected ? '#f6e8c6' : 'rgba(196,198,218,0.62)');
     });
-    // 5つの部屋の灯りが、梟楼を登る道のりを示す。
-    c.fillStyle = '#eddbad'; c.beginPath(); c.arc(519, 67, 25, 0, Math.PI * 2); c.fill();
-    c.fillStyle = '#131b32'; c.beginPath(); c.arc(530, 58, 25, 0, Math.PI * 2); c.fill();
-    c.fillStyle = '#101828'; c.strokeStyle = '#636876'; c.lineWidth = 1.5;
-    c.beginPath(); c.moveTo(400, 385); c.lineTo(400, 132); c.lineTo(454, 89); c.lineTo(508, 132); c.lineTo(508, 385); c.closePath(); c.fill(); c.stroke();
-    const rooms = ['天文台', '夜桜', '回廊', '書庫', '門'];
-    rooms.forEach((room, i) => {
-      const y = 143 + i * 44;
-      const glow = 0.45 + Math.sin(game.frame * 0.013 + i) * 0.12;
-      c.fillStyle = `rgba(221,198,143,${glow})`; c.beginPath(); c.roundRect(422, y, 26, 26, [13, 13, 2, 2]); c.fill();
-      c.strokeStyle = '#171d2c'; c.beginPath(); c.moveTo(435, y); c.lineTo(435, y + 26); c.moveTo(422, y + 15); c.lineTo(448, y + 15); c.stroke();
-      this.uiText(room, 460, y + 14, 10, '#b2b2bc');
-    });
-    c.strokeStyle = '#526e69'; c.beginPath(); c.moveTo(359, 394); c.quadraticCurveTo(455, 363, 594, 397); c.stroke();
-    this.image(game, 'mimiko-sprite', 514, 275, 106, 106);
-    this.uiText('夜明けまで、あと5つの部屋。', 470, 422, 10, '#b3cfc2', 'center');
-    this.uiText('↑ ↓ 選択   Z 決定   X 戻る', 40, 455, 10, '#8c96a8');
   }
 
   private image(game: Game, id: string, x: number, y: number, w: number, h: number, alpha = 1): void {
@@ -153,7 +156,6 @@ export class Renderer {
     }
     if (game.scene === 'title') {
       c.fillStyle = '#11192e'; c.fillRect(0, 0, 640, 480);
-      this.stars(game.frame, 640, 480, 0.3);
       this.drawTitle(game);
       return;
     }
