@@ -1,6 +1,6 @@
 export type PlayerId = 'mimiko';
 export type Difficulty = 'easy' | 'normal' | 'hard' | 'lunatic';
-export type ItemKind = 'small' | 'large' | 'point' | 'bomb' | 'life';
+export type ItemKind = 'small' | 'large' | 'point' | 'bomb' | 'life' | 'radiant';
 
 export const FIELD = { x: 32, y: 16, w: 384, h: 448 } as const;
 export const DIFFICULTY: Record<Difficulty, number> = { easy: 0.6, normal: 1, hard: 1.4, lunatic: 1.8 };

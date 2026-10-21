@@ -396,7 +396,7 @@ export class Renderer {
     for (const ring of game.interviewRings) this.interviewRing(ring);
     game.shots.forEach((shot) => {
       c.save(); c.translate(shot.x, shot.y); c.rotate(Math.atan2(shot.vx, -shot.vy));
-      c.fillStyle = '#a9f7ff'; c.shadowColor = c.fillStyle; c.shadowBlur = 6;
+      c.fillStyle = game.awakened ? '#ffe7a1' : '#a9f7ff'; c.shadowColor = c.fillStyle; c.shadowBlur = 6;
       c.fillRect(-shot.radius, -6, shot.radius * 2, 12); c.restore();
     });
     game.particles.forEach((p) => { c.globalAlpha = 1 - p.age / p.life; c.fillStyle = p.color; c.fillRect(p.x, p.y, p.size, p.size); c.globalAlpha = 1; });
@@ -1093,7 +1093,7 @@ export class Renderer {
   private item(game: Game, item: Item): void {
     const image = game.images[`${game.player}-sprite`];
     const owlReady = image.complete && image.naturalWidth > 0;
-    const size = item.kind === 'large' ? 48 : 32;
+    const size = item.kind === 'large' || item.kind === 'radiant' ? 48 : 32;
     // 代用絵も保存し、読み込みに失敗してもキャンバスを毎フレーム作らない。
     const key = item.kind === 'life' ? `item-life-${game.player}-${owlReady ? 'ready' : 'fallback'}` : `item-${item.kind}`;
     let sprite = this.sprites.get(key);
@@ -1106,6 +1106,9 @@ export class Renderer {
       if (item.kind === 'small' || item.kind === 'large') {
         c.rotate(-Math.atan2(19, 33));
         notebookFeather(c, 0, -2, item.kind === 'large' ? 0.8 : 0.5, 1, true);
+      } else if (item.kind === 'radiant') {
+        c.rotate(-Math.atan2(19, 33));
+        for (const x of [-9, 9, 0]) notebookFeather(c, x, x === 0 ? -4 : 0, 0.63, 1, true, true);
       } else if (item.kind === 'bomb') {
         const aura = c.createRadialGradient(0, 0, 7, 0, 0, 13);
         aura.addColorStop(0, 'rgba(113,218,157,0.48)'); aura.addColorStop(0.5, 'rgba(113,218,157,0.3)'); aura.addColorStop(1, 'rgba(113,218,157,0)');
@@ -1124,6 +1127,13 @@ export class Renderer {
       this.sprites.set(key, sprite);
     }
     this.ctx.drawImage(sprite, item.x - size / 2, item.y - size / 2, size, size);
+    if (item.kind === 'radiant') {
+      const c = this.ctx;
+      for (let i = 0; i < 3; i++) {
+        const angle = game.frame * 0.035 + i * Math.PI * 2 / 3;
+        notebookStar(c, item.x + Math.cos(angle) * 19, item.y + Math.sin(angle) * 19, 2.5 + Math.sin(game.frame * 0.12 + i), '#fff0c0');
+      }
+    }
   }
 
   private player(game: Game): void {
@@ -1133,8 +1143,11 @@ export class Renderer {
     const options = Math.floor(game.power);
     for (let i = 0; i < options; i++) {
       const a = game.frame * 0.04 + i * Math.PI * 2 / options;
-      c.fillStyle = '#d9eeff'; c.shadowColor = '#9de8ff'; c.shadowBlur = 8;
-      c.beginPath(); c.arc(game.px + Math.cos(a) * 21, game.py + Math.sin(a) * 14, 3.4, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0;
+      const x = game.px + Math.cos(a) * 21; const y = game.py + Math.sin(a) * 14;
+      c.fillStyle = game.awakened ? '#fff1bf' : '#d9eeff'; c.shadowColor = game.awakened ? '#ffd36f' : '#9de8ff'; c.shadowBlur = game.awakened ? 14 : 8;
+      if (game.awakened) notebookStar(c, x, y, 6, '#fff1bf');
+      else { c.beginPath(); c.arc(x, y, 3.4, 0, Math.PI * 2); c.fill(); }
+      c.shadowBlur = 0;
     }
   }
 
@@ -1275,9 +1288,13 @@ export class Renderer {
     this.uiText('ボム', 448, 269, 10, '#bfdcbf');
     for (let i = 0; i < MAX_BOMBS; i++) notebookBomb(c, 456 + i * 20, 289, 7, i < game.bombs);
     this.uiText('ショット強度', 448, 322, 10, '#c2d0c8');
-    this.uiText(game.power >= MAX_POWER ? 'MAX' : `${game.power.toFixed(2)} / ${MAX_POWER}`, 608, 322, 10, '#efdfb9', 'right');
+    this.uiText(game.awakened ? '最高形態' : game.power >= MAX_POWER ? 'MAX' : `${game.power.toFixed(2)} / ${MAX_POWER}`, 608, 322, 10, '#efdfb9', 'right');
     for (let i = 0; i < MAX_POWER; i++) {
-      notebookFeather(c, 462 + i * 32, 350, 0.66, Math.max(0, Math.min(1, game.power - i)));
+      c.save();
+      if (game.awakened) { c.shadowColor = '#ffd36f'; c.shadowBlur = 10 + Math.sin(game.frame * 0.09 + i) * 4; }
+      notebookFeather(c, 462 + i * 32, 350, 0.66, Math.max(0, Math.min(1, game.power - i)), false, game.awakened);
+      if (game.awakened) notebookStar(c, 470 + i * 32, 338, 2.5 + Math.sin(game.frame * 0.09 + i), '#fff4d1');
+      c.restore();
     }
     rule(382, 0.3);
     this.image(game, `${game.player}-face`, 444, 390, 52, 52);

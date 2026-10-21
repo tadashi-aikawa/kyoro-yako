@@ -70,6 +70,7 @@ export class Game {
   py = FIELD.h - 50;
   playerDx = 0;
   power = 0;
+  awakened = false;
   lives = 2;
   bombs = 3;
   score = 0;
@@ -217,6 +218,7 @@ export class Game {
       this.startStage(1);
     }
     this.power = this.queryNumber('power', 0, MAX_POWER, this.power);
+    this.awakened = this.params.get('maxform') === '1' && this.power >= MAX_POWER;
     this.lives = Math.floor(this.queryNumber('lives', 0, 8, this.lives));
     this.bombs = Math.floor(this.queryNumber('bombs', 0, MAX_BOMBS, this.bombs));
   }
@@ -316,6 +318,7 @@ export class Game {
 
   private startRun(): void {
     this.score = 0; this.power = 0; this.lives = 2; this.bombs = 3; this.graze = 0; this.point = 10000;
+    this.awakened = false;
   }
 
   startStage(stage: number): void {
@@ -394,7 +397,7 @@ export class Game {
   private fireShot(focus: boolean): void {
     const tier = Math.floor(this.power);
     const base = 1.35;
-    const count = 2 + Math.floor(tier / 2);
+    const count = this.awakened ? 5 : 2 + Math.floor(tier / 2);
     for (let i = 0; i < count; i++) {
       const shot = this.shots.acquire(); if (!shot) break;
       shot.x = this.px + (i - (count - 1) / 2) * (focus ? 6 : 10);
@@ -407,7 +410,8 @@ export class Game {
     }
     // 最大Powerの補助弾は半分の頻度。通常は斜め前方を補い、低速では全弾を正面へ束ねる。
     if (tier >= MAX_POWER && this.frame % 10 === 0) {
-      for (const side of [-1, 1]) for (const [index, degrees] of [15, 30].entries()) {
+      const angles = this.awakened ? [15, 30, 45] : [15, 30];
+      for (const side of [-1, 1]) for (const [index, degrees] of angles.entries()) {
         const shot = this.shots.acquire(); if (!shot) break;
         const angle = focus ? 0 : degrees * Math.PI / 180;
         Object.assign(shot, {
@@ -443,6 +447,7 @@ export class Game {
     this.bombs = Math.max(3, this.bombs);
     const lostPower = Math.min(1, this.power);
     this.power = Math.max(0, this.power - 1);
+    this.awakened = false;
     this.invulnFrames = 180;
     this.hitDuringSpell = true;
     this.audio.play('hit');
@@ -645,7 +650,9 @@ export class Game {
     const kinds: ItemKind[] = Array<ItemKind>(10 * multiplier).fill('small');
     // 後半の本ボスはP量と追加品の確率を倍増する。ライフとボムは同時には出さない。
     const roll = Math.random();
-    const bonus: ItemKind | undefined = roll < 0.02 * multiplier ? 'life' : roll < 0.32 * multiplier ? 'bomb' : undefined;
+    // 光の羽根は「追加なし」の枠から抽選し、ライフとボムの確率を保つ。
+    const bonus: ItemKind | undefined = roll < 0.02 * multiplier ? 'life' : roll < 0.32 * multiplier ? 'bomb'
+      : this.power >= MAX_POWER && !this.awakened && roll < 0.34 * multiplier ? 'radiant' : undefined;
     // 追加品がいつも同じ区画へ出ないよう、散布順のランダムな位置へ挿入する。
     if (bonus) kinds.splice(Math.floor(Math.random() * (kinds.length + 1)), 0, bonus);
     kinds.forEach((kind, index) => { this.scatterItem(kind, index, kinds.length); });
@@ -1009,7 +1016,9 @@ export class Game {
         this.audio.play('kill');
         this.spark(e.x, e.y, '#f8c5ff', 12);
         const roll = Math.random();
-        this.spawnItem(e.x, e.y, roll < 0.003 ? 'life' : roll < 0.013 ? 'bomb' : roll < 0.063 ? 'large' : roll < 0.72 ? 'small' : 'point', false);
+        const kind = roll < 0.003 ? 'life' : roll < 0.013 ? 'bomb' : roll < 0.063 ? 'large' : roll < 0.72 ? 'small'
+          : this.power >= MAX_POWER && !this.awakened && roll >= 0.997 ? 'radiant' : 'point';
+        this.spawnItem(e.x, e.y, kind, false);
         e.active = false;
       }
       if (e.age > 260 || (e.age > 140 && e.y < -35) || (e.age > 30 && (e.x < -35 || e.x > FIELD.w + 35))) e.active = false;
@@ -1100,6 +1109,17 @@ export class Game {
       case 'point': this.addScore(pointValue(item.y, this.point)); break;
       case 'bomb': this.bombs = Math.min(MAX_BOMBS, this.bombs + 1); break;
       case 'life': this.lives++; this.audio.play('extend'); break;
+      case 'radiant':
+        // 被弾前に落ちた羽根でも、Powerを戻すだけで最高形態が復活しないようにする。
+        if (this.power < MAX_POWER) this.power = Math.min(MAX_POWER, this.power + 1);
+        else if (this.awakened) this.addScore(this.point);
+        else {
+          this.awakened = true;
+          this.spark(this.px, this.py, '#ffe39a', 45);
+          this.audio.play('extend');
+          this.message = '光の羽根'; this.messageFrames = 100;
+        }
+        break;
     }
   }
 
@@ -1134,7 +1154,7 @@ export class Game {
   }
 
   get debugState(): Record<string, string | number | null> {
-    return { scene: this.scene, stage: this.stage, boss: this.boss ? NAMES[this.boss] : null, bossRole: this.boss ? this.midboss ? 'midboss' : 'boss' : null, phase: this.phase ? this.phaseIndex : -1, spell: this.phase?.spell ? this.phase.name : null, phaseRemainingSeconds: this.phase ? Math.max(0, (this.phase.duration * 60 - this.phaseFrame) / 60) : null, phaseHpRatio: this.phase ? Math.max(0, this.phaseHp / this.phaseMaxHp) : null, bullets: this.bullets.count, graphNodes: this.graphNodes.length, graphEdges: this.graphEdges.length, dawnOwls: this.dawnOwls.length, score: this.score, power: this.power, lives: this.lives, bombs: this.bombs, fps: this.fps, bgm: this.bgm.cue };
+    return { scene: this.scene, stage: this.stage, boss: this.boss ? NAMES[this.boss] : null, bossRole: this.boss ? this.midboss ? 'midboss' : 'boss' : null, phase: this.phase ? this.phaseIndex : -1, spell: this.phase?.spell ? this.phase.name : null, phaseRemainingSeconds: this.phase ? Math.max(0, (this.phase.duration * 60 - this.phaseFrame) / 60) : null, phaseHpRatio: this.phase ? Math.max(0, this.phaseHp / this.phaseMaxHp) : null, bullets: this.bullets.count, graphNodes: this.graphNodes.length, graphEdges: this.graphEdges.length, dawnOwls: this.dawnOwls.length, score: this.score, power: this.power, maxform: Number(this.awakened), lives: this.lives, bombs: this.bombs, fps: this.fps, bgm: this.bgm.cue };
   }
 
   get endingLines(): string[] { return ENDINGS[this.player]; }

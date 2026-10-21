@@ -15,7 +15,7 @@ export function notebookBomb(c: CanvasRenderingContext2D, x: number, y: number, 
   if (active) notebookStar(c, x, y, radius * 2.3 / 7, '#dce9c8');
 }
 
-export function notebookFeather(c: CanvasRenderingContext2D, x: number, y: number, scale: number, amount = 1, collectible = false): void {
+export function notebookFeather(c: CanvasRenderingContext2D, x: number, y: number, scale: number, amount = 1, collectible = false, radiant = false): void {
   c.save(); c.translate(x, y); c.scale(scale, scale);
   const shape = () => {
     c.beginPath(); c.moveTo(-7, 13);
@@ -27,12 +27,12 @@ export function notebookFeather(c: CanvasRenderingContext2D, x: number, y: numbe
   shape(); c.fillStyle = '#263b43'; c.fill(); c.strokeStyle = collectible ? '#291b29' : '#658078'; c.lineWidth = collectible ? 2.6 : 0.7; c.stroke();
   if (amount > 0) {
     c.save(); c.beginPath(); c.rect(-14, 13 - 28 * amount, 28, 28 * amount); c.clip();
-    shape(); c.fillStyle = collectible ? '#f47c86' : amount >= 1 ? '#c6a0a9' : '#7d6b7c'; c.fill(); c.restore();
+    shape(); c.fillStyle = radiant ? '#ffe7a1' : collectible ? '#f47c86' : amount >= 1 ? '#c6a0a9' : '#7d6b7c'; c.fill(); c.restore();
   }
   if (collectible) {
     shape(); c.strokeStyle = '#291b29'; c.lineWidth = 1.2 / scale; c.stroke();
   }
-  c.strokeStyle = collectible ? '#6d3043' : amount >= 1 ? '#7c5e72' : '#6a8580'; c.lineWidth = collectible ? 0.7 / scale : 0.8;
+  c.strokeStyle = radiant ? '#997442' : collectible ? '#6d3043' : amount >= 1 ? '#7c5e72' : '#6a8580'; c.lineWidth = collectible ? 0.7 / scale : 0.8;
   c.beginPath(); c.moveTo(-13, 22); c.lineTo(6, -11);
   c.moveTo(-4, 5); c.lineTo(5, 2); c.moveTo(0, -2); c.lineTo(-4, -7); c.stroke();
   c.restore();
