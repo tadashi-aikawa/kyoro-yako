@@ -1019,7 +1019,7 @@ export class Renderer {
     if (game.phase?.pattern !== 'owlDawn' || !game.minervaReprise) return;
     const local = repriseLocal(game.phaseFrame, game.minervaReprise);
     if (dawnPrayerStep(game.phaseFrame, game.minervaReprise) >= 0) return;
-    const opacity = Math.max(0, Math.min(1, (local - 60) / 48)) * (0.58 + Math.sin(game.frame * 0.035) * 0.04);
+    const opacity = Math.max(0, Math.min(1, (local - REPRISE_PREPARE * 0.5) / (REPRISE_PREPARE * 0.4))) * (0.58 + Math.sin(game.frame * 0.035) * 0.04);
     if (!opacity) return;
     const source = REPRISES[game.minervaReprise.index];
     const sprite = this.readySprite(game, bossSpriteId(source.boss, 'cast', game.frame));

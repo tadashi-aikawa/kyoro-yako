@@ -233,7 +233,7 @@ it('終符の祈りは元の溜めと発散を保ち、再演3回の後に挟む
   vi.spyOn(Math, 'random').mockReturnValue(0.99);
   const game = phase(10);
   game.phaseFrame = 104; game.update();
-  for (let i = 0; i < 3; i++) { game.phaseHp -= game.phaseMaxHp * 0.05 + 0.000001; game.update(); }
+  for (let i = 0; i < 3; i++) { game.phaseHp -= game.phaseMaxHp * 0.08 + 0.000001; game.update(); }
   const position: [number, number] = [192, 132];
   let bullets = 0;
   for (let i = 1; i < PRAYER_PERIOD; i++) {
@@ -252,7 +252,7 @@ it('終符の祈りは元の溜めと発散を保ち、再演3回の後に挟む
   game.update();
   expect(dawnPrayerStep(game.phaseFrame, game.minervaReprise)).toBe(0);
   expect(game.minervaReprise?.cycle).toBe(3);
-  game.phaseHp -= game.phaseMaxHp * 0.05 + 0.000001; game.update();
+  game.phaseHp -= game.phaseMaxHp * 0.08 + 0.000001; game.update();
   expect(dawnPrayerStep(game.phaseFrame, game.minervaReprise)).toBe(-1);
   expect(game.minervaReprise?.cycle).toBe(4);
 });

@@ -8,11 +8,20 @@ import { emitJinraiPattern } from './jinrai';
 import { emitNeo } from './neo';
 import { emitObsidia, sweepPosition } from './obsidia';
 
-export const REPRISE_PREPARE = 120;
+export const REPRISE_PREPARE = 60;
 const PATTERNS = ['vim', 'enter', 'clean', 'link', 'sweep', 'complement', 'type', 'grid', 'whiteSpace', 'jinraiKiss', 'jinraiLaser', 'jinraiSakura'];
 export const REPRISES = STAGES.slice(0, 4).flatMap(stage => stage.phases
   .filter(phase => PATTERNS.includes(phase.pattern)).map(phase => ({ boss: stage.boss, phase })));
-export interface Reprise { cycle: number; index: number; entry: [number, number]; startFrame: number; startHp: number; prayer: boolean; }
+export interface Reprise { cycle: number; index: number; seen: number[]; entry: [number, number]; startFrame: number; startHp: number; prayer: boolean; }
+export function repriseIndex(seen: readonly number[], roll = Math.random()): number {
+  const weights = REPRISES.map((_, index) => seen.includes(index) ? 1 : 4);
+  let choice = roll * weights.reduce((sum, weight) => sum + weight, 0);
+  for (let index = 0; index < weights.length; index++) {
+    choice -= weights[index];
+    if (choice < 0) return index;
+  }
+  return REPRISES.length - 1;
+}
 export const repriseLocal = (frame: number, reprise: Reprise): number => Math.max(0, frame - reprise.startFrame);
 export function repriseDifficulty(difficulty: Difficulty): Difficulty {
   const levels = ['easy', 'normal', 'hard', 'lunatic'] as const;

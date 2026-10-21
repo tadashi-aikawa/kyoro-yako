@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { dawnPrayerStep, PRAYER_CHARGE, PRAYER_PERIOD } from './patterns/minerva-dawn';
-import { REPRISE_PREPARE, REPRISES, repriseDifficulty, repriseView } from './patterns/minerva-reprise';
+import { REPRISE_PREPARE, REPRISES, repriseDifficulty, repriseIndex, repriseView } from './patterns/minerva-reprise';
 
 const difficulties = ['easy', 'normal', 'hard', 'lunatic'] as const;
 let keydown: (event: { code: string; repeat: boolean; preventDefault: () => void }) => void;
@@ -20,14 +20,14 @@ function fight(pattern = 'owlDawn', difficulty: Game['difficulty'] = 'normal'): 
   }
   return game;
 }
-function next(game: Game): void { game.phaseHp -= game.phaseMaxHp * 0.05 + 0.000001; game.update(); }
+function next(game: Game): void { game.phaseHp -= game.phaseMaxHp * 0.08 + 0.000001; game.update(); }
 function prayer(game: Game, ratio = 1): void {
   game.phaseHp = game.phaseMaxHp * ratio; game.phaseFrame = 104; game.update();
   for (let i = 0; i < 3; i++) next(game);
   expect(game.minervaReprise?.prayer).toBe(true);
 }
 
-it.each(difficulties)('再演12種類は%sで元の仕掛けを動かし、5%減少時に全て片付く', difficulty => {
+it.each(difficulties)('再演12種類は%sで元の仕掛けを動かし、8%減少時に全て片付く', difficulty => {
   expect(REPRISES).toHaveLength(12);
   expect(new Set(REPRISES.map(source => source.boss)).size).toBe(4);
   for (const [index, source] of REPRISES.entries()) {
@@ -59,22 +59,49 @@ it.each(difficulties)('再演12種類は%sで元の仕掛けを動かし、5%減
   }
 });
 
-it('抽選はHP切替ごとに独立し、同じ技の連続も選べる。時間やボムでは切り替えない', () => {
+it('抽選はHP切替ごとに行い、同じ技の連続も選べる。時間やボムでは切り替えない', () => {
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.01);
   const game = fight(); game.phaseFrame = 104; game.update();
   const first = game.minervaReprise;
-  game.phaseHp -= game.phaseMaxHp * 0.049; game.bombFrames = 20;
+  game.phaseHp -= game.phaseMaxHp * 0.079; game.bombFrames = 20;
   for (let i = 0; i < 1500; i++) { game.update(); expect(game.minervaReprise).toBe(first); }
   game.phaseHp -= game.phaseMaxHp * 0.002; game.update();
   expect(game.minervaReprise?.cycle).toBe(1); expect(game.minervaReprise?.index).toBe(0);
   random.mockReturnValue(0.999); next(game);
   expect(game.minervaReprise?.index).toBe(11);
+  expect(game.minervaReprise?.seen).toEqual([0, 11]);
   game.startBoss(false, 9); expect(game.minervaReprise).toBeUndefined();
 });
 
-it('HP5%ごとに再演3回と4回の後へ祈りを挟み、祈りもHPで終わる', () => {
+it('未登場は登場済みの4倍で選び、全12技を候補に保つ', () => {
+  const counts = Array<number>(12).fill(0);
+  for (let sample = 0; sample < 4500; sample++) counts[repriseIndex([0], (sample + 0.5) / 4500)]++;
+  expect(counts).toEqual([100, ...Array<number>(11).fill(400)]);
+  for (const seen of [[], Array.from({ length: 12 }, (_, i) => i)]) {
+    expect(Array.from({ length: 12 }, (_, i) => repriseIndex(seen, (i + 0.5) / 12))).toEqual(Array.from({ length: 12 }, (_, i) => i));
+  }
+});
+
+it('祈りでは登場履歴を増やさず、最終技やステージのやり直しで履歴を消す', () => {
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  const choose = (roll: number) => { random.mockReturnValueOnce(roll).mockReturnValueOnce(0.5); };
+  const game = fight(); game.phaseFrame = 104;
+  choose(0); game.update(); choose(0.999); next(game); choose(0.01); next(game);
+  expect(game.minervaReprise?.seen).toEqual([0, 11]);
+  next(game);
+  expect(game.minervaReprise?.prayer).toBe(true);
+  expect(game.minervaReprise?.seen).toEqual([0, 11]);
+  choose(0.5); next(game);
+  expect(game.minervaReprise?.cycle).toBe(4);
+  expect(game.minervaReprise?.seen).toEqual([0, 11, 6]);
+  game.startBoss(false, 10); expect(game.minervaReprise).toBeUndefined();
+  game.phaseFrame = 104; game.update(); expect(game.minervaReprise?.seen).toEqual([6]);
+  game.startStage(5); expect(game.minervaReprise).toBeUndefined();
+});
+
+it('HP8%ごとに再演3回と4回の後へ祈りを挟み、祈りもHPで終わる', () => {
   const game = fight(); game.phaseFrame = 104; game.update();
-  for (let cycle = 0; cycle < 19; cycle++) {
+  for (let cycle = 0; cycle <= 12; cycle++) {
     expect(game.minervaReprise?.cycle).toBe(cycle);
     expect(game.minervaReprise?.prayer).toBe(cycle % 9 === 3 || cycle % 9 === 8);
     if (game.minervaReprise?.prayer) {
@@ -82,7 +109,7 @@ it('HP5%ごとに再演3回と4回の後へ祈りを挟み、祈りもHPで終�
       expect(game.minervaReprise.cycle).toBe(cycle);
       expect(dawnPrayerStep(game.phaseFrame, game.minervaReprise)).toBe(0);
     }
-    next(game);
+    if (cycle < 12) next(game);
   }
 });
 

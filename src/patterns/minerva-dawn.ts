@@ -1,6 +1,6 @@
 import type { Game } from '../game';
 import type { Difficulty } from '../rules';
-import { emitReprise, REPRISES, type Reprise, repriseLocal, reprisePosition } from './minerva-reprise';
+import { emitReprise, type Reprise, repriseIndex, repriseLocal, reprisePosition } from './minerva-reprise';
 
 export const PRAYER_PERIOD = 360;
 export const PRAYER_CHARGE = 72;
@@ -28,12 +28,14 @@ export function emitDawn(game: Game): void {
   if (game.phaseHp <= 0) return;
   const previous = game.minervaReprise;
   if (game.bombFrames > 0) game.clearAttackEffects();
-  if (!previous || previous.startHp - game.phaseHp >= game.phaseMaxHp * 0.05) {
+  if (!previous || previous.startHp - game.phaseHp >= game.phaseMaxHp * 0.08) {
     const cycle = previous ? previous.cycle + 1 : 0;
     const prayer = cycle % 9 === 3 || cycle % 9 === 8;
     const entry = dawnPosition(game.phaseFrame - 1, previous, game.difficulty);
     game.clearAttackEffects();
-    game.minervaReprise = { cycle, index: prayer ? previous!.index : Math.floor(Math.random() * REPRISES.length), entry,
+    const seen = previous?.seen ?? [];
+    const index = prayer ? previous!.index : repriseIndex(seen);
+    game.minervaReprise = { cycle, index, seen: prayer || seen.includes(index) ? seen : [...seen, index], entry,
       startFrame: game.phaseFrame, startHp: game.phaseHp, prayer };
     game.jinraiWindDirection = Math.random() < 0.5 ? -1 : 1;
   }
