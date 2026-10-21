@@ -233,13 +233,13 @@ it('5面中ボスはエトキチの3技を使い、ネオのキーやVimを再�
   expect(game.remainingSpells).toBe(0);
 });
 
-it('Wiki網は予告線から降り、タグ弾は対応する色の魔法陣へ曲がる', () => {
+it('グラフはノートから枝を伸ばし、タグ弾は対応する色の魔法陣へ曲がる', () => {
   const link = start(2, 3);
-  const beam = link.bullets.objects.find((b) => b.active && b.motion === 'linkBeam')!;
-  expect(beam.delay).toBeGreaterThan(0);
-  const y = beam.y;
+  const root = link.graphNodes[0];
+  expect(root.warning).toBeGreaterThan(root.age);
   for (let i = 0; i < 67; i++) link.update();
-  expect(beam.y).toBeGreaterThan(y);
+  expect(link.graphNodes.length).toBeGreaterThan(1);
+  expect(link.graphEdges[0].from).toBe(root);
   const tag = start(2, 5);
   const orb = tag.bullets.objects.find((b) => b.active && b.motion === 'tagPull')!;
   const vx = orb.vx;
@@ -265,11 +265,11 @@ it('Easyほど各スペルの予告が長い', () => {
     [1, 1, 'keyDrop', false],
     [1, 6, 'enterLine', false],
     [2, 0, 'bookshelf', true],
-    [2, 3, 'linkBeam', false],
   ] as const) {
     const easy = start(stage, phase, mid, 'easy').bullets.objects.find((b) => b.active && b.motion === motion)!;
     const lunatic = start(stage, phase, mid, 'lunatic').bullets.objects.find((b) => b.active && b.motion === motion)!;
     expect(easy.delay || easy.releaseAt, motion).toBeGreaterThan(lunatic.delay || lunatic.releaseAt);
   }
+  expect(start(2, 3, false, 'easy').graphNodes[0].warning).toBeGreaterThan(start(2, 3, false, 'lunatic').graphNodes[0].warning);
   expect(vimScene(0, 0).warning).toBeGreaterThan(vimScene(0, 3).warning);
 });

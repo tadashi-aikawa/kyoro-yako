@@ -1,5 +1,6 @@
 import type { Game } from '../game';
 import { DIFFICULTY, density } from '../rules';
+import { emitObsidiaGraph } from './obsidia-graph';
 
 const levelOf = (game: Game) => ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
 export const SWEEP_PERIOD = [330, 300, 270, 240] as const;
@@ -45,24 +46,7 @@ export function emitObsidia(game: Game, pattern: string, t: number): void {
       if (b && (i - gap + n) % n < [6, 5, 4, 3][level]) { b.motion = 'vanish'; b.color = 2; b.fadeAt = [78, 65, 54, 46][level]; }
     }
   }
-  if (pattern === 'link' && t % [230, 200, 175, 150][level] === 0) {
-    const nodes = [5, 6, 7, 8][level];
-    const gap = Math.floor(t / [230, 200, 175, 150][level]) % (nodes - 1);
-    const warning = [82, 66, 52, 42][level];
-    const y0 = 90;
-    for (let i = 0; i < nodes; i++) {
-      const nx = 30 + i * 324 / (nodes - 1);
-      const node = game.spawnBullet(nx, y0 + (i % 2) * 38, 0, [0.72, 0.84, 0.96, 1.08][level], 2, 'star');
-      if (node) { node.motion = 'linkNode'; node.delay = warning; node.radius = 6; }
-      if (i >= nodes - 1 || i === gap) continue;
-      const nextX = 30 + (i + 1) * 324 / (nodes - 1);
-      const nextY = y0 + ((i + 1) % 2) * 38;
-      for (let j = 1; j < 12; j++) {
-        const b = game.spawnBullet(nx + (nextX - nx) * j / 12, y0 + (i % 2) * 38 + (nextY - (y0 + (i % 2) * 38)) * j / 12, 0, [0.72, 0.84, 0.96, 1.08][level], 1, 'needle');
-        if (b) { b.motion = 'linkBeam'; b.delay = warning; b.radius = 3; }
-      }
-    }
-  }
+  if (pattern === 'link') emitObsidiaGraph(game);
   if (pattern === 'tags' && t % [100, 82, 70, 58][level] === 0) {
     const centers = tags(t);
     for (let color = 0; color < 3; color++) {

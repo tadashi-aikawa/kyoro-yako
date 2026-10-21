@@ -21,13 +21,14 @@ import { type InterviewRing, interviewRingBlocksShot, updateInterviewRings } fro
 import { emitNeo, inBog, updateVimBullet, type VimAttack } from './patterns/neo';
 import { emitNeoEncore, encoreBogTime } from './patterns/neo-encore';
 import { emitObsidia, sweepPosition, tags } from './patterns/obsidia';
+import { type GraphEdge, type GraphNode, updateObsidiaGraph } from './patterns/obsidia-graph';
 import { Pool } from './pool';
 import { autoCollect, bulletContact, bulletSpeed, circlesHit, type Difficulty, deathbomb, density, FIELD, type ItemKind, MAX_BOMBS, MAX_POWER, newExtends, type PlayerId, pointValue, safeLoad, safeSave } from './rules';
 import { type BossId, midPhases, NAMES, type Phase, STAGES } from './stages';
 import { readRecords } from './story';
 
 export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'stage' | 'dialogue' | 'clear' | 'pause' | 'gameover' | 'ending' | 'credits';
-export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'question' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'starOwl' | 'starTrail' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'linkNode' | 'linkBeam' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'chappyBloom' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
+export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'question' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'starOwl' | 'starTrail' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'chappyBloom' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
 export interface JinraiLaser { x: number; y: number; angle: number; age: number; warning: number; life: number; speed: number; }
 export interface DawnOwl { x: number; y: number; targetX: number; targetY: number; age: number; warning: number; color: number; }
 export interface Shot { active: boolean; x: number; y: number; vx: number; vy: number; damage: number; radius: number; homing: boolean; }
@@ -115,6 +116,9 @@ export class Game {
   jinraiThunderstorm?: Thunderstorm;
   readonly dawnOwls: DawnOwl[] = [];
   readonly interviewRings: InterviewRing[] = [];
+  readonly graphNodes: GraphNode[] = [];
+  readonly graphEdges: GraphEdge[] = [];
+  graphFrame = 0;
   galaxyFlash?: GalaxyFlash;
   keyboardWord = '';
   vimAttack?: VimAttack;
@@ -357,6 +361,7 @@ export class Game {
       else this.updateWaves();
     }
     updateInterviewRings(this);
+    updateObsidiaGraph(this);
     this.updateShots();
     this.updateClones();
     this.updateBullets();
@@ -600,6 +605,7 @@ export class Game {
       const y = b.motion === 'jinraiHeart' ? Math.max(20, Math.min(FIELD.h - 20, b.y)) : b.y;
       this.spawnItem(x, y, 'point', true);
     });
+    for (const node of this.graphNodes) this.spawnItem(node.x, node.y, 'point', true);
     this.clearBullets(); this.clones.clear();
     this.flash = 8;
     const next = (this.midboss ? midPhases(this.boss!, this.stage) : STAGES[this.stage - 1].phases)[this.phaseIndex + 1];
@@ -748,6 +754,7 @@ export class Game {
     this.jinraiBolts.length = 0; this.jinraiThunderstorm = undefined;
     this.vimAttack = undefined;
     this.interviewRings.length = 0;
+    this.graphNodes.length = 0; this.graphEdges.length = 0; this.graphFrame = 0;
     this.galaxyFlash = undefined;
   }
 
@@ -1127,7 +1134,7 @@ export class Game {
   }
 
   get debugState(): Record<string, string | number | null> {
-    return { scene: this.scene, stage: this.stage, boss: this.boss ? NAMES[this.boss] : null, bossRole: this.boss ? this.midboss ? 'midboss' : 'boss' : null, phase: this.phase ? this.phaseIndex : -1, spell: this.phase?.spell ? this.phase.name : null, phaseRemainingSeconds: this.phase ? Math.max(0, (this.phase.duration * 60 - this.phaseFrame) / 60) : null, phaseHpRatio: this.phase ? Math.max(0, this.phaseHp / this.phaseMaxHp) : null, bullets: this.bullets.count, dawnOwls: this.dawnOwls.length, score: this.score, power: this.power, lives: this.lives, bombs: this.bombs, fps: this.fps, bgm: this.bgm.cue };
+    return { scene: this.scene, stage: this.stage, boss: this.boss ? NAMES[this.boss] : null, bossRole: this.boss ? this.midboss ? 'midboss' : 'boss' : null, phase: this.phase ? this.phaseIndex : -1, spell: this.phase?.spell ? this.phase.name : null, phaseRemainingSeconds: this.phase ? Math.max(0, (this.phase.duration * 60 - this.phaseFrame) / 60) : null, phaseHpRatio: this.phase ? Math.max(0, this.phaseHp / this.phaseMaxHp) : null, bullets: this.bullets.count, graphNodes: this.graphNodes.length, graphEdges: this.graphEdges.length, dawnOwls: this.dawnOwls.length, score: this.score, power: this.power, lives: this.lives, bombs: this.bombs, fps: this.fps, bgm: this.bgm.cue };
   }
 
   get endingLines(): string[] { return ENDINGS[this.player]; }

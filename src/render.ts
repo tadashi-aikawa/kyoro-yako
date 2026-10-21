@@ -17,6 +17,7 @@ import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-rin
 import { bogs, enterScene, KEY_ROWS, keyPosition, vimScene } from './patterns/neo';
 import { encoreBogTime } from './patterns/neo-encore';
 import { SWEEP_CHARGE, SWEEP_MOVE, SWEEP_PERIOD, SWEEP_SHOTS, sweepStep, sweepTarget, tags } from './patterns/obsidia';
+import { GRAPH_FADE, GRAPH_LINE_WIDTH, graphEdgeState, graphNodeState } from './patterns/obsidia-graph';
 import { FIELD, MAX_BOMBS, MAX_POWER } from './rules';
 import { drawScenery } from './stage-scenery';
 import { NAMES, STAGES } from './stages';
@@ -383,6 +384,7 @@ export class Renderer {
     this.stageTelegraphs(game);
     this.galaxyFlash(game);
     this.minervaTelegraphs(game);
+    this.obsidiaGraph(game);
     for (const owl of game.dawnOwls) {
       c.save();
       c.globalAlpha = owl.age <= owl.warning ? 0.35 + 0.2 * Math.sin(owl.age * 0.25) : 1;
@@ -427,6 +429,41 @@ export class Renderer {
     if (!thunder) this.focusMarker(game);
     c.restore();
     c.strokeStyle = '#b5a8d4'; c.lineWidth = 2; c.strokeRect(FIELD.x, FIELD.y, FIELD.w, FIELD.h);
+  }
+
+  private obsidiaGraph(game: Game): void {
+    if (game.graphNodes.length === 0) return;
+    const c = this.ctx;
+    c.save(); c.lineCap = 'round';
+    for (const edge of game.graphEdges) {
+      const state = graphEdgeState(edge);
+      const fade = Math.max(0, Math.min(1, (edge.from.fadeAt + GRAPH_FADE - edge.from.age) / GRAPH_FADE, (edge.to.fadeAt + GRAPH_FADE - edge.to.age) / GRAPH_FADE));
+      c.globalAlpha = state === 'fading' ? fade * 0.25 : state === 'warning' ? 0.7 : 0.9;
+      c.strokeStyle = state === 'active' ? '#b6b4ef' : state === 'warning' ? '#f1d3a1' : '#8982b0';
+      c.lineWidth = state === 'active' ? GRAPH_LINE_WIDTH : 1;
+      c.setLineDash(state === 'active' ? [] : [3, 5]);
+      c.beginPath(); c.moveTo(edge.from.x, edge.from.y); c.lineTo(edge.to.x, edge.to.y); c.stroke();
+      if (state === 'warning') {
+        const progress = Math.min(1, edge.to.age / edge.to.warning);
+        c.globalAlpha = 0.9; c.fillStyle = '#fff0cf';
+        c.beginPath(); c.arc(edge.from.x + (edge.to.x - edge.from.x) * progress, edge.from.y + (edge.to.y - edge.from.y) * progress, 2, 0, Math.PI * 2); c.fill();
+      }
+    }
+    c.setLineDash([]);
+    for (const node of game.graphNodes) {
+      const state = graphNodeState(node);
+      const fade = Math.max(0, Math.min(1, (node.fadeAt + GRAPH_FADE - node.age) / GRAPH_FADE));
+      c.globalAlpha = state === 'fading' ? fade * 0.3 : state === 'warning' ? 0.8 : 1;
+      const color = ['#c3b1fa', '#a8d6ef', '#d4caee'][node.color];
+      c.fillStyle = state === 'active' ? color : '#17152d';
+      c.strokeStyle = state === 'warning' ? '#f1d3a1' : color; c.lineWidth = 1;
+      c.beginPath(); c.arc(node.x, node.y, node.radius, 0, Math.PI * 2); c.fill(); c.stroke();
+      if (state === 'warning') {
+        c.beginPath(); c.arc(node.x, node.y, node.radius + 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, node.age / node.warning)); c.stroke();
+      }
+      if (node.label && state !== 'fading') this.text(node.label, node.x + node.radius + 6, node.y + 3, 9, state === 'warning' ? '#e3cba4' : '#c4bedc');
+    }
+    c.restore();
   }
 
   private galaxyFlash(game: Game): void {
