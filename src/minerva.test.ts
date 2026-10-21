@@ -270,7 +270,10 @@ it('Lunaticの各スペルを進めても弾プールを飽和させない', () 
 });
 
 it('全スペルが自機のいる下半分へ届き、下端が常設の安全地帯にならない', () => {
-  for (const index of [1, 3, 5, 7, 9, 10, 11, 12]) {
+  for (const [index, spell] of STAGES[4].phases.entries()) {
+    if (!spell.spell) continue;
+    // グラフなど弾以外の攻撃も抽選されるため、弾の到達を測る再演はVimに固定する。
+    if (spell.pattern === 'owlDawn') vi.spyOn(Math, 'random').mockReturnValue(0.01);
     const game = phase(index);
     let lowerFrames = 0;
     let bottomFrames = 0;

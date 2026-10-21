@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
+import { CLONE_CHARGE, CLONE_FIRST_CHARGE, CLONE_SPLIT, jinraiCloneScene } from './patterns/jinrai-clone';
 import { dawnPrayerStep, PRAYER_CHARGE, PRAYER_PERIOD } from './patterns/minerva-dawn';
 import { REPRISE_PREPARE, REPRISES, repriseDifficulty, repriseIndex, repriseView } from './patterns/minerva-reprise';
 
@@ -27,8 +28,8 @@ function prayer(game: Game, ratio = 1): void {
   expect(game.minervaReprise?.prayer).toBe(true);
 }
 
-it.each(difficulties)('再演12種類は%sで元の仕掛けを動かし、8%減少時に全て片付く', difficulty => {
-  expect(REPRISES).toHaveLength(12);
+it.each(difficulties)('再演10種類は%sで元の仕掛けを動かし、8%減少時に全て片付く', difficulty => {
+  expect(REPRISES).toHaveLength(10);
   expect(new Set(REPRISES.map(source => source.boss)).size).toBe(4);
   for (const [index, source] of REPRISES.entries()) {
     vi.spyOn(Math, 'random').mockReturnValue((index + 0.5) / REPRISES.length);
@@ -48,10 +49,9 @@ it.each(difficulties)('再演12種類は%sで元の仕掛けを動かし、8%減
       game.bullets.forEach(b => { expect(Number.isFinite(b.x) && Number.isFinite(b.y), source.phase.name).toBe(true); });
       if (local < REPRISE_PREPARE) expect(game.bullets.count).toBe(0);
     }
-    expect(maxMove, source.phase.name).toBeLessThan(8);
+    if (source.phase.pattern !== 'jinraiClone') expect(maxMove, source.phase.name).toBeLessThan(8);
     expect(bullets + lasers + nodes, source.phase.name).toBeGreaterThan(0);
     if (source.phase.pattern === 'link') expect(nodes).toBeGreaterThan(15);
-    if (source.phase.pattern === 'jinraiLaser') expect(lasers).toBeGreaterThan(0);
     next(game);
     expect(game.minervaReprise?.cycle).toBe(1);
     expect(game.bullets.count).toBe(0); expect(game.graphNodes).toHaveLength(0); expect(game.jinraiLasers).toHaveLength(0);
@@ -68,17 +68,17 @@ it('抽選はHP切替ごとに行い、同じ技の連続も選べる。時間�
   game.phaseHp -= game.phaseMaxHp * 0.002; game.update();
   expect(game.minervaReprise?.cycle).toBe(1); expect(game.minervaReprise?.index).toBe(0);
   random.mockReturnValue(0.999); next(game);
-  expect(game.minervaReprise?.index).toBe(11);
-  expect(game.minervaReprise?.seen).toEqual([0, 11]);
+  expect(game.minervaReprise?.index).toBe(9);
+  expect(game.minervaReprise?.seen).toEqual([0, 9]);
   game.startBoss(false, 9); expect(game.minervaReprise).toBeUndefined();
 });
 
-it('未登場は登場済みの4倍で選び、全12技を候補に保つ', () => {
-  const counts = Array<number>(12).fill(0);
-  for (let sample = 0; sample < 4500; sample++) counts[repriseIndex([0], (sample + 0.5) / 4500)]++;
-  expect(counts).toEqual([100, ...Array<number>(11).fill(400)]);
-  for (const seen of [[], Array.from({ length: 12 }, (_, i) => i)]) {
-    expect(Array.from({ length: 12 }, (_, i) => repriseIndex(seen, (i + 0.5) / 12))).toEqual(Array.from({ length: 12 }, (_, i) => i));
+it('未登場は登場済みの4倍で選び、全10技を候補に保つ', () => {
+  const counts = Array<number>(10).fill(0);
+  for (let sample = 0; sample < 3700; sample++) counts[repriseIndex([0], (sample + 0.5) / 3700)]++;
+  expect(counts).toEqual([100, ...Array<number>(9).fill(400)]);
+  for (const seen of [[], Array.from({ length: 10 }, (_, i) => i)]) {
+    expect(Array.from({ length: 10 }, (_, i) => repriseIndex(seen, (i + 0.5) / 10))).toEqual(Array.from({ length: 10 }, (_, i) => i));
   }
 });
 
@@ -87,16 +87,57 @@ it('祈りでは登場履歴を増やさず、最終技やステージのやり�
   const choose = (roll: number) => { random.mockReturnValueOnce(roll).mockReturnValueOnce(0.5); };
   const game = fight(); game.phaseFrame = 104;
   choose(0); game.update(); choose(0.999); next(game); choose(0.01); next(game);
-  expect(game.minervaReprise?.seen).toEqual([0, 11]);
+  expect(game.minervaReprise?.seen).toEqual([0, 9]);
   next(game);
   expect(game.minervaReprise?.prayer).toBe(true);
-  expect(game.minervaReprise?.seen).toEqual([0, 11]);
+  expect(game.minervaReprise?.seen).toEqual([0, 9]);
   choose(0.5); next(game);
   expect(game.minervaReprise?.cycle).toBe(4);
-  expect(game.minervaReprise?.seen).toEqual([0, 11, 6]);
+  expect(game.minervaReprise?.seen).toEqual([0, 9, 5]);
   game.startBoss(false, 10); expect(game.minervaReprise).toBeUndefined();
-  game.phaseFrame = 104; game.update(); expect(game.minervaReprise?.seen).toEqual([6]);
+  game.phaseFrame = 104; game.update(); expect(game.minervaReprise?.seen).toEqual([5]);
   game.startStage(5); expect(game.minervaReprise).toBeUndefined();
+});
+
+it('再演候補を指定の10技に絞る', () => {
+  expect(REPRISES.map(source => source.phase.pattern)).toEqual([
+    'vim', 'enter', 'link', 'sweep', 'type', 'grid', 'jinraiKiss', 'jinraiSakura', 'jinraiClone', 'jinraiPetal',
+  ]);
+});
+
+it('花影は召喚後に二身・三身へ分かれ、どの分身も共有HPへ通常の2/3のダメージを受ける', () => {
+  const index = REPRISES.findIndex(source => source.phase.pattern === 'jinraiClone');
+  vi.spyOn(Math, 'random').mockReturnValue((index + 0.5) / REPRISES.length);
+  const game = fight(); game.phaseFrame = 104; game.update();
+  expect(game.bossTargets()).toEqual([game.bossXY]);
+  const start = game.minervaReprise!.startFrame + REPRISE_PREPARE - CLONE_FIRST_CHARGE;
+  for (const [frame, count] of [[CLONE_FIRST_CHARGE + 30, 1], [CLONE_FIRST_CHARGE + CLONE_CHARGE + CLONE_SPLIT + 60, 2], [2400 + CLONE_CHARGE + CLONE_SPLIT + 60, 3]]) {
+    game.phaseFrame = start + frame;
+    const scene = jinraiCloneScene(frame, 60);
+    expect(game.bossTargets()).toHaveLength(count);
+    expect(game.bossXY).toEqual([scene.bodies[0].x, scene.bodies[0].y]);
+    for (const body of scene.bodies) {
+      const hp = game.phaseHp, shot = game.shots.acquire()!;
+      Object.assign(shot, { x: body.x, y: body.y, vx: 0, vy: 0, radius: 3, damage: 30, homing: false });
+      game.update(); expect(hp - game.phaseHp).toBeCloseTo(20); expect(shot.active).toBe(false);
+    }
+  }
+  next(game); expect(game.bossTargets()).toEqual([game.bossXY]);
+});
+
+it.each(difficulties)('花影の%sはPower4で撃ち続けてもHP切替前に二身の射撃まで見せる', difficulty => {
+  const index = REPRISES.findIndex(source => source.phase.pattern === 'jinraiClone');
+  vi.spyOn(Math, 'random').mockReturnValue((index + 0.5) / REPRISES.length);
+  const game = fight('owlDawn', difficulty); game.phaseFrame = 104; game.autoshot = true; game.power = 4;
+  let twoFired = false, praying = false;
+  for (let frame = 0; frame < 1800 && (game.minervaReprise?.cycle ?? 0) === 0; frame++) {
+    game.px = game.bossXY[0]; game.update();
+    if (game.minervaReprise?.cycle !== 0) break;
+    const attack = repriseView(game), scene = jinraiCloneScene(attack.phaseFrame, attack.phase!.duration);
+    praying ||= scene.charging;
+    twoFired ||= scene.bodies.length === 2 && game.bullets.count > 0;
+  }
+  expect(praying).toBe(true); expect(twoFired).toBe(true); expect(game.minervaReprise?.cycle).toBe(1);
 });
 
 it('HP8%ごとに再演3回と4回の後へ祈りを挟み、祈りもHPで終わる', () => {

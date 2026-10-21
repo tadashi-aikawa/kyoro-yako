@@ -11,7 +11,7 @@ import { BURST_MOVE, BURST_RETURN, BURST_SHOTS, burstVisibility, dashBurstStep }
 import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_CHARGE, KISS_FADE, KISS_ORIGIN, KISS_POSE_END, kissEdgeWarning, kissStep } from './patterns/jinrai-kiss';
 import { THUNDER_FADE, THUNDER_HOLD, thunderGround, thunderPath, thunderScene } from './patterns/jinrai-thunder';
-import { dawnPrayerStep, eyeX, PRAYER_CHARGE, PRAYER_FIRE } from './patterns/minerva';
+import { dawnPrayerStep, eyeX, PRAYER_CHARGE, PRAYER_FIRE, recallReturnWarning } from './patterns/minerva';
 import { STAR_FLIGHT_TIME, STAR_TRAIL_WARNING } from './patterns/minerva-flight';
 import { gravityScene } from './patterns/minerva-inquiry';
 import { REPRISE_PREPARE, REPRISES, repriseLocal } from './patterns/minerva-reprise';
@@ -287,6 +287,8 @@ export class Renderer {
     this.minervaEcho(game);
     if (game.phase && game.boss) {
       const thunder = thunderScene(game);
+      const attack = game.attackContext();
+      const clones = attack.phase?.pattern === 'jinraiClone' && (attack === game || attack.phaseFrame >= 105) ? jinraiCloneScene(attack.phaseFrame, attack.phase.duration) : undefined;
       const [x, y] = game.bossXY;
       const burst = game.phase.pattern === 'jinraiDash' ? dashBurstStep(game.phaseFrame) : -1;
       const seal = burst >= BURST_MOVE && burst < BURST_RETURN;
@@ -329,9 +331,9 @@ export class Renderer {
         }
         c.restore();
       }
-      if (!seal && game.phase.pattern !== 'jinraiClone') this.magic(x, y, game.frame, stage.colors[2], 38, 0.7 * burstVisibility(burst));
-      if (game.phase.pattern === 'jinraiClone') {
-        const scene = jinraiCloneScene(game.phaseFrame, game.phase.duration);
+      if (!seal && !clones) this.magic(x, y, game.frame, stage.colors[2], 38, 0.7 * burstVisibility(burst));
+      if (clones) {
+        const scene = clones;
         const performingNinpo = scene.charging || scene.splitting;
         const casting = !!game.galaxyFlash || isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
         // 跳ぶ分身は元の場所に煙を残し、跳び先へ向けて残像を並べる。
@@ -355,7 +357,7 @@ export class Renderer {
             this.magic(body.x, body.y, game.frame, '#fff4bd', 30 + scene.chargeProgress * 10, 0.6);
           }
           const breathing = scene.charging ? 1 + Math.sin(game.frame * 0.09) * 0.025 : 1;
-          this.fieldCharacter(game, performingNinpo ? 'jinrai-seal' : this.readySprite(game, bossSpriteId(game.boss, casting && scene.firing[index] ? 'cast' : 'idle', game.frame + index * 7)), body.x, body.y + (performingNinpo ? 0 : Math.sin(game.frame * 0.045) * 2), 64 * breathing, 0, body.opacity);
+          this.fieldCharacter(game, performingNinpo ? game.boss === 'minerva' ? 'minerva-prayer' : 'jinrai-seal' : this.readySprite(game, bossSpriteId(game.boss, casting && scene.firing[index] ? 'cast' : 'idle', game.frame + index * 7)), body.x, body.y + (performingNinpo ? 0 : Math.sin(game.frame * 0.045) * 2), 64 * breathing, 0, body.opacity);
           this.magic(body.x, body.y, game.frame, '#ffdc84', 25, 0.4 * body.opacity);
           c.restore();
         }
@@ -1111,7 +1113,7 @@ export class Renderer {
         c.strokeStyle = '#ffe4b866'; c.lineWidth = 1;
         c.beginPath(); c.moveTo(b.x, b.y); c.lineTo(b.x + b.vx * 18, b.y + b.vy * 18); c.stroke(); return;
       }
-      if (b.age < b.gridRow) return;
+      if (!recallReturnWarning(b)) return;
       const outside = b.x < 0 || b.x > FIELD.w || b.y < 0 || b.y > FIELD.h;
       if (b.age >= b.releaseAt && !outside) return;
       c.strokeStyle = '#fff0bf88'; c.lineWidth = 1.5;

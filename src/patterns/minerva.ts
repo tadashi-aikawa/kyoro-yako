@@ -1,5 +1,5 @@
-import type { Game } from '../game';
-import { DIFFICULTY, density } from '../rules';
+import type { Bullet, Game } from '../game';
+import { DIFFICULTY, density, FIELD } from '../rules';
 import { emitDawn } from './minerva-dawn';
 import { emitStarFlight } from './minerva-flight';
 import { emitGravity } from './minerva-inquiry';
@@ -13,6 +13,14 @@ export const INTERVIEW_SPEED = [0.5, 0.6, 0.7, 0.8] as const;
 export const INTERVIEW_SPIN = [0.003, 0.0036, 0.0042, 0.0048] as const;
 const INTERVIEW_GAP = [0.62, 0.54, 0.46, 0.4] as const;
 const INTERVIEW_STOPS = [[192, 132], [272, 104], [136, 182], [256, 164], [112, 102], [218, 82]] as const;
+
+// 帰還線は場外での待機中には出さず、弾が画面へ入る直前にだけ見せる。
+export function recallReturnWarning(b: Bullet): boolean {
+  if (b.age < b.releaseAt) return false;
+  const frames = Math.max(0, b.x < 0 ? -b.x / b.vx : b.x > FIELD.w ? (FIELD.w - b.x) / b.vx : 0,
+    b.y < 0 ? -b.y / b.vy : b.y > FIELD.h ? (FIELD.h - b.y) / b.vy : 0);
+  return frames <= 3;
+}
 
 export function interviewPosition(frame: number, level: number): [number, number] {
   const t = Math.max(0, frame - 105);

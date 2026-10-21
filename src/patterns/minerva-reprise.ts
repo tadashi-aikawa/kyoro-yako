@@ -5,11 +5,12 @@ import type { Difficulty } from '../rules';
 import { STAGES } from '../stages';
 import { emitClaudine } from './claudine';
 import { emitJinraiPattern } from './jinrai';
+import { CLONE_FIRST_CHARGE, jinraiCloneScene } from './jinrai-clone';
 import { emitNeo } from './neo';
 import { emitObsidia, sweepPosition } from './obsidia';
 
 export const REPRISE_PREPARE = 60;
-const PATTERNS = ['vim', 'enter', 'clean', 'link', 'sweep', 'complement', 'type', 'grid', 'whiteSpace', 'jinraiKiss', 'jinraiLaser', 'jinraiSakura'];
+const PATTERNS = ['vim', 'enter', 'link', 'sweep', 'type', 'grid', 'jinraiKiss', 'jinraiSakura', 'jinraiClone', 'jinraiPetal'];
 export const REPRISES = STAGES.slice(0, 4).flatMap(stage => stage.phases
   .filter(phase => PATTERNS.includes(phase.pattern)).map(phase => ({ boss: stage.boss, phase })));
 export interface Reprise { cycle: number; index: number; seen: number[]; entry: [number, number]; startFrame: number; startHp: number; prayer: boolean; }
@@ -23,6 +24,11 @@ export function repriseIndex(seen: readonly number[], roll = Math.random()): num
   return REPRISES.length - 1;
 }
 export const repriseLocal = (frame: number, reprise: Reprise): number => Math.max(0, frame - reprise.startFrame);
+function repriseFrame(frame: number, reprise: Reprise): number {
+  const elapsed = repriseLocal(frame, reprise) - REPRISE_PREPARE;
+  // 花影は単身射撃の前置きを省き、召喚後すぐに分身を始める。召喚中の時計は進めない。
+  return 105 + elapsed + (elapsed >= 0 && REPRISES[reprise.index].phase.pattern === 'jinraiClone' ? CLONE_FIRST_CHARGE - 105 : 0);
+}
 export function repriseDifficulty(difficulty: Difficulty): Difficulty {
   const levels = ['easy', 'normal', 'hard', 'lunatic'] as const;
   return levels[Math.min(3, levels.indexOf(difficulty) + 1)];
@@ -30,8 +36,9 @@ export function repriseDifficulty(difficulty: Difficulty): Difficulty {
 
 export function reprisePosition(frame: number, reprise: Reprise, difficulty: Difficulty): [number, number] {
   const local = repriseLocal(frame, reprise), { boss, phase } = REPRISES[reprise.index];
-  const virtualFrame = 105 + Math.max(0, local - REPRISE_PREPARE);
-  const target = phase.pattern === 'sweep' ? sweepPosition(virtualFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(repriseDifficulty(difficulty)))
+  const virtualFrame = Math.max(105, repriseFrame(frame, reprise));
+  const clone = phase.pattern === 'jinraiClone' ? jinraiCloneScene(virtualFrame, phase.duration).bodies[0] : undefined;
+  const target = clone ? [clone.x, clone.y] : phase.pattern === 'sweep' ? sweepPosition(virtualFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(repriseDifficulty(difficulty)))
     : boss === 'obsidia' ? obsidiaPosition(phase.pattern, virtualFrame, reprise.entry)
     : patternPosition(phase, virtualFrame, reprise.entry)!;
   const progress = Math.max(0, Math.min(1, local / REPRISE_PREPARE));
@@ -48,7 +55,7 @@ export function repriseView(game: Game): Game {
     view = new Proxy(game, {
       get(target, property) {
         if (property === 'phase') return REPRISES[target.minervaReprise!.index].phase;
-        if (property === 'phaseFrame') return 105 + repriseLocal(target.phaseFrame, target.minervaReprise!) - REPRISE_PREPARE;
+        if (property === 'phaseFrame') return repriseFrame(target.phaseFrame, target.minervaReprise!);
         if (property === 'difficulty') return repriseDifficulty(target.difficulty);
         const value = Reflect.get(target, property, target);
         return typeof value === 'function' ? value.bind(target) : value;

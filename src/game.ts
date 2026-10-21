@@ -746,8 +746,9 @@ export class Game {
   }
 
   bossTargets(): [number, number][] {
-    return this.phase?.pattern === 'jinraiClone'
-      ? jinraiCloneScene(this.phaseFrame, this.phase.duration).bodies.filter((body) => body.opacity > 0).map((body) => [body.x, body.y]) : [this.bossPosition()];
+    const attack = this.attackContext();
+    return attack.phase?.pattern === 'jinraiClone' && (attack === this || attack.phaseFrame >= 105)
+      ? jinraiCloneScene(attack.phaseFrame, attack.phase.duration).bodies.filter((body) => body.opacity > 0).map((body) => [body.x, body.y]) : [this.bossPosition()];
   }
 
   private emitPattern(pattern: string): void {

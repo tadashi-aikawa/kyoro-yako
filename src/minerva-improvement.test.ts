@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
-import { INTERVIEW_PERIOD, MINERVA_WARNING } from './patterns/minerva';
+import { INTERVIEW_PERIOD, MINERVA_WARNING, recallReturnWarning } from './patterns/minerva';
 import { STAR_FLIGHT_TIME, starFlightPoint } from './patterns/minerva-flight';
 
 const difficulties = ['easy', 'normal', 'hard', 'lunatic'] as const;
@@ -69,6 +69,7 @@ it.each(difficulties)('リトラクションの%sは場外で止まり、移動�
   const stop = [bullet.x, bullet.y];
   while (bullet.age < bullet.releaseAt - 1) {
     game.update(); expect([bullet.x, bullet.y]).toEqual(stop);
+    expect(recallReturnWarning(bullet)).toBe(false);
     expect([bullet.targetX, bullet.targetY]).toEqual(game.bossPosition());
   }
   expect(Math.hypot(bullet.targetX - origin[0], bullet.targetY - origin[1])).toBeGreaterThan(20);
@@ -85,6 +86,27 @@ it.each(difficulties)('リトラクションの%sは場外で止まり、移動�
     }
   }
   expect(Math.hypot(bullet.x - bullet.targetX, bullet.y - bullet.targetY)).toBeLessThanOrEqual(bullet.sway);
+});
+
+it.each(difficulties)('リトラクションの%sは帰還線から4フレーム以内に弾が画面端へ入る', difficulty => {
+  const game = fight(7, difficulty); game.phaseFrame = 104; game.update();
+  const bullets = game.bullets.objects.filter(b => b.active && b.motion === 'recall');
+  const warnings = new Map<object, number>(), entered = new Set<object>();
+  for (let frame = 0; frame < 800 && entered.size < bullets.length; frame++) {
+    game.update();
+    for (const b of bullets) {
+      if (!b.active || b.age < b.releaseAt || entered.has(b)) continue;
+      const outside = b.x < 0 || b.x > 384 || b.y < 0 || b.y > 448;
+      if (outside && recallReturnWarning(b) && !warnings.has(b)) warnings.set(b, frame);
+      if (!outside) {
+        expect(warnings.has(b)).toBe(true);
+        expect(frame - warnings.get(b)!).toBeGreaterThan(0);
+        expect(frame - warnings.get(b)!).toBeLessThanOrEqual(4);
+        entered.add(b);
+      }
+    }
+  }
+  expect(entered.size).toBe(bullets.length);
 });
 
 it.each(difficulties)('フライトの%sはHPで早く増員し、段階を保持し、3羽への切替を最低2秒空ける', (difficulty) => {
