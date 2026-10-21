@@ -26,7 +26,7 @@ function press(game: Game, code: string): void {
 }
 function run(game: Game, count: number): void { for (let i = 0; i < count; i++) game.update(); }
 
-it.each([false, true])('光の羽根を拾うと中央5本・左右3本ずつの最高形態になる: 低速=%s', (focus) => {
+it.each([false, true])('光の羽根を拾うと中央5本・左右2方向ずつに2発の束を撃つ最高形態になる: 低速=%s', (focus) => {
   const game = start(); pick(game, 'radiant');
   expect(game.awakened).toBe(true); expect(game.power).toBe(5);
   game.autoshot = true; game.frame = 9;
@@ -34,19 +34,54 @@ it.each([false, true])('光の羽根を拾うと中央5本・左右3本ずつの
   game.update();
   const main = game.shots.objects.filter((s) => s.active && s.homing);
   const extra = game.shots.objects.filter((s) => s.active && !s.homing);
-  expect(main).toHaveLength(5); expect(extra).toHaveLength(6);
+  expect(main).toHaveLength(5); expect(extra).toHaveLength(8);
   expect(main.every((s) => s.damage === 1.35 && s.vx === 0)).toBe(true);
   expect(new Set(main.map((s) => s.x)).size).toBe(5);
   expect(extra.every((s) => s.damage === 0.65)).toBe(true);
-  if (focus) expect(extra.every((s) => s.vx === 0 && s.vy === main[0].vy)).toBe(true);
+  if (focus) {
+    expect(extra.every((s) => s.vx === 0 && s.vy === main[0].vy)).toBe(true);
+    expect(new Set([...main, ...extra].map((s) => s.x)).size).toBe(13);
+    for (const shot of main) for (const sideShot of extra) {
+      expect(Math.abs(shot.x - sideShot.x)).toBeGreaterThan(shot.radius + sideShot.radius);
+    }
+    for (const side of [-1, 1]) {
+      const positions = extra.filter((s) => Math.sign(s.x - game.px) === side).map((s) => Math.abs(s.x - game.px)).sort((a, b) => a - b);
+      expect(positions[1] - positions[0]).toBe(6);
+      expect(positions[3] - positions[2]).toBe(6);
+      expect(positions[2] - positions[1]).toBeGreaterThan(6);
+    }
+  }
   else for (const side of [-1, 1]) {
     const angles = extra.filter((s) => Math.sign(s.vx) === side).map((s) => Math.atan2(Math.abs(s.vx), -s.vy) * 180 / Math.PI).sort((a, b) => a - b);
-    expect(angles).toHaveLength(3);
-    for (let i = 0; i < 3; i++) expect(angles[i]).toBeCloseTo([15, 30, 45][i]);
+    expect(angles).toHaveLength(4);
+    for (let i = 0; i < 4; i++) expect(angles[i]).toBeCloseTo([20, 20, 40, 40][i]);
   }
 });
 
-it('最高形態の低速切り替えと毎秒104.4の全弾火力を保つ', () => {
+it('補助弾は各方向2発が平行に進み、時間が経っても束の幅が広がらない', () => {
+  const game = start(); pick(game, 'radiant'); game.autoshot = true; game.frame = 9; game.update();
+  const extra = game.shots.objects.filter((s) => s.active && !s.homing);
+  const groups = new Map<number, typeof extra>();
+  for (const shot of extra) {
+    const pair = groups.get(shot.vx) ?? [];
+    pair.push(shot); groups.set(shot.vx, pair);
+  }
+  expect(groups.size).toBe(4);
+  game.autoshot = false;
+  for (const frames of [0, 20]) {
+    run(game, frames);
+    for (const pair of groups.values()) {
+      expect(pair).toHaveLength(2);
+      const [a, b] = pair;
+      expect(a.active && b.active).toBe(true);
+      expect(a.vy).toBe(b.vy);
+      expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeCloseTo(6);
+      expect((a.x - b.x) * a.vx + (a.y - b.y) * a.vy).toBeCloseTo(0);
+    }
+  }
+});
+
+it('最高形態の低速切り替えと毎秒112.2の全弾火力を保つ', () => {
   const game = start(); pick(game, 'radiant'); game.autoshot = true;
   for (const focus of [false, true, false]) {
     game.shots.clear(); game.frame = 9;
@@ -59,7 +94,7 @@ it('最高形態の低速切り替えと毎秒104.4の全弾火力を保つ', ()
     game.shots.clear(); game.update();
     game.shots.forEach((s) => { damage += s.damage; });
   }
-  expect(damage).toBeCloseTo(104.4);
+  expect(damage).toBeCloseTo(112.2);
 });
 
 it('実際の被弾で解除し、Pで5へ戻しても復活せず、再取得でだけ復活する', () => {

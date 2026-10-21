@@ -410,15 +410,21 @@ export class Game {
     }
     // 最大Powerの補助弾は半分の頻度。通常は斜め前方を補い、低速では全弾を正面へ束ねる。
     if (tier >= MAX_POWER && this.frame % 10 === 0) {
-      const angles = this.awakened ? [15, 30, 45] : [15, 30];
+      const angles = this.awakened ? [20, 40] : [15, 30];
+      const clusterSize = this.awakened ? 2 : 1;
       for (const side of [-1, 1]) for (const [index, degrees] of angles.entries()) {
-        const shot = this.shots.acquire(); if (!shot) break;
         const angle = focus ? 0 : degrees * Math.PI / 180;
-        Object.assign(shot, {
-          x: this.px + side * (focus ? 15 + index * 6 : 12), y: this.py - 10,
-          vx: side * Math.sin(angle) * 10.5, vy: -Math.cos(angle) * 10.5,
-          damage: 0.65, radius: 2, homing: false,
-        });
+        const originX = this.px + side * (focus ? this.awakened ? 21 + index * 16 : 15 + index * 6 : 12);
+        for (let lane = 0; lane < clusterSize; lane++) {
+          const shot = this.shots.acquire(); if (!shot) break;
+          // 進行方向に垂直な6px間隔で並べ、飛翔中も2発の束が広がらないようにする。
+          const offset = (lane - (clusterSize - 1) / 2) * 6;
+          Object.assign(shot, {
+            x: originX + Math.cos(angle) * offset, y: this.py - 10 + side * Math.sin(angle) * offset,
+            vx: side * Math.sin(angle) * 10.5, vy: -Math.cos(angle) * 10.5,
+            damage: 0.65, radius: 2, homing: false,
+          });
+        }
       }
     }
     this.audio.play('shot');
