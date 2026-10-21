@@ -11,8 +11,9 @@ import { BURST_MOVE, BURST_RETURN, BURST_SHOTS, burstVisibility, dashBurstStep }
 import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_CHARGE, KISS_FADE, KISS_ORIGIN, KISS_POSE_END, kissEdgeWarning, kissStep } from './patterns/jinrai-kiss';
 import { THUNDER_FADE, THUNDER_HOLD, thunderGround, thunderPath, thunderScene } from './patterns/jinrai-thunder';
-import { DAWN_PERIOD, dawnLane, dawnPrayerStep, eyeX, HYPOTHESIS_COLUMNS, HYPOTHESIS_PERIOD, hypothesisBrightness, hypothesisSide, hypothesisX, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE, SEVEN_OPENING, SEVEN_PERIOD, sevenLane } from './patterns/minerva';
+import { dawnPrayerStep, eyeX, PRAYER_CHARGE, PRAYER_FIRE } from './patterns/minerva';
 import { STAR_FLIGHT_TIME, STAR_TRAIL_WARNING } from './patterns/minerva-flight';
+import { gravityScene, SOCRATIC_SYMBOLS, socraticScene } from './patterns/minerva-inquiry';
 import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-ring';
 import { bogs, enterScene, KEY_ROWS, keyPosition, vimScene } from './patterns/neo';
 import { encoreBogTime } from './patterns/neo-encore';
@@ -282,6 +283,7 @@ export class Renderer {
       this.magic(192, 80, game.frame, stage.colors[2], 130, 0.25);
     }
     this.claudineFinaleBackdrop(game);
+    if (game.phase?.pattern === 'question') this.minervaTelegraphs(game);
     if (game.phase && game.boss) {
       const thunder = thunderScene(game);
       const [x, y] = game.bossXY;
@@ -375,7 +377,7 @@ export class Renderer {
       c.fillStyle = '#e4aeea'; c.fillRect(17, 8, 346 * Math.max(0, game.phaseHp / game.phaseMaxHp), 9);
       this.text(NAMES[game.boss], 18, 29, 12, '#f9ebff');
       this.text('★'.repeat(game.remainingSpells), 330, 29, 12, '#ffe1a7', 'right');
-      this.text(`${Math.ceil((game.phase.duration * 60 - game.phaseFrame) / 60)}`, 367, 29, 14, '#fff', 'right');
+      this.text(Number.isFinite(game.phase.duration) ? `${Math.ceil((game.phase.duration * 60 - game.phaseFrame) / 60)}` : '∞', 367, 29, 14, '#fff', 'right');
     }
     game.enemies.forEach((enemy) => { this.enemy(game, enemy); });
     game.clones.forEach((clone) => { this.clone(clone, game.frame); });
@@ -383,15 +385,8 @@ export class Renderer {
     this.jinraiSpellTelegraphs(game);
     this.stageTelegraphs(game);
     this.galaxyFlash(game);
-    this.minervaTelegraphs(game);
+    if (game.phase?.pattern !== 'question') this.minervaTelegraphs(game);
     this.obsidiaGraph(game);
-    for (const owl of game.dawnOwls) {
-      c.save();
-      c.globalAlpha = owl.age <= owl.warning ? 0.35 + 0.2 * Math.sin(owl.age * 0.25) : 1;
-      if (owl.age <= owl.warning) this.magic(owl.x, owl.y, game.frame, '#fff0b2', 27, 0.8);
-      this.owl(owl, game.frame);
-      c.restore();
-    }
     game.bullets.forEach((b) => { this.bullet(b); });
     for (const ring of game.interviewRings) this.interviewRing(ring);
     game.shots.forEach((shot) => {
@@ -1017,25 +1012,18 @@ export class Renderer {
     if (game.boss !== 'minerva' || game.midboss || !game.phase?.spell) return;
     const pattern = game.phase.pattern;
     const t = game.phaseFrame - 105;
-    const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
-    const warning = MINERVA_WARNING[level];
     const c = this.ctx;
     c.save();
     if (pattern === 'sevenRings') {
-      if (t >= 0) {
-        const lane = sevenLane(Math.floor(t / SEVEN_PERIOD[level]));
-        const half = SEVEN_OPENING[level] / 2;
-        c.strokeStyle = '#ffe2a488'; c.lineWidth = 1; c.setLineDash([5, 7]);
-        for (const edge of [lane - half, lane + half]) {
-          c.beginPath(); c.moveTo(edge, 270); c.lineTo(edge, FIELD.h); c.stroke();
-        }
-        c.setLineDash([]);
-      }
       game.bullets.forEach((b) => {
         if (b.motion !== 'minervaRing') return;
         if (b.delay <= 0 && b.releaseAt - b.age <= 30) {
           c.strokeStyle = '#fff1b8bb'; c.lineWidth = 1;
-          c.beginPath(); c.moveTo(b.x, b.y); c.lineTo(b.x, b.y + 28); c.stroke();
+          const angle = Math.atan2(b.y - 220, b.x - 192);
+          const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
+          const vx = Math.cos(angle) * 0.55, vy = Math.sin(angle) * 0.55 + [1.25, 1.65, 1.95, 2.25][level];
+          const length = 28 / Math.hypot(vx, vy);
+          c.beginPath(); c.moveTo(b.x, b.y); c.lineTo(b.x + vx * length, b.y + vy * length); c.stroke();
           return;
         }
         if (b.delay <= 0) return;
@@ -1044,27 +1032,33 @@ export class Renderer {
         c.lineTo(b.x + b.vx * 24, b.y + b.vy * 24); c.stroke();
       });
     }
-    if (pattern === 'question') game.bullets.forEach((b) => {
-      if (b.motion !== 'question' || b.age < 41 || b.age >= b.releaseAt) return;
-      c.strokeStyle = '#f9dfad66'; c.lineWidth = 1;
-      c.beginPath(); c.moveTo(b.x, b.y); c.lineTo(game.px, game.py); c.stroke();
-    });
-    if (pattern === 'hypothesis' && t >= 0) {
-      const period = HYPOTHESIS_PERIOD[level];
-      const local = t % period;
-      if (local < warning) {
-        const real = hypothesisSide(Math.floor(t / period));
-        for (const side of [0, 1]) {
-          c.globalAlpha = hypothesisBrightness(level, side === real, local);
-          c.strokeStyle = side === 0 ? '#87e7ff' : '#ffc6e1'; c.lineWidth = 2;
-          c.setLineDash([7, 6]);
-          for (let i = 0; i < HYPOTHESIS_COLUMNS[level]; i++) {
-            const x = hypothesisX(side, i, level, Math.floor(t / period));
-            c.beginPath(); c.moveTo(x, 24); c.lineTo(x, FIELD.h); c.stroke();
-          }
-          c.setLineDash([]);
+    if (pattern === 'question' && t >= 0) {
+      const scene = socraticScene(game.phaseFrame, game.difficulty);
+      c.fillStyle = '#100b20e8'; c.fillRect(8, 90, 128, 54); c.fillRect(248, 90, 128, 54);
+      for (const [row, symbol] of scene.rows.entries()) this.text(`${SOCRATIC_SYMBOLS[symbol]} → ${SOCRATIC_SYMBOLS[scene.mapping[symbol]]}`,
+        row % 2 ? 312 : 72, 104 + Math.floor(row / 2) * 23, 18, '#ffe6a0', 'center');
+      this.text(`${SOCRATIC_SYMBOLS[scene.source]} を2回変換すると？`, 192, 175, 13, '#fff4d5', 'center');
+      const revealed = scene.local >= scene.reveal;
+      for (let lane = 0; lane < 3; lane++) {
+        const correct = revealed && lane === scene.lane;
+        c.strokeStyle = correct ? '#9de6d4aa' : revealed ? '#efa7bf66' : '#d9ccad44'; c.lineWidth = correct ? 2 : 1;
+        c.setLineDash(revealed ? [] : [5, 8]); c.strokeRect(lane * 128 + 1, 210, 126, 236); c.setLineDash([]);
+        if (correct) { c.fillStyle = '#71dbc611'; c.fillRect(lane * 128 + 2, 212, 124, 234); }
+        this.text(SOCRATIC_SYMBOLS[scene.gates[lane]], lane * 128 + 64, 200, 22, correct ? '#baffea' : '#ffedbf', 'center');
+      }
+    }
+    if (pattern === 'gravityShift') {
+      const gravity = gravityScene(game.phaseFrame, game.difficulty);
+      if (gravity.visible) {
+        const symbol = gravity.dx > 0 ? '→' : gravity.dx < 0 ? '←' : gravity.dy > 0 ? '↓' : '↑';
+        c.fillStyle = '#100b20d9'; c.fillRect(14, 43, 64, 44);
+        this.text(`${gravity.active ? '重力' : '予告'} ${symbol}`, 46, 65, 13, '#ffe3a3', 'center');
+        c.strokeStyle = gravity.active ? '#f9d58a88' : '#f9d58a44'; c.lineWidth = 1.5;
+        for (let row = 0; row < 4; row++) for (let column = 0; column < 4; column++) {
+          c.save(); c.translate(48 + column * 96 + gravity.dx * (game.frame % 30) * 0.3,
+            210 + row * 60 + gravity.dy * (game.frame % 30) * 0.3); c.rotate(Math.atan2(gravity.dy, gravity.dx));
+          c.beginPath(); c.moveTo(-11, 0); c.lineTo(11, 0); c.lineTo(5, -4); c.moveTo(11, 0); c.lineTo(5, 4); c.stroke(); c.restore();
         }
-        c.globalAlpha = 1;
       }
     }
     if (pattern === 'owlEye' && t >= 0) {
@@ -1086,14 +1080,27 @@ export class Renderer {
       c.beginPath(); c.arc(x, y, 45, 0, Math.PI * 2); c.stroke(); c.setLineDash([]);
     }
     if (pattern === 'owlDawn') {
-      const period = DAWN_PERIOD[level];
-      const next = t < 0 ? 0 : Math.ceil((t + 1) / period) * period;
-      if (next - t <= warning) {
-        const side = Math.floor(next / period) % 2 ? -1 : 1;
-        const from = side > 0 ? 0 : FIELD.w;
-        const lane = dawnLane(Math.floor(next / period));
-        c.strokeStyle = '#ffe7b388'; c.lineWidth = 2; c.setLineDash([8, 7]);
-        c.beginPath(); c.moveTo(from, lane); c.lineTo(from + side * 100, lane + 36); c.stroke(); c.setLineDash([]);
+      for (const star of game.dawnStars) {
+        c.save();
+        c.globalAlpha = star.fired ? Math.max(0, 1 - (game.phaseFrame - star.fireAt) / 70) : 1;
+        const warning = star.angle !== undefined && !star.fired;
+        const radius = warning ? 11 + Math.sin(game.frame * 0.15) * 2 : 8;
+        c.strokeStyle = warning ? '#fff1b4' : '#d8c8ff99'; c.fillStyle = warning ? '#ffe095' : '#b8b2df'; c.lineWidth = 1.5;
+        c.beginPath();
+        for (let i = 0; i < 8; i++) {
+          const a = i * Math.PI / 4, r = i % 2 ? radius * 0.3 : radius;
+          const x = star.x + Math.cos(a) * r, y = star.y + Math.sin(a) * r;
+          if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+        }
+        c.closePath(); c.fill(); c.stroke();
+        if (warning) {
+          const angle = star.angle!; c.setLineDash([4, 5]);
+          c.beginPath(); c.moveTo(star.x + Math.cos(angle) * 16, star.y + Math.sin(angle) * 16);
+          c.lineTo(star.x + Math.cos(angle) * 58, star.y + Math.sin(angle) * 58); c.stroke(); c.setLineDash([]);
+          c.save(); c.translate(star.x + Math.cos(angle) * 58, star.y + Math.sin(angle) * 58); c.rotate(angle);
+          c.beginPath(); c.moveTo(-7, -4); c.lineTo(0, 0); c.lineTo(-7, 4); c.stroke(); c.restore();
+        }
+        c.restore();
       }
     }
     c.restore();

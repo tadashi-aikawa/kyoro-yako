@@ -171,8 +171,7 @@ it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ�
   game.startBoss(false, 12);
   game.phaseHp = 0;
   game.update();
-  expect(game.phase?.pattern).toBe('owlDawn');
-  game.skipPhase();
+  expect(game.phase).toBeUndefined();
   while (game.collectionFrames > 0) game.update();
   expect(game.scene).toBe('dialogue');
   for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
@@ -182,7 +181,7 @@ it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ�
   expect(game.endingLines).toHaveLength(6);
 });
 
-it('新しいスペルはキー弾・星輪・疑問符・巻き戻し・羽ばたきを作る', () => {
+it('新しいスペルはキー弾・星輪・推論の門・巻き戻し・星図を作る', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   game.startStage(1); game.startBoss(true, 0);
   game.phaseFrame = 104; game.update();
@@ -192,13 +191,9 @@ it('新しいスペルはキー弾・星輪・疑問符・巻き戻し・羽ば�
 
   game.startStage(5); game.startBoss(false, 1); game.phaseFrame = 104; game.update();
   expect(game.bullets.count).toBeGreaterThan(100);
-  game.startBoss(false, 3); game.phaseFrame = 104; game.update();
-  const question = game.bullets.objects.find((bullet) => bullet.active && bullet.motion === 'question');
-  expect(question).toBeDefined();
-  for (let i = 0; i < 40; i++) game.update();
-  expect(question?.vx).toBe(0);
-  for (let i = 0; i < 35; i++) game.update();
-  expect(question?.motion).toBe('normal');
+  game.startBoss(false, 3); game.phaseFrame = 284; game.update();
+  expect(game.bullets.count).toBe(120);
+  expect(game.bullets.objects.filter(b => b.active).every(b => b.delay > 0)).toBe(true);
 
   game.startBoss(false, 9); game.phaseFrame = 104; game.update();
   const recalled = game.bullets.objects.find((bullet) => bullet.active && bullet.motion === 'recall');
@@ -209,5 +204,5 @@ it('新しいスペルはキー弾・星輪・疑問符・巻き戻し・羽ば�
   while (recalled!.active) game.update();
 
   game.startBoss(false, 12); game.phaseFrame = 104; game.update();
-  expect(game.bullets.objects.filter((bullet) => bullet.active && bullet.motion === 'wing').length).toBeGreaterThan(20);
+  expect(game.dawnStars).toHaveLength(7);
 });

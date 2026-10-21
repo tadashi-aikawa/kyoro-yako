@@ -80,8 +80,8 @@ const MOVEMENTS: Record<string, Movement> = {
   minervaStarFan: patrol([[124, 0], [260, 14]], 96, 136),
   minervaStarRings: curve(80, 16, 660, 'eight'),
   sevenRings: curve(70, 10, 840, 'ellipse'),
-  question: patrol([[120, -12], [264, -12]], 96, 120),
-  hypothesis: patrol([[136, -16], [248, -16]], 84, 150),
+  question: curve(18, 4, 720, 'ellipse'),
+  gravityShift: patrol([[136, -16], [248, -16]], 84, 150),
   owlEye: curve(64, 12, 720, 'eight'),
   recall: patrol([[140, -10], [244, -10]], 100, 200, true),
   starFlight: patrol([[112, -12], [192, 12], [272, -12]], 108, 120),
@@ -108,7 +108,7 @@ export function patternPosition(phase: Phase, frame: number, entry: Point, encor
   const baseY = phase.spell ? 132 : 77;
   if (frame < 105 && encoreCount === 0) return moveBetween(entry, [192, baseY], frame / 90);
   // ネオの延長では射撃時計だけが巻き戻る。移動時計は通算し、延長のたびに本体が飛ぶのを防ぐ。
-  const time = Math.max(0, frame - 105) + encoreCount * (phase.duration * 60 - 105);
+  const time = Math.max(0, frame - 105) + (encoreCount > 0 ? encoreCount * (phase.duration * 60 - 105) : 0);
   const [x, y] = phase.pattern === 'final' ? finale(time) : MOVEMENTS[phase.pattern](time);
   return [x, baseY + y];
 }

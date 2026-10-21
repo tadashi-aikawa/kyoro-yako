@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
-import { dawnPrayerStep, emitMinerva, eyeX, hypothesisBrightness, INTERVIEW_PERIOD, INTERVIEW_SPEED, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE, PRAYER_PERIOD } from './patterns/minerva';
+import { dawnPrayerStep, emitMinerva, eyeX, INTERVIEW_PERIOD, INTERVIEW_SPEED, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE, PRAYER_PERIOD } from './patterns/minerva';
+import { CONSTELLATION_TIME } from './patterns/minerva-dawn';
 import { interviewRingBlocksShot, interviewRingDistance, updateInterviewRings } from './patterns/minerva-ring';
 import { STAGES } from './stages';
 
@@ -28,19 +29,13 @@ it('5面は通常5回とスペル8枚を設計順に持ち、全番号に直行�
     expect(game.phaseIndex).toBe(index);
   }
   expect(phases.map((p) => p.pattern)).toEqual([
-    'minervaStarFan', 'sevenRings', 'minervaStarRings', 'question', 'minervaStarFan', 'hypothesis',
+    'minervaStarFan', 'sevenRings', 'minervaStarRings', 'question', 'minervaStarFan', 'gravityShift',
     'minervaStarRings', 'owlEye', 'minervaStarFan', 'recall', 'starFlight', 'interview', 'owlDawn',
   ]);
 });
 
-it('本物の予告だけ脈打ち、Easyほど差と予告時間が大きい', () => {
+it('Easyほど共通の予告時間が長い', () => {
   expect(MINERVA_WARNING).toEqual([90, 70, 55, 42]);
-  for (const level of [0, 1, 2, 3]) {
-    expect(hypothesisBrightness(level, true, 8)).toBeGreaterThan(hypothesisBrightness(level, false, 8));
-    expect(hypothesisBrightness(level, true, 8)).not.toBe(hypothesisBrightness(level, true, 20));
-  }
-  expect(hypothesisBrightness(0, true, 8) - hypothesisBrightness(0, false, 8))
-    .toBeGreaterThan(hypothesisBrightness(3, true, 8) - hypothesisBrightness(3, false, 8));
 });
 
 it('視線は左右へ等速で往復し、当たる弾だけ停止する', () => {
@@ -224,126 +219,38 @@ it('シールドの丸い端をかするショットも止まり、穴の内側�
   expect(interviewRingBlocksShot(ring, 100, 0, 100, 0, 3)).toBe(true);
 });
 
-it('終符の時間切れ直前も編隊が画面内に残る', () => {
+it('終符は時間が経っても終わらず、HPを削るとクリアになる', () => {
   const game = phase(12);
-  for (let i = 0; i < 3599; i++) game.update();
+  for (let i = 0; i < 7200; i++) game.update();
   expect(game.phase?.pattern).toBe('owlDawn');
-  expect(game.bullets.objects.some((b) => b.active && b.motion === 'wing' && b.x >= 0 && b.x <= 384)).toBe(true);
+  expect(game.phase?.duration).toBe(Infinity);
+  expect(game.phaseHp).toBeGreaterThan(1);
+  game.phaseHp = 0; game.update();
+  expect(game.phase).toBeUndefined();
+  expect(game.collectionFrames).toBe(180);
 });
 
-it('終符は残り45秒から後方弾幕を重ね、残り30秒から祈りの後に高速の渦を連射する', () => {
+it('終符の祈りは元の溜めと発散を保ち、星図と交互に繰り返す', () => {
   const game = phase(12);
-  const emission = (frame: number) => {
-    game.bullets.clear(); game.phaseFrame = frame;
-    emitMinerva(game, 'owlDawn');
-    return game.bullets.objects.filter((b) => b.active);
-  };
-  expect(emission(899).some((b) => b.kind === 'needle' && b.vy < 0)).toBe(false);
-  const rear = emission(900).filter((b) => b.kind === 'needle');
-  expect(rear).toHaveLength(21);
-  expect(rear.some((b) => b.vx < 0)).toBe(true);
-  expect(rear.some((b) => b.vx > 0)).toBe(true);
-  expect(emission(1799).some((b) => b.kind === 'orb')).toBe(false);
-  expect(emission(1800).some((b) => b.kind === 'orb')).toBe(false);
-  expect(emission(1800 + PRAYER_CHARGE - 1).some((b) => b.kind === 'orb')).toBe(false);
-  const first = emission(1800 + PRAYER_CHARGE).filter((b) => b.kind === 'orb');
-  expect(first).toHaveLength(7);
-  for (const b of first) expect(Math.hypot(b.vx, b.vy)).toBeCloseTo(3);
-  expect(first.some((b) => b.vy > 0)).toBe(true);
-  const angle = Math.atan2(first[0].vy, first[0].vx);
-  const next = emission(1800 + PRAYER_CHARGE + 3).filter((b) => b.kind === 'orb');
-  expect(next).toHaveLength(7);
-  expect(Math.atan2(next[0].vy, next[0].vx)).not.toBeCloseTo(angle);
-  expect(emission(1800 + PRAYER_CHARGE + PRAYER_FIRE).some((b) => b.kind === 'orb')).toBe(false);
-  expect(emission(1800 + PRAYER_PERIOD).some((b) => b.kind === 'orb')).toBe(false);
-});
-
-it('終符の祈りと連射は停止した位置で続き、休止で移動を再開して6秒ごとに繰り返す', () => {
-  const game = phase(12);
-  while (game.phaseFrame < 1800) game.update();
+  const start = 105 + CONSTELLATION_TIME;
+  while (game.phaseFrame < start) game.update();
   const position = game.bossXY;
   let bullets = 0;
   for (let i = 1; i < PRAYER_PERIOD; i++) {
-    const before = game.bossXY;
-    game.update();
+    const before = game.bossXY; game.update();
     const step = dawnPrayerStep(game.phaseFrame);
     if (step < PRAYER_CHARGE + PRAYER_FIRE) expect(game.bossXY).toEqual(position);
     expect(Math.hypot(game.bossXY[0] - before[0], game.bossXY[1] - before[1])).toBeLessThan(3);
-    const newOrbs = game.bullets.objects.filter((b) => b.active && b.age === 1 && b.kind === 'orb');
+    const newOrbs = game.bullets.objects.filter(b => b.active && b.age === 1 && b.kind === 'orb');
     if (step < PRAYER_CHARGE || step >= PRAYER_CHARGE + PRAYER_FIRE) expect(newOrbs).toHaveLength(0);
     bullets += newOrbs.length;
+    expect(game.dawnStars).toHaveLength(0);
   }
   expect(bullets).toBe(420);
   expect(game.bossXY).not.toEqual(position);
   game.update();
-  const secondPosition = game.bossXY;
-  for (let i = 0; i < PRAYER_CHARGE - 1; i++) game.update();
-  expect(game.bossXY).toEqual(secondPosition);
-  expect(game.bullets.objects.some((b) => b.active && b.age === 1 && b.kind === 'orb')).toBe(false);
-  game.update();
-  expect(game.bullets.objects.filter((b) => b.active && b.age === 1 && b.kind === 'orb')).toHaveLength(7);
-});
-
-it('終符の後方弾幕が上端と左右隅の待機位置へ届く', () => {
-  const game = phase(12);
-  const probes = [9, 96, 192, 288, 375].flatMap((x) => [12, 48, 84].map((y) => [x, y]));
-  const hits = probes.map(() => 0);
-  for (let frame = 0; frame < 1800; frame++) {
-    game.update();
-    for (const [index, [x, y]] of probes.entries()) {
-      if (game.bullets.objects.some((b) => b.active && b.kind === 'needle' && Math.hypot(b.x - x, b.y - y) <= b.radius + 2.5)) hits[index]++;
-    }
-  }
-  for (const [index, count] of hits.entries()) expect(count, `position ${probes[index]}`).toBeGreaterThan(0);
-});
-
-it('終符は30秒で1羽、45秒で2羽になり、予告の後は画面内のランダムな行き先へ飛ぶ', () => {
-  vi.spyOn(Math, 'random').mockReturnValue(0.4);
-  const game = phase(12);
-  for (let i = 0; i < 1799; i++) game.update();
-  expect(game.dawnOwls).toHaveLength(0);
-  game.update();
-  expect(game.dawnOwls).toHaveLength(1);
-  const owl = game.dawnOwls[0];
-  const origin = [owl.x, owl.y];
-  for (let i = 1; i < owl.warning; i++) game.update();
-  expect([owl.x, owl.y]).toEqual(origin);
-  game.update();
-  expect([owl.x, owl.y]).not.toEqual(origin);
-  let targetsChanged = 0;
-  while (game.phaseFrame < 3599) {
-    const before = game.dawnOwls.map((o) => [o.x, o.y, o.targetX, o.targetY]);
-    game.update();
-    expect(game.dawnOwls).toHaveLength(game.phaseFrame < 2700 ? 1 : 2);
-    for (const [i, o] of game.dawnOwls.entries()) {
-      expect(o.x).toBeGreaterThanOrEqual(28); expect(o.x).toBeLessThanOrEqual(356);
-      expect(o.y).toBeGreaterThanOrEqual(60); expect(o.y).toBeLessThanOrEqual(412);
-      if (!before[i]) continue;
-      expect(Math.hypot(o.x - before[i][0], o.y - before[i][1])).toBeLessThanOrEqual(1.51);
-      if (o.targetY !== before[i][3]) targetsChanged++;
-    }
-  }
-  expect(targetsChanged).toBeGreaterThan(3);
-  game.update();
-  expect(game.dawnOwls).toHaveLength(0);
-});
-
-it('終符の梟は出現予告中に無害で、接触すると被弾し、無敵中は被弾しない', () => {
-  const game = phase(12);
-  game.invincible = false; game.phaseFrame = 1799;
-  game.update();
-  const owl = game.dawnOwls[0];
-  game.px = owl.x; game.py = owl.y;
-  game.bullets.clear(); game.update();
-  expect(game.pendingHit).toBe(-1);
-  owl.age = owl.warning;
-  game.invulnFrames = 30; game.update();
-  expect(game.pendingHit).toBe(-1);
-  game.invulnFrames = 0; game.update();
-  expect(game.pendingHit).toBeGreaterThanOrEqual(0);
-  expect(game.hitDuringSpell).toBe(true);
-  game.startBoss(false, 11);
-  expect(game.dawnOwls).toHaveLength(0);
+  expect(dawnPrayerStep(game.phaseFrame)).toBe(-1);
+  expect(game.dawnStars).toHaveLength(7);
 });
 
 it('Lunaticの各スペルを進めても弾プールを飽和させない', () => {
@@ -391,7 +298,7 @@ it('七重の輪は収縮後に予告付きで落ち、自機の高さを横切�
   expect(ring.vy).toBeGreaterThan(1.5);
 });
 
-it('仮説とパノプティコンは中央や左右端に止まっている自機にも届く', () => {
+it('重力とパノプティコンは中央や左右端に止まっている自機にも届く', () => {
   for (const index of [5, 7]) {
     const game = phase(index);
     const hits = [0, 0, 0];

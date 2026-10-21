@@ -1,13 +1,13 @@
 import type { BgmCue } from './bgm';
 
 export type BossId = 'etokichi' | 'neo' | 'obsidia' | 'jinrai' | 'claudine' | 'chappy' | 'minerva';
-export type PhaseKind = 'normal' | 'spell' | 'midboss' | 'survival';
+export type PhaseKind = 'normal' | 'spell' | 'midboss' | 'survival' | 'finale';
 export interface Phase { name: string; spell: boolean; duration: number; hp: number; pattern: string; kind: PhaseKind; }
 export interface Stage { title: string; boss: BossId; mid: BossId; bgm: BgmCue; colors: [string, string, string]; phases: Phase[]; }
 
 export const STAGE_DPS = [32.4, 48.6, 48.6, 64.8, 64.8] as const;
-export const PHASE_SECONDS = { normal: 14, spell: 25, midboss: 18 } as const;
-export const PHASE_LIMIT = { normal: 40, spell: 60, midboss: 45 } as const;
+export const PHASE_SECONDS = { normal: 14, spell: 25, midboss: 18, finale: 60 } as const;
+export const PHASE_LIMIT = { normal: 40, spell: 60, midboss: 45, finale: Infinity } as const;
 export function phaseHp(stage: number, kind: PhaseKind): number {
   return kind === 'survival' ? 1 : Math.round(STAGE_DPS[stage - 1] * PHASE_SECONDS[kind]);
 }
@@ -78,14 +78,14 @@ export const STAGES: Stage[] = [
       phase(5, '通常攻撃・観測の螺旋', 'normal', 'minervaStarRings'),
       phase(5, 'ソクラティック・メソッド', 'spell', 'question'),
       phase(5, '通常攻撃・再検討', 'normal', 'minervaStarFan'),
-      phase(5, 'トゥルース・オア・デコイ', 'spell', 'hypothesis'),
+      phase(5, 'グラビティ・シフト', 'spell', 'gravityShift'),
       phase(5, '通常攻撃・観測の焦点', 'normal', 'minervaStarRings'),
       phase(5, 'パノプティコン', 'spell', 'owlEye'),
       phase(5, '通常攻撃・引用の星列', 'normal', 'minervaStarFan'),
       phase(5, 'リトラクション', 'spell', 'recall'),
       phase(5, 'アストラル・フライト', 'spell', 'starFlight'),
       phase(5, 'エンドレス・インクワイアリー', 'spell', 'interview'),
-      phase(5, 'オウル・オブ・ミネルヴァ', 'survival', 'owlDawn'),
+      phase(5, 'オウル・オブ・ミネルヴァ', 'finale', 'owlDawn'),
     ],
   },
 ];

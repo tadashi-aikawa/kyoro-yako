@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
-import { INTERVIEW_PERIOD, MINERVA_WARNING, SEVEN_OPENING, SEVEN_PERIOD, sevenLane } from './patterns/minerva';
+import { INTERVIEW_PERIOD, MINERVA_WARNING } from './patterns/minerva';
 import { STAR_FLIGHT_TIME, starFlightPoint } from './patterns/minerva-flight';
 
 const difficulties = ['easy', 'normal', 'hard', 'lunatic'] as const;
@@ -16,21 +16,22 @@ function fight(index: number, difficulty: Game['difficulty']): Game {
   return game;
 }
 
-it.each(difficulties)('サーベイの%sは予告された通路へ通常速度で移れば無敵・ボムなしで60秒避けられる', (difficulty) => {
-  const game = fight(1, difficulty); game.invincible = false; game.invulnFrames = 0;
-  game.px = 192; game.py = 398;
-  const level = difficulties.indexOf(difficulty);
-  for (let frame = 0; frame < 3598; frame++) {
-    const wave = Math.max(0, Math.floor((game.phaseFrame + 1 - 105) / SEVEN_PERIOD[level]));
-    const lane = sevenLane(wave);
-    game.keys.clear();
-    if (Math.abs(game.px - lane) > 2) game.keys.add(game.px < lane ? 'ArrowRight' : 'ArrowLeft');
-    game.update();
-    expect(game.pendingHit, `frame ${game.phaseFrame}, x ${game.px}`).toBe(-1);
-    expect(game.hitDuringSpell).toBe(false);
-  }
-  expect(game.bombs).toBe(3);
-  expect(SEVEN_OPENING[level]).toBeGreaterThanOrEqual(48);
+it.each(difficulties)('サーベイの%sは七重の輪を保って解放し、広い縦通路を作らない', (difficulty) => {
+  const game = fight(1, difficulty); game.phaseFrame = 104; game.update();
+  const rings = game.bullets.objects.filter(b => b.active && b.motion === 'minervaRing');
+  expect(new Set(rings.map(b => b.color)).size).toBe(4);
+  expect(rings.some(b => Math.abs(b.x - 192) < 24)).toBe(true);
+  const release = rings[0].releaseAt;
+  while (rings[0].age < release - 1) game.update();
+  const positions = rings.map(b => [b.x, b.y]);
+  game.update();
+  const fall = [1.25, 1.65, 1.95, 2.25][difficulties.indexOf(difficulty)];
+  rings.forEach((b, i) => {
+    const angle = Math.atan2(positions[i][1] - 220, positions[i][0] - 192);
+    expect(b.motion).toBe('normal');
+    expect(b.vx).toBeCloseTo(Math.cos(angle) * 0.55);
+    expect(b.vy).toBeCloseTo(fall + Math.sin(angle) * 0.55);
+  });
 });
 
 it.each(difficulties)('サーベイの両端とパノプティコンの下半分は%sで1px刻みの固定点にも弾が届く', (difficulty) => {
@@ -53,14 +54,7 @@ it.each(difficulties)('サーベイの両端とパノプティコンの下半分
     }
     for (const [row, y] of rows.entries()) {
       const untouched = Array.from({ length: 367 }, (_, i) => i + 9).filter(x => !touched[row].has(x));
-      // Easyの最初のスペルは中央の細い余裕を許し、広かった両端の安置を検査する。
-      const required = index === 1 && difficulty === 'easy' ? untouched.filter(x => x < 90 || x > 294) : untouched;
-      expect(required, `phase ${index}, y ${y}`).toEqual([]);
-      if (index === 1 && difficulty === 'easy') {
-        let longest = 0, run = 0, previous = -100;
-        for (const x of untouched) { run = x === previous + 1 ? run + 1 : 1; longest = Math.max(longest, run); previous = x; }
-        expect(longest, `Easyの中央の余裕は予告通路の半分以下: y ${y}`).toBeLessThanOrEqual(SEVEN_OPENING[0] / 2);
-      }
+      expect(untouched, `phase ${index}, y ${y}`).toEqual([]);
     }
   }
 });
