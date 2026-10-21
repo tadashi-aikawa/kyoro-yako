@@ -72,17 +72,19 @@ export function emitMinerva(game: Game, pattern: string): void {
   if (pattern === 'recall' && t % [480, 420, 390, 360][level] === 0) {
     const n = count(40);
     const wave = Math.floor(t / [480, 420, 390, 360][level]);
-    const speed = [2.1, 2.4, 2.7, 3.0][level];
+    const speed = [4.5, 5.1, 5.7, 6.3][level], warning = [60, 48, 42, 36][level];
     for (let i = 0; i < n; i++) {
       const angle = i * Math.PI * 2 / n + wave * 0.13;
       const dx = Math.cos(angle), dy = Math.sin(angle);
-      // 画面の縁で止め、上・横へ放った弾も画面外削除の前に引き戻す。
-      const edgeX = Math.abs(dx) < 0.001 ? Infinity : ((dx > 0 ? 372 : 12) - x) / dx;
-      const edgeY = Math.abs(dy) < 0.001 ? Infinity : ((dy > 0 ? 432 : 24) - y) / dy;
-      const outFrames = Math.max(1, Math.floor(Math.min(310, edgeX, edgeY) / speed));
+      // 全方向とも画面外まで出す。外側で待ち、同じ射線を戻って端も横切る。
+      const edgeX = Math.abs(dx) < 0.001 ? Infinity : ((dx > 0 ? 432 : -48) - x) / dx;
+      const edgeY = Math.abs(dy) < 0.001 ? Infinity : ((dy > 0 ? 496 : -48) - y) / dy;
+      const outFrames = Math.max(1, Math.ceil(Math.min(edgeX, edgeY) / speed));
       const b = game.spawnBullet(x, y, dx * speed, dy * speed, i % 4, 'orb');
       if (b) { b.motion = 'recall'; b.targetX = x; b.targetY = y;
-        b.gridRow = outFrames; b.releaseAt = outFrames + [60, 54, 48, 42][level]; b.sway = speed * 1.1; b.gridColumn = i; }
+        b.delay = warning; b.gridRow = warning + outFrames + 1;
+        b.releaseAt = b.gridRow + [60, 54, 48, 42][level]; b.sway = [3.2, 3.6, 4, 4.4][level]; b.gridColumn = i;
+        b.fadeAt = b.releaseAt + Math.ceil(outFrames * speed / b.sway) + 60; }
     }
   }
   if (pattern === 'starFlight') emitStarFlight(game);

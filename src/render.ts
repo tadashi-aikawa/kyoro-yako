@@ -14,6 +14,7 @@ import { THUNDER_FADE, THUNDER_HOLD, thunderGround, thunderPath, thunderScene } 
 import { dawnPrayerStep, eyeX, PRAYER_CHARGE, PRAYER_FIRE } from './patterns/minerva';
 import { STAR_FLIGHT_TIME, STAR_TRAIL_WARNING } from './patterns/minerva-flight';
 import { gravityScene, SOCRATIC_SYMBOLS, socraticScene } from './patterns/minerva-inquiry';
+import { REPRISE_PREPARE, REPRISES, repriseLocal } from './patterns/minerva-reprise';
 import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-ring';
 import { bogs, enterScene, KEY_ROWS, keyPosition, vimScene } from './patterns/neo';
 import { encoreBogTime } from './patterns/neo-encore';
@@ -283,6 +284,7 @@ export class Renderer {
       this.magic(192, 80, game.frame, stage.colors[2], 130, 0.25);
     }
     this.claudineFinaleBackdrop(game);
+    this.minervaEcho(game);
     if (game.phase?.pattern === 'question') this.minervaTelegraphs(game);
     if (game.phase && game.boss) {
       const thunder = thunderScene(game);
@@ -377,13 +379,17 @@ export class Renderer {
       c.fillStyle = '#e4aeea'; c.fillRect(17, 8, 346 * Math.max(0, game.phaseHp / game.phaseMaxHp), 9);
       this.text(NAMES[game.boss], 18, 29, 12, '#f9ebff');
       this.text('★'.repeat(game.remainingSpells), 330, 29, 12, '#ffe1a7', 'right');
+      if (game.phase.pattern === 'owlDawn' && game.minervaReprise && dawnPrayerStep(game.phaseFrame) < 0) {
+        this.text(`再演「${REPRISES[game.minervaReprise.index].phase.name}」`, 330, 29, 10, '#ffe5b7', 'right');
+      }
       this.text(Number.isFinite(game.phase.duration) ? `${Math.ceil((game.phase.duration * 60 - game.phaseFrame) / 60)}` : '∞', 367, 29, 14, '#fff', 'right');
     }
     game.enemies.forEach((enemy) => { this.enemy(game, enemy); });
     game.clones.forEach((clone) => { this.clone(clone, game.frame); });
     game.items.forEach((item) => { this.item(game, item); });
-    this.jinraiSpellTelegraphs(game);
-    this.stageTelegraphs(game);
+    const attack = game.attackContext();
+    this.jinraiSpellTelegraphs(attack);
+    this.stageTelegraphs(attack);
     this.galaxyFlash(game);
     if (game.phase?.pattern !== 'question') this.minervaTelegraphs(game);
     this.obsidiaGraph(game);
@@ -1008,6 +1014,17 @@ export class Renderer {
     c.restore();
   }
 
+  private minervaEcho(game: Game): void {
+    if (game.phase?.pattern !== 'owlDawn' || !game.minervaReprise) return;
+    const local = repriseLocal(game.phaseFrame);
+    const opacity = local < 18 ? local / 18 * 0.28 : local < REPRISE_PREPARE
+      ? 0.28 - (local - 18) / (REPRISE_PREPARE - 18) * 0.16 : Math.max(0, (105 - local) / 45) * 0.12;
+    if (!opacity) return;
+    const source = REPRISES[game.minervaReprise.index];
+    const sprite = this.readySprite(game, bossSpriteId(source.boss, 'cast', game.frame));
+    this.fieldCharacter(game, sprite, 192, 205, 170, 0, opacity);
+  }
+
   private minervaTelegraphs(game: Game): void {
     if (game.boss !== 'minerva' || game.midboss || !game.phase?.spell) return;
     const pattern = game.phase.pattern;
@@ -1069,39 +1086,30 @@ export class Renderer {
       c.fillStyle = '#fbe9b9'; c.beginPath(); c.ellipse(x, 29, 28, 13, 0, 0, Math.PI * 2); c.fill();
       c.fillStyle = '#382039'; c.beginPath(); c.arc(x, 29, 8, 0, Math.PI * 2); c.fill();
     }
+    if (pattern === 'recall') {
+      const source = game.bullets.objects.find(b => b.active && b.motion === 'recall');
+      if (source) this.magic(source.targetX, source.targetY, game.frame, '#ffe3b4', 16, 0.5);
+    }
     if (pattern === 'recall') game.bullets.forEach((b) => {
-      if (b.motion !== 'recall' || b.age < b.gridRow || b.age >= b.releaseAt) return;
+      if (b.motion !== 'recall') return;
+      if (b.delay > 0) {
+        c.strokeStyle = '#ffe4b866'; c.lineWidth = 1;
+        c.beginPath(); c.moveTo(b.x, b.y); c.lineTo(b.x + b.vx * 18, b.y + b.vy * 18); c.stroke(); return;
+      }
+      if (b.age < b.gridRow) return;
+      const outside = b.x < 0 || b.x > FIELD.w || b.y < 0 || b.y > FIELD.h;
+      if (b.age >= b.releaseAt && !outside) return;
       c.strokeStyle = '#fff0bf88'; c.lineWidth = 1.5;
       c.beginPath(); c.moveTo(b.x, b.y); c.lineTo(b.targetX, b.targetY); c.stroke();
+      const x = Math.max(10, Math.min(FIELD.w - 10, b.x)), y = Math.max(10, Math.min(FIELD.h - 10, b.y));
+      const angle = Math.atan2(b.targetY - b.y, b.targetX - b.x);
+      c.save(); c.translate(x, y); c.rotate(angle);
+      c.beginPath(); c.moveTo(-6, -4); c.lineTo(0, 0); c.lineTo(-6, 4); c.stroke(); c.restore();
     });
     if (pattern === 'interview' && t >= 0) {
       const [x, y] = game.bossXY;
       c.strokeStyle = '#ffe2bd88'; c.lineWidth = 2; c.setLineDash([6, 7]);
       c.beginPath(); c.arc(x, y, 45, 0, Math.PI * 2); c.stroke(); c.setLineDash([]);
-    }
-    if (pattern === 'owlDawn') {
-      for (const star of game.dawnStars) {
-        c.save();
-        c.globalAlpha = star.fired ? Math.max(0, 1 - (game.phaseFrame - star.fireAt) / 70) : 1;
-        const warning = star.angle !== undefined && !star.fired;
-        const radius = warning ? 11 + Math.sin(game.frame * 0.15) * 2 : 8;
-        c.strokeStyle = warning ? '#fff1b4' : '#d8c8ff99'; c.fillStyle = warning ? '#ffe095' : '#b8b2df'; c.lineWidth = 1.5;
-        c.beginPath();
-        for (let i = 0; i < 8; i++) {
-          const a = i * Math.PI / 4, r = i % 2 ? radius * 0.3 : radius;
-          const x = star.x + Math.cos(a) * r, y = star.y + Math.sin(a) * r;
-          if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
-        }
-        c.closePath(); c.fill(); c.stroke();
-        if (warning) {
-          const angle = star.angle!; c.setLineDash([4, 5]);
-          c.beginPath(); c.moveTo(star.x + Math.cos(angle) * 16, star.y + Math.sin(angle) * 16);
-          c.lineTo(star.x + Math.cos(angle) * 58, star.y + Math.sin(angle) * 58); c.stroke(); c.setLineDash([]);
-          c.save(); c.translate(star.x + Math.cos(angle) * 58, star.y + Math.sin(angle) * 58); c.rotate(angle);
-          c.beginPath(); c.moveTo(-7, -4); c.lineTo(0, 0); c.lineTo(-7, 4); c.stroke(); c.restore();
-        }
-        c.restore();
-      }
     }
     c.restore();
   }

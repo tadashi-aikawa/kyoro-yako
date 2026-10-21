@@ -16,9 +16,9 @@ import { jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_FADE, updateJinraiHeart } from './patterns/jinrai-kiss';
 import { type Thunderbolt, type Thunderstorm, thunderPosition } from './patterns/jinrai-thunder';
 import { dawnPosition, emitMinerva, eyeX, interviewPosition } from './patterns/minerva';
-import type { DawnStar } from './patterns/minerva-dawn';
 import { updateStarFlightSource } from './patterns/minerva-flight';
 import { gravityScene } from './patterns/minerva-inquiry';
+import { REPRISES, type Reprise, repriseView } from './patterns/minerva-reprise';
 import { type InterviewRing, interviewRingBlocksShot, updateInterviewRings } from './patterns/minerva-ring';
 import { emitNeo, inBog, updateVimBullet, type VimAttack } from './patterns/neo';
 import { emitNeoEncore, encoreBogTime } from './patterns/neo-encore';
@@ -121,8 +121,7 @@ export class Game {
   readonly jinraiLasers: JinraiLaser[] = [];
   readonly jinraiBolts: Thunderbolt[] = [];
   jinraiThunderstorm?: Thunderstorm;
-  readonly dawnStars: DawnStar[] = [];
-  minervaDawnCycle = -1;
+  minervaReprise?: Reprise;
   readonly interviewRings: InterviewRing[] = [];
   readonly graphNodes: GraphNode[] = [];
   readonly graphEdges: GraphEdge[] = [];
@@ -339,7 +338,7 @@ export class Game {
     this.midboss = false;
     this.phase = undefined;
     this.phaseIndex = -1;
-    this.dawnStars.length = 0; this.minervaDawnCycle = -1;
+    this.minervaReprise = undefined;
     this.px = FIELD.w / 2;
     this.py = FIELD.h - 50;
     this.pendingHit = -1;
@@ -591,7 +590,7 @@ export class Game {
     this.phaseMaxHp = phase.hp;
     this.jinraiLasers.length = 0;
     this.jinraiBolts.length = 0; this.jinraiThunderstorm = undefined;
-    this.dawnStars.length = 0; this.minervaDawnCycle = -1;
+    this.minervaReprise = undefined;
     this.jinraiDashTick = -1;
     this.jinraiDashDouble = false;
     this.jinraiDashCrossing = -1;
@@ -618,7 +617,7 @@ export class Game {
   private finishPhase(defeated: boolean): void {
     const phase = this.phase;
     if (!phase) return;
-    this.dawnStars.length = 0; this.minervaDawnCycle = -1;
+    this.minervaReprise = undefined;
     if (phase.spell && defeated && !this.bombUsed && !this.hitDuringSpell && this.pendingHit < 0) {
       this.addScore(this.spellBonus);
       this.message = '技の記録ボーナス！';
@@ -627,9 +626,10 @@ export class Game {
     }
     this.supplyPhaseItems();
     this.bullets.forEach((b) => {
-      // 画面外で戻り待ちのハートも得点へ変え、直後の画面外削除で失わないよう縁に置く。
-      const x = b.motion === 'jinraiHeart' ? Math.max(12, Math.min(FIELD.w - 12, b.x)) : b.x;
-      const y = b.motion === 'jinraiHeart' ? Math.max(20, Math.min(FIELD.h - 20, b.y)) : b.y;
+      // 画面外で戻り待ちの弾も、得点アイテムを回収できる位置へ寄せる。
+      const returns = b.motion === 'jinraiHeart' || b.motion === 'recall';
+      const x = returns ? Math.max(12, Math.min(FIELD.w - 12, b.x)) : b.x;
+      const y = returns ? Math.max(20, Math.min(FIELD.h - 20, b.y)) : b.y;
       this.spawnItem(x, y, 'point', true);
     });
     for (const node of this.graphNodes) this.spawnItem(node.x, node.y, 'point', true);
@@ -700,7 +700,7 @@ export class Game {
     if (this.midboss) this.midbossElapsedFrames++;
     if (phase.spell) this.spellBonus = Math.max(0, this.spellBonus - 22);
     if (this.phaseFrame >= 105) this.emitPattern(phase.pattern);
-    updateJinraiHazards(this);
+    updateJinraiHazards(this.attackContext());
     updateGalaxyFlash(this);
     if (phase.pattern !== 'final' && this.phaseHp <= 0) { this.finishPhase(true); return; }
     if (Number.isFinite(phase.duration) && this.phaseFrame >= phase.duration * 60) {
@@ -719,7 +719,7 @@ export class Game {
     if (this.phase?.pattern === 'jinraiThunder' && this.phaseFrame >= 105) return thunderPosition(this.phaseFrame, this.difficulty);
     if (this.phase?.pattern === 'sweep') return sweepPosition(this.phaseFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty));
     if (this.stage === 2 && this.phase) return obsidiaPosition(this.phase.pattern, this.phaseFrame, this.bossEntry);
-    if (this.phase?.pattern === 'owlDawn') return dawnPosition(this.phaseFrame);
+    if (this.phase?.pattern === 'owlDawn') return dawnPosition(this.phaseFrame, this.minervaReprise, this.difficulty);
     if (this.phase?.pattern === 'interview') return interviewPosition(this.phaseFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty));
     if (this.phase?.pattern === 'jinraiClone') {
       const body = jinraiCloneScene(this.phaseFrame, this.phase.duration).bodies[0];
@@ -779,7 +779,6 @@ export class Game {
 
   private clearBullets(): void {
     this.bullets.clear();
-    this.dawnStars.length = 0;
     this.jinraiBolts.length = 0; this.jinraiThunderstorm = undefined;
     this.vimAttack = undefined;
     this.interviewRings.length = 0;
@@ -792,9 +791,16 @@ export class Game {
     this.audio.play('graze'); this.spark(x, y, '#fff6a3', 3);
   }
 
+  attackContext(): Game { return repriseView(this); }
+
+  clearAttackEffects(): void {
+    this.clearBullets(); this.jinraiLasers.length = 0;
+  }
+
   private updateBullets(): void {
-    const sakuraLevel = this.phase?.pattern === 'jinraiSakura' ? ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty) : -1;
-    const sakuraTime = this.phaseFrame - 105;
+    const attack = this.attackContext(), attackFrame = attack.phaseFrame;
+    const sakuraLevel = attack.phase?.pattern === 'jinraiSakura' ? ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty) : -1;
+    const sakuraTime = attackFrame - 105;
     const windFrame = sakuraTime >= SAKURA_PERIOD ? (sakuraTime - SAKURA_PERIOD) % SAKURA_PERIOD : -1;
     this.bullets.forEach((b) => {
       b.age++;
@@ -860,7 +866,7 @@ export class Game {
         b.vy = b.vx * Math.sin(b.sway) + b.vy * Math.cos(b.sway);
         b.vx = vx;
       }
-      if (b.motion === 'jinraiHold' && b.releaseAt > 0 && this.phaseFrame >= b.releaseAt) {
+      if (b.motion === 'jinraiHold' && b.releaseAt > 0 && attackFrame >= b.releaseAt) {
         const angle = Math.atan2(b.targetY - b.y, b.targetX - b.x);
         const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty);
         const speed = 0.95 + level * 0.14;
@@ -913,7 +919,7 @@ export class Game {
         const bogTime = this.phase?.pattern === 'neoEncore' ? encoreBogTime(this) : this.phaseFrame - 105;
         const slow = bog && inBog(b.x, b.y, bogTime) ? 0.28 : 1;
         if (b.motion === 'complement') {
-          const blue = b.x < complementBoundary(this.phase?.pattern === 'final' ? (this.phaseFrame - 105) % 600 : this.phaseFrame - 105);
+          const blue = b.x < complementBoundary(attack.phase?.pattern === 'final' ? (attackFrame - 105) % 600 : attackFrame - 105);
           b.color = blue ? 1 : 3;
           b.x += b.vx; b.y += b.vy * (blue ? 0.58 : 1.55);
         // 扇の頂点を固定すると中央の弾が上端で永久に凍る。視線は帯ごと左右へ掃く。
@@ -921,8 +927,8 @@ export class Game {
           b.x += b.vx * slow; b.y += b.vy * slow;
         }
       }
-      if (b.motion === 'whiteSpace' && claudineScene(this) === 'whiteSpace') {
-        const local = this.phase?.pattern === 'final' ? (this.phaseFrame - 105) % 600 : this.phaseFrame - 105;
+      if (b.motion === 'whiteSpace' && claudineScene(attack) === 'whiteSpace') {
+        const local = attack.phase?.pattern === 'final' ? (attackFrame - 105) % 600 : attackFrame - 105;
         const [cx, cy, r] = whiteSpaceCircle(local);
         if (Math.hypot(b.x - cx, b.y - cy) < r + b.radius + 5) { b.active = false; return; }
       }
@@ -935,7 +941,7 @@ export class Game {
       }
       const margin = b.motion === 'wing' ? 130 : 25;
       // 宵の誘いは画面外から戻る。通常弾の画面外削除から外し、10秒の寿命で必ず回収する。
-      if (b.motion !== 'jinraiHeart' && (b.x < -margin || b.x > FIELD.w + margin || b.y < -30 || b.y > FIELD.h + 25)) { b.active = false; return; }
+      if (b.motion !== 'jinraiHeart' && b.motion !== 'recall' && (b.x < -margin || b.x > FIELD.w + margin || b.y < -30 || b.y > FIELD.h + 25)) { b.active = false; return; }
       // 点滅中に見えない弾へ当たらないよう、消える最後の1秒は無害にする。
       if (b.motion === 'jinraiHeart' && b.age >= b.fadeAt - KISS_FADE) return;
       if (this.invulnFrames > 0 || this.invincible || this.pendingHit >= 0) return;
@@ -968,7 +974,8 @@ export class Game {
   }
 
   private updateShots(): void {
-    const letters = this.phase?.pattern === 'enter' && this.bombFrames <= 0
+    const attack = this.attackContext();
+    const letters = attack.phase?.pattern === 'enter' && this.bombFrames <= 0
       ? this.bullets.objects.filter((b) => b.active && b.motion === 'enterLine' && b.delay <= 0) : undefined;
     this.shots.forEach((s) => {
       if (s.homing && !this.held('ShiftLeft') && !this.held('ShiftRight')) {
@@ -980,7 +987,7 @@ export class Game {
       }
       const fromX = s.x; const fromY = s.y;
       s.x += s.vx; s.y += s.vy;
-      if (letters && reflectEnterShot(this, s, fromX, fromY, letters)) return;
+      if (letters && reflectEnterShot(attack, s, fromX, fromY, letters)) return;
       if (this.interviewRings.some((ring) => interviewRingBlocksShot(ring, fromX, fromY, s.x, s.y, s.radius))) {
         s.active = false; this.spark(s.x, s.y, '#c7ddff', 1); return;
       }
@@ -1174,7 +1181,7 @@ export class Game {
   }
 
   get debugState(): Record<string, string | number | null> {
-    return { scene: this.scene, stage: this.stage, boss: this.boss ? NAMES[this.boss] : null, bossRole: this.boss ? this.midboss ? 'midboss' : 'boss' : null, phase: this.phase ? this.phaseIndex : -1, spell: this.phase?.spell ? this.phase.name : null, phaseRemainingSeconds: this.phase ? Number.isFinite(this.phase.duration) ? Math.max(0, (this.phase.duration * 60 - this.phaseFrame) / 60) : '∞' : null, phaseHpRatio: this.phase ? Math.max(0, this.phaseHp / this.phaseMaxHp) : null, bullets: this.bullets.count, graphNodes: this.graphNodes.length, graphEdges: this.graphEdges.length, dawnStars: this.dawnStars.length, score: this.score, power: this.power, maxform: Number(this.awakened), lives: this.lives, bombs: this.bombs, fps: this.fps, bgm: this.bgm.cue };
+    return { scene: this.scene, stage: this.stage, boss: this.boss ? NAMES[this.boss] : null, bossRole: this.boss ? this.midboss ? 'midboss' : 'boss' : null, phase: this.phase ? this.phaseIndex : -1, spell: this.phase?.spell ? this.phase.name : null, phaseRemainingSeconds: this.phase ? Number.isFinite(this.phase.duration) ? Math.max(0, (this.phase.duration * 60 - this.phaseFrame) / 60) : '∞' : null, phaseHpRatio: this.phase ? Math.max(0, this.phaseHp / this.phaseMaxHp) : null, bullets: this.bullets.count, graphNodes: this.graphNodes.length, graphEdges: this.graphEdges.length, reprise: this.minervaReprise ? REPRISES[this.minervaReprise.index].phase.name : null, score: this.score, power: this.power, maxform: Number(this.awakened), lives: this.lives, bombs: this.bombs, fps: this.fps, bgm: this.bgm.cue };
   }
 
   get endingLines(): string[] { return ENDINGS[this.player]; }

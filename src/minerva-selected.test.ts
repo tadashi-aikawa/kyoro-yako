@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { emitMinerva } from './patterns/minerva';
-import { CONSTELLATION_TIME, DAWN_CYCLE } from './patterns/minerva-dawn';
 import { gravityScene, socraticScene } from './patterns/minerva-inquiry';
 import { density } from './rules';
 
@@ -70,32 +69,4 @@ it.each(difficulties)('リトラクションは%sで全周の等間隔弾を省�
     const next = i + 1 === angles.length ? angles[0] + Math.PI * 2 : angles[i + 1];
     expect(next - angles[i]).toBeCloseTo(Math.PI * 2 / angles.length);
   }
-});
-
-it.each(difficulties)('星図は%sで予告した方向を追尾せず、HP段階は次の星図で反映する', difficulty => {
-  const game = fight(12, difficulty); game.phaseFrame = 104; game.update();
-  expect(game.dawnStars).toHaveLength(7);
-  const star = game.dawnStars.find(s => s.angle !== undefined)!;
-  const origin = [star.x, star.y], angle = star.angle!;
-  game.phaseHp = game.phaseMaxHp * 0.2; game.px = 9;
-  while (game.phaseFrame < star.fireAt) game.update();
-  expect([star.x, star.y]).toEqual(origin); expect(star.angle).toBe(angle); expect(star.tier).toBe(0);
-  const fired = game.bullets.objects.filter(b => b.active && b.age === 1 && b.kind === 'petal');
-  expect(fired).toHaveLength([5, 7, 9, 11][difficulties.indexOf(difficulty)]);
-  const center = fired[(fired.length - 1) / 2]; expect(Math.atan2(center.vy, center.vx)).toBeCloseTo(angle);
-  while (game.phaseFrame < 105 + DAWN_CYCLE) game.update();
-  expect(game.dawnStars).toHaveLength(7);
-  expect(game.dawnStars.every(s => s.tier === 2 && s.y < 200)).toBe(true);
-});
-
-it('星図のボムは発射源も消し、ボム明けは新しい予告から始め、祈り直前の一斉射を捨てる', () => {
-  const game = fight(12, 'normal'); game.phaseFrame = 104; game.update();
-  listeners.keydown({ code: 'KeyX', repeat: false, preventDefault: () => {} }); game.update();
-  listeners.keyup({ code: 'KeyX', repeat: false, preventDefault: () => {} });
-  expect(game.dawnStars).toHaveLength(0);
-  while (game.bombFrames > 1) game.update();
-  game.update(); expect(game.dawnStars.length).toBeGreaterThan(0);
-  expect(game.dawnStars.every(s => !s.fired && s.fireAt > game.phaseFrame)).toBe(true);
-  game.dawnStars.length = 0; game.bullets.clear(); game.phaseFrame = 105 + CONSTELLATION_TIME - 20;
-  emitMinerva(game, 'owlDawn'); expect(game.dawnStars).toHaveLength(0); expect(game.bullets.count).toBe(0);
 });

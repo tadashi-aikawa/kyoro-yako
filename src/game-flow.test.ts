@@ -181,7 +181,7 @@ it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ�
   expect(game.endingLines).toHaveLength(6);
 });
 
-it('新しいスペルはキー弾・星輪・推論の門・巻き戻し・星図を作る', () => {
+it('新しいスペルはキー弾・星輪・推論の門・巻き戻し・再演を作る', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   game.startStage(1); game.startBoss(true, 0);
   game.phaseFrame = 104; game.update();
@@ -204,5 +204,5 @@ it('新しいスペルはキー弾・星輪・推論の門・巻き戻し・星�
   while (recalled!.active) game.update();
 
   game.startBoss(false, 12); game.phaseFrame = 104; game.update();
-  expect(game.dawnStars).toHaveLength(7);
+  expect(game.minervaReprise?.cycle).toBe(0);
 });

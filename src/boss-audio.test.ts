@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
-import { CONSTELLATION_TIME, DAWN_CYCLE } from './patterns/minerva-dawn';
+import { DAWN_CYCLE } from './patterns/minerva-dawn';
+import { REPRISE_TIME } from './patterns/minerva-reprise';
 import { STAGES } from './stages';
 
 beforeEach(() => {
@@ -129,7 +130,7 @@ it('カットインは攻撃開始前に消え、入れ替えたボスに技が�
 it('最後の祈りは充填開始に低い唸りを1回鳴らし、連射と休止中には繰り返さない', () => {
   const game = new Game(); game.invincible = true; game.startStage(5); game.startBoss(false, 12);
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
-  game.phaseFrame = 105 + CONSTELLATION_TIME - 2; game.update();
+  game.phaseFrame = 105 + REPRISE_TIME - 2; game.update();
   expect(play).not.toHaveBeenCalledWith('prayerCharge');
   game.update();
   expect(play.mock.calls.filter(([sound]) => sound === 'prayerCharge')).toHaveLength(1);

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { dawnPrayerStep, emitMinerva, eyeX, INTERVIEW_PERIOD, INTERVIEW_SPEED, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE, PRAYER_PERIOD } from './patterns/minerva';
-import { CONSTELLATION_TIME } from './patterns/minerva-dawn';
+import { REPRISE_TIME } from './patterns/minerva-reprise';
 import { interviewRingBlocksShot, interviewRingDistance, updateInterviewRings } from './patterns/minerva-ring';
 import { STAGES } from './stages';
 
@@ -230,27 +230,28 @@ it('終符は時間が経っても終わらず、HPを削るとクリアにな�
   expect(game.collectionFrames).toBe(180);
 });
 
-it('終符の祈りは元の溜めと発散を保ち、星図と交互に繰り返す', () => {
+it('終符の祈りは元の溜めと発散を保ち、再演と交互に繰り返す', () => {
   const game = phase(12);
-  const start = 105 + CONSTELLATION_TIME;
+  const start = 105 + REPRISE_TIME;
   while (game.phaseFrame < start) game.update();
-  const position = game.bossXY;
+  const position: [number, number] = [192, 132];
   let bullets = 0;
   for (let i = 1; i < PRAYER_PERIOD; i++) {
     const before = game.bossXY; game.update();
     const step = dawnPrayerStep(game.phaseFrame);
-    if (step < PRAYER_CHARGE + PRAYER_FIRE) expect(game.bossXY).toEqual(position);
-    expect(Math.hypot(game.bossXY[0] - before[0], game.bossXY[1] - before[1])).toBeLessThan(3);
+    if (step >= 60 && step < PRAYER_CHARGE + PRAYER_FIRE) expect(game.bossXY).toEqual(position);
+    expect(Math.hypot(game.bossXY[0] - before[0], game.bossXY[1] - before[1])).toBeLessThan(4.5);
     const newOrbs = game.bullets.objects.filter(b => b.active && b.age === 1 && b.kind === 'orb');
     if (step < PRAYER_CHARGE || step >= PRAYER_CHARGE + PRAYER_FIRE) expect(newOrbs).toHaveLength(0);
     bullets += newOrbs.length;
-    expect(game.dawnStars).toHaveLength(0);
+    expect(game.jinraiLasers).toHaveLength(0);
+    expect(game.graphNodes).toHaveLength(0);
   }
   expect(bullets).toBe(420);
   expect(game.bossXY).not.toEqual(position);
   game.update();
   expect(dawnPrayerStep(game.phaseFrame)).toBe(-1);
-  expect(game.dawnStars).toHaveLength(7);
+  expect(game.minervaReprise?.cycle).toBe(1);
 });
 
 it('Lunaticの各スペルを進めても弾プールを飽和させない', () => {
