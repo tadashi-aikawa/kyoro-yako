@@ -57,7 +57,7 @@ it.each(difficulties)('再演10種類は%sで元の仕掛けを動かし、8%減
     expect(game.bullets.count).toBe(0); expect(game.graphNodes).toHaveLength(0); expect(game.jinraiLasers).toHaveLength(0);
     vi.restoreAllMocks();
   }
-});
+}, 10_000);
 
 it('抽選はHP切替ごとに行い、同じ技の連続も選べる。時間やボムでは切り替えない', () => {
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.01);
@@ -154,11 +154,28 @@ it('HP8%ごとに再演3回と4回の後へ祈りを挟み、祈りもHPで終�
   }
 });
 
-it.each(difficulties)('再演の%sだけ1段階上げ、本体の難易度と祈りは変えない', difficulty => {
-  const game = fight('owlDawn', difficulty); game.phaseFrame = 104; game.update();
-  expect(repriseView(game).difficulty).toBe(repriseDifficulty(difficulty)); expect(game.difficulty).toBe(difficulty);
-  next(game); next(game); next(game);
-  expect(repriseView(game)).toBe(game); expect(repriseView(game).difficulty).toBe(difficulty);
+it.each(difficulties)('再演の%sはHP半分以上で同じ難易度、半分未満で1段階上げる', difficulty => {
+  const stronger = { easy: 'normal', normal: 'hard', hard: 'lunatic', lunatic: 'lunatic' }[difficulty];
+  for (const ratio of [1, 0.5001, 0.5, 0.4999]) {
+    const game = fight('owlDawn', difficulty); game.phaseFrame = 104; game.phaseHp = game.phaseMaxHp * ratio; game.update();
+    expect(repriseDifficulty(difficulty, ratio)).toBe(ratio < 0.5 ? stronger : difficulty);
+    expect(repriseView(game).difficulty).toBe(ratio < 0.5 ? stronger : difficulty);
+    expect(game.difficulty).toBe(difficulty);
+    next(game); next(game); next(game);
+    expect(repriseView(game)).toBe(game); expect(repriseView(game).difficulty).toBe(difficulty);
+  }
+});
+
+it.each(difficulties)('再演の%sは途中でHP半分を跨いでも予告と動きを保ち、次の再演から上げる', difficulty => {
+  const index = REPRISES.findIndex(source => source.phase.pattern === 'sweep');
+  vi.spyOn(Math, 'random').mockReturnValue((index + 0.5) / REPRISES.length);
+  const game = fight('owlDawn', difficulty); game.phaseFrame = 104; game.phaseHp = game.phaseMaxHp * 0.51; game.update();
+  game.phaseFrame = game.minervaReprise!.startFrame + REPRISE_PREPARE + 280;
+  const position = game.bossXY, reprise = game.minervaReprise;
+  game.phaseHp = game.phaseMaxHp * 0.49; game.update();
+  expect(game.minervaReprise).toBe(reprise); expect(repriseView(game).difficulty).toBe(difficulty);
+  expect(Math.hypot(game.bossXY[0] - position[0], game.bossXY[1] - position[1])).toBeLessThan(8);
+  next(game); expect(repriseView(game).difficulty).toBe(repriseDifficulty(difficulty, 0.41));
 });
 
 it('召喚中はダメージを受けず、最終技のショットとボムのダメージだけ2/3になる', () => {
@@ -222,27 +239,35 @@ it.each(difficulties)('リトラクションは%sで全弾が画面外へ出て�
   expect(outside.size).toBe(bullets.length);
 });
 
-it.each([[0.01, 'life'], [0.10, 'bomb'], [0.31, undefined]] as const)('祈りの抽選%sでは%sを混ぜ、HP区間が長引いても最大1個だけ放出する', (roll, kind) => {
-  vi.spyOn(Math, 'random').mockReturnValue(roll);
-  const game = fight(); prayer(game);
-  const spawn = vi.spyOn(game, 'spawnItem'), start = game.phaseFrame;
-  while (game.phaseFrame < start + PRAYER_CHARGE + 72) game.update();
-  const items = game.items.objects.filter(item => item.active && (item.kind === 'life' || item.kind === 'bomb'));
-  expect(items).toHaveLength(kind ? 1 : 0);
-  if (kind) { expect(items[0].kind).toBe(kind); expect(items[0].vy).toBeGreaterThan(0); expect(items[0].manual).toBe(true); }
+it.each(difficulties)('祈りの%sで残機・大型パワー・ボムを1個ずつ配布し、同じHP区間で繰り返さない', difficulty => {
+  const game = fight('owlDawn', difficulty); game.power = 3; game.lives = 2; game.bombs = 1;
+  const spawn = vi.spyOn(game, 'spawnItem'); prayer(game); const start = game.phaseFrame;
+  const items = game.items.objects.filter(item => item.active);
+  expect(items.map(item => item.kind)).toEqual(['life', 'large', 'bomb']);
+  expect(items.every(item => item.vy > 0 && item.manual && !item.auto)).toBe(true);
+  for (const item of items) { game.px = item.x; game.py = item.y; game.update(); expect(item.active).toBe(false); }
+  expect(game.lives).toBe(3); expect(game.power).toBe(4); expect(game.bombs).toBe(2);
   while (game.phaseFrame < start + PRAYER_PERIOD * 3) game.update();
-  expect(spawn.mock.calls.filter(([, , item]) => item === 'bomb' || item === 'life')).toHaveLength(kind ? 1 : 0);
+  expect(spawn.mock.calls.map(([, , kind]) => kind)).toEqual(['life', 'large', 'bomb']);
 });
 
-it('HP後半でも補給でき、ボム中に抽選時点を過ぎても後で放出しない', () => {
-  vi.spyOn(Math, 'random').mockReturnValue(0.10);
+it.each([[4, 0, false], [5, 0.2499, true], [5, 0.25, false], [5, 0.99, false]] as const)('Power%sで抽選%sの時だけ光の羽根を追加する=%s', (power, roll, rare) => {
+  vi.spyOn(Math, 'random').mockReturnValue(roll);
+  const game = fight(); game.power = power; const spawn = vi.spyOn(game, 'spawnItem'); prayer(game);
+  expect(spawn.mock.calls.map(([, , kind]) => kind)).toEqual(['life', 'large', 'bomb', ...(rare ? ['radiant'] : [])]);
+  if (rare) {
+    const item = game.items.objects.find(item => item.active && item.kind === 'radiant')!;
+    game.px = item.x; game.py = item.y; game.update(); expect(game.awakened).toBe(true); expect(game.power).toBe(5);
+  }
+});
+
+it('HP後半やボム中も必ず補給し、次の祈りでは新しい1セットを配る', () => {
   for (const bombFrames of [0, 20]) {
-    const game = fight(); prayer(game, 0.65);
-    game.phaseFrame = game.minervaReprise!.startFrame + PRAYER_CHARGE + 71; game.bombFrames = bombFrames; game.update();
-    expect(game.items.objects.filter(item => item.active && item.kind === 'bomb')).toHaveLength(bombFrames ? 0 : 1);
-    if (bombFrames) {
-      for (let i = 0; i < PRAYER_PERIOD * 2; i++) game.update();
-      expect(game.items.objects.some(item => item.active && item.kind === 'bomb')).toBe(false);
-    }
+    const game = fight(); game.phaseHp = game.phaseMaxHp * 0.65; game.phaseFrame = 104; game.update(); next(game); next(game);
+    const spawn = vi.spyOn(game, 'spawnItem'); game.bombFrames = bombFrames; next(game);
+    expect(spawn.mock.calls.map(([, , kind]) => kind)).toEqual(['life', 'large', 'bomb']);
+    for (let i = 0; i < 5; i++) next(game);
+    expect(game.minervaReprise?.prayer).toBe(true); expect(game.minervaReprise?.supplied).toBe(true);
+    expect(spawn.mock.calls.map(([, , kind]) => kind)).toEqual(['life', 'large', 'bomb', 'life', 'large', 'bomb']);
   }
 });

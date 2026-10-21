@@ -719,7 +719,7 @@ export class Game {
     if (this.phase?.pattern === 'jinraiThunder' && this.phaseFrame >= 105) return thunderPosition(this.phaseFrame, this.difficulty);
     if (this.phase?.pattern === 'sweep') return sweepPosition(this.phaseFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty));
     if (this.stage === 2 && this.phase) return obsidiaPosition(this.phase.pattern, this.phaseFrame, this.bossEntry);
-    if (this.phase?.pattern === 'owlDawn') return dawnPosition(this.phaseFrame, this.minervaReprise, this.difficulty);
+    if (this.phase?.pattern === 'owlDawn') return dawnPosition(this.phaseFrame, this.minervaReprise);
     if (this.phase?.pattern === 'interview') return interviewPosition(this.phaseFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty));
     if (this.phase?.pattern === 'jinraiClone') {
       const body = jinraiCloneScene(this.phaseFrame, this.phase.duration).bodies[0];
