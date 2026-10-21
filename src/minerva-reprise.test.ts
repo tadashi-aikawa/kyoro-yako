@@ -239,12 +239,18 @@ it.each(difficulties)('リトラクションは%sで全弾が画面外へ出て�
   expect(outside.size).toBe(bullets.length);
 });
 
-it.each(difficulties)('祈りの%sで残機・大型パワー・ボムを1個ずつ配布し、同じHP区間で繰り返さない', difficulty => {
+it.each(difficulties)('祈りの%sは最初の発散で残機・大型パワー・ボムを弾に混ぜ、同じHP区間で繰り返さない', difficulty => {
   const game = fight('owlDawn', difficulty); game.power = 3; game.lives = 2; game.bombs = 1;
   const spawn = vi.spyOn(game, 'spawnItem'); prayer(game); const start = game.phaseFrame;
+  while (game.phaseFrame < start + PRAYER_CHARGE - 1) { expect(spawn).not.toHaveBeenCalled(); game.update(); }
+  expect(spawn).not.toHaveBeenCalled(); game.update();
   const items = game.items.objects.filter(item => item.active);
   expect(items.map(item => item.kind)).toEqual(['life', 'large', 'bomb']);
   expect(items.every(item => item.vy > 0 && item.manual && !item.auto)).toBe(true);
+  const [x, y] = game.bossXY;
+  for (const [spawnX, spawnY] of spawn.mock.calls) expect(Math.hypot(spawnX - x, spawnY - y)).toBeCloseTo(22);
+  expect(game.bullets.count).toBe({ easy: 4, normal: 6, hard: 8, lunatic: 10 }[difficulty]);
+  for (let frame = 0; frame < 30; frame++) game.update();
   for (const item of items) { game.px = item.x; game.py = item.y; game.update(); expect(item.active).toBe(false); }
   expect(game.lives).toBe(3); expect(game.power).toBe(4); expect(game.bombs).toBe(2);
   while (game.phaseFrame < start + PRAYER_PERIOD * 3) game.update();
@@ -254,6 +260,8 @@ it.each(difficulties)('祈りの%sで残機・大型パワー・ボムを1個ず
 it.each([[4, 0, false], [5, 0.2499, true], [5, 0.25, false], [5, 0.99, false]] as const)('Power%sで抽選%sの時だけ光の羽根を追加する=%s', (power, roll, rare) => {
   vi.spyOn(Math, 'random').mockReturnValue(roll);
   const game = fight(); game.power = power; const spawn = vi.spyOn(game, 'spawnItem'); prayer(game);
+  expect(spawn).not.toHaveBeenCalled();
+  while (!game.minervaReprise!.supplied) game.update();
   expect(spawn.mock.calls.map(([, , kind]) => kind)).toEqual(['life', 'large', 'bomb', ...(rare ? ['radiant'] : [])]);
   if (rare) {
     const item = game.items.objects.find(item => item.active && item.kind === 'radiant')!;
@@ -264,10 +272,13 @@ it.each([[4, 0, false], [5, 0.2499, true], [5, 0.25, false], [5, 0.99, false]] a
 it('HP後半やボム中も必ず補給し、次の祈りでは新しい1セットを配る', () => {
   for (const bombFrames of [0, 20]) {
     const game = fight(); game.phaseHp = game.phaseMaxHp * 0.65; game.phaseFrame = 104; game.update(); next(game); next(game);
-    const spawn = vi.spyOn(game, 'spawnItem'); game.bombFrames = bombFrames; next(game);
+    const spawn = vi.spyOn(game, 'spawnItem'); next(game);
+    expect(spawn).not.toHaveBeenCalled();
+    game.phaseFrame = game.minervaReprise!.startFrame + PRAYER_CHARGE - 1; game.bombFrames = bombFrames; game.update();
     expect(spawn.mock.calls.map(([, , kind]) => kind)).toEqual(['life', 'large', 'bomb']);
     for (let i = 0; i < 5; i++) next(game);
-    expect(game.minervaReprise?.prayer).toBe(true); expect(game.minervaReprise?.supplied).toBe(true);
+    expect(game.minervaReprise?.prayer).toBe(true); expect(game.minervaReprise?.supplied).toBe(false);
+    game.bombFrames = 0; game.phaseFrame = game.minervaReprise!.startFrame + PRAYER_CHARGE - 1; game.update();
     expect(spawn.mock.calls.map(([, , kind]) => kind)).toEqual(['life', 'large', 'bomb', 'life', 'large', 'bomb']);
   }
 });

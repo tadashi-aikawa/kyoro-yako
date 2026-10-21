@@ -247,7 +247,7 @@ it('終符の祈りは元の溜めと発散を保ち、再演3回の後に挟む
     expect(game.jinraiLasers).toHaveLength(0);
     expect(game.graphNodes).toHaveLength(0);
   }
-  expect(bullets).toBe(420);
+  expect(bullets).toBe(419); // 最初の発散の1発は確定補給へ置き換わる。
   expect(game.bossXY).not.toEqual(position);
   game.update();
   expect(dawnPrayerStep(game.phaseFrame, game.minervaReprise)).toBe(0);
