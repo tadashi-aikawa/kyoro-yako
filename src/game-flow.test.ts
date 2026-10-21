@@ -109,6 +109,53 @@ it.each(['defeat', 'timeout'] as const)('5面エトキチは%sで3技を順に�
   expect(game.bgm.cue).toBe('boss-minerva');
 });
 
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('5面中ボスの全技を%sで時間切れにしても、回収と会話を経て本ボス戦が始まる', (difficulty) => {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true; game.difficulty = difficulty;
+  game.startStage(5); game.stageFrame = 2449;
+  game.update();
+  expect(game.scene).toBe('dialogue');
+  expect(game.afterDialogue).toBe('mid');
+  for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
+  expect(game.scene).toBe('stage');
+  const midbossAt = game.stageFrame;
+  let elapsed = 0;
+  for (let index = 0; index < 3; index++) {
+    expect(game.phaseIndex).toBe(index);
+    const phase = game.phase!;
+    for (let frame = 0; frame < phase.duration * 60; frame++) game.update();
+    elapsed += phase.duration * 60;
+    expect(game.midbossElapsedFrames).toBe(elapsed);
+    expect(game.stageFrame).toBe(midbossAt);
+    if (index < 2) expect(game.collectionFrames).toBe(0);
+  }
+  expect(game.phase).toBeUndefined();
+  expect(game.collectionFrames).toBe(180);
+  expect(game.items.objects.some((item) => item.active && item.kind === 'small' && item.manual)).toBe(true);
+  for (let frame = 0; frame < 179; frame++) game.update();
+  expect(game.scene).toBe('stage');
+  expect(game.collectionFrames).toBe(1);
+  expect(game.stageFrame).toBe(midbossAt);
+  game.update();
+  expect(game.scene).toBe('dialogue');
+  expect(game.afterDialogue).toBe('stage');
+  expect(game.lines[0].who).toBe('etokichi');
+  for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
+  expect(game.scene).toBe('stage');
+  expect(game.boss).toBeUndefined();
+  expect(game.bgm.cue).toBe('stage-dawn');
+  let enemiesAppeared = false;
+  for (let frame = 0; frame < 900 && game.scene === 'stage'; frame++) {
+    game.update();
+    enemiesAppeared ||= game.enemies.count > 0;
+  }
+  expect(enemiesAppeared).toBe(true);
+  expect(game.scene).toBe('dialogue');
+  expect(game.afterDialogue).toBe('boss');
+  expect(game.bgm.cue).toBe('boss-minerva');
+  for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
+  expect(game.debugState).toMatchObject({ scene: 'stage', boss: 'ミネルヴァ', bossRole: 'boss', phase: 0, bgm: 'boss-minerva' });
+});
+
 it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ進む', () => {
   const game = new Game(); game.audio.volume = 0;
   game.startStage(4);
