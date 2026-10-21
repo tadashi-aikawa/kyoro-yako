@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
-import { DAWN_CYCLE } from './patterns/minerva-dawn';
-import { REPRISE_TIME } from './patterns/minerva-reprise';
+import { PRAYER_PERIOD } from './patterns/minerva-dawn';
 import { STAGES } from './stages';
 
 beforeEach(() => {
@@ -58,7 +57,7 @@ it('花影は二度の溜めと分身の開始時だけ忍術の音を鳴らす'
 });
 
 it('発射SEは予告中に鳴らず、インタビューの輪が動き始める時に鳴る', () => {
-  const game = new Game(); game.invincible = true; game.startStage(5); game.startBoss(false, 11);
+  const game = new Game(); game.invincible = true; game.startStage(5); game.startBoss(false, 9);
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
   game.phaseFrame = 104; game.update();
   const ring = game.interviewRings[0];
@@ -128,14 +127,15 @@ it('カットインは攻撃開始前に消え、入れ替えたボスに技が�
 });
 
 it('最後の祈りは充填開始に低い唸りを1回鳴らし、連射と休止中には繰り返さない', () => {
-  const game = new Game(); game.invincible = true; game.startStage(5); game.startBoss(false, 12);
+  const game = new Game(); game.invincible = true; game.startStage(5); game.startBoss(false, 10);
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
-  game.phaseFrame = 105 + REPRISE_TIME - 2; game.update();
+  game.phaseFrame = 104; game.update();
+  for (let i = 0; i < 2; i++) { game.phaseHp -= game.phaseMaxHp * 0.05 + 0.000001; game.update(); }
   expect(play).not.toHaveBeenCalledWith('prayerCharge');
-  game.update();
+  game.phaseHp -= game.phaseMaxHp * 0.05 + 0.000001; game.update();
   expect(play.mock.calls.filter(([sound]) => sound === 'prayerCharge')).toHaveLength(1);
   expect(play).not.toHaveBeenCalledWith('declare');
-  for (let i = 0; i < DAWN_CYCLE - 1; i++) game.update();
+  for (let i = 0; i < PRAYER_PERIOD - 1; i++) game.update();
   expect(play.mock.calls.filter(([sound]) => sound === 'prayerCharge')).toHaveLength(1);
   game.update();
   expect(play.mock.calls.filter(([sound]) => sound === 'prayerCharge')).toHaveLength(2);

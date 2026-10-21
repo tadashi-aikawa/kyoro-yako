@@ -19,7 +19,7 @@ function press(game: Game, code: string): void {
 
 it('エンドレス・インクワイアリーの輪もボムで消え、ポーズ中には広がらない', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
-  game.startStage(5); game.startBoss(false, 11);
+  game.startStage(5); game.startBoss(false, 9);
   game.phaseFrame = 104; game.update();
   const ring = game.interviewRings[0];
   expect(ring).toBeDefined();
@@ -168,7 +168,7 @@ it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ�
   press(game, 'KeyZ');
   expect(game.stage).toBe(5);
   expect(game.scene).toBe('stage');
-  game.startBoss(false, 12);
+  game.startBoss(false, 10);
   game.phaseHp = 0;
   game.update();
   expect(game.phase).toBeUndefined();
@@ -181,7 +181,7 @@ it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ�
   expect(game.endingLines).toHaveLength(6);
 });
 
-it('新しいスペルはキー弾・星輪・推論の門・巻き戻し・再演を作る', () => {
+it('新しいスペルはキー弾・星輪・巻き戻し・再演を作る', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   game.startStage(1); game.startBoss(true, 0);
   game.phaseFrame = 104; game.update();
@@ -191,11 +191,8 @@ it('新しいスペルはキー弾・星輪・推論の門・巻き戻し・再�
 
   game.startStage(5); game.startBoss(false, 1); game.phaseFrame = 104; game.update();
   expect(game.bullets.count).toBeGreaterThan(100);
-  game.startBoss(false, 3); game.phaseFrame = 284; game.update();
-  expect(game.bullets.count).toBe(120);
-  expect(game.bullets.objects.filter(b => b.active).every(b => b.delay > 0)).toBe(true);
 
-  game.startBoss(false, 9); game.phaseFrame = 104; game.update();
+  game.startBoss(false, 7); game.phaseFrame = 104; game.update();
   const recalled = game.bullets.objects.find((bullet) => bullet.active && bullet.motion === 'recall');
   expect(recalled).toBeDefined();
   while (recalled!.age < recalled!.releaseAt) game.update();
@@ -203,6 +200,6 @@ it('新しいスペルはキー弾・星輪・推論の門・巻き戻し・再�
   expect(recalled?.motion).toBe('recall');
   while (recalled!.active) game.update();
 
-  game.startBoss(false, 12); game.phaseFrame = 104; game.update();
+  game.startBoss(false, 10); game.phaseFrame = 104; game.update();
   expect(game.minervaReprise?.cycle).toBe(0);
 });

@@ -8,19 +8,21 @@ import { emitJinraiPattern } from './jinrai';
 import { emitNeo } from './neo';
 import { emitObsidia, sweepPosition } from './obsidia';
 
-export const REPRISE_PREPARE = 60;
-export const REPRISE_FIRE = 600;
-export const REPRISE_TIME = REPRISE_PREPARE + REPRISE_FIRE;
+export const REPRISE_PREPARE = 120;
 const PATTERNS = ['vim', 'enter', 'clean', 'link', 'sweep', 'complement', 'type', 'grid', 'whiteSpace', 'jinraiKiss', 'jinraiLaser', 'jinraiSakura'];
 export const REPRISES = STAGES.slice(0, 4).flatMap(stage => stage.phases
   .filter(phase => PATTERNS.includes(phase.pattern)).map(phase => ({ boss: stage.boss, phase })));
-export interface Reprise { cycle: number; index: number; entry: [number, number]; }
-export const repriseLocal = (frame: number): number => (frame - 105) % (REPRISE_TIME + 360);
+export interface Reprise { cycle: number; index: number; entry: [number, number]; startFrame: number; startHp: number; prayer: boolean; }
+export const repriseLocal = (frame: number, reprise: Reprise): number => Math.max(0, frame - reprise.startFrame);
+export function repriseDifficulty(difficulty: Difficulty): Difficulty {
+  const levels = ['easy', 'normal', 'hard', 'lunatic'] as const;
+  return levels[Math.min(3, levels.indexOf(difficulty) + 1)];
+}
 
 export function reprisePosition(frame: number, reprise: Reprise, difficulty: Difficulty): [number, number] {
-  const local = repriseLocal(frame), { boss, phase } = REPRISES[reprise.index];
+  const local = repriseLocal(frame, reprise), { boss, phase } = REPRISES[reprise.index];
   const virtualFrame = 105 + Math.max(0, local - REPRISE_PREPARE);
-  const target = phase.pattern === 'sweep' ? sweepPosition(virtualFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty))
+  const target = phase.pattern === 'sweep' ? sweepPosition(virtualFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(repriseDifficulty(difficulty)))
     : boss === 'obsidia' ? obsidiaPosition(phase.pattern, virtualFrame, reprise.entry)
     : patternPosition(phase, virtualFrame, reprise.entry)!;
   const progress = Math.max(0, Math.min(1, local / REPRISE_PREPARE));
@@ -29,15 +31,16 @@ export function reprisePosition(frame: number, reprise: Reprise, difficulty: Dif
 }
 
 const views = new WeakMap<Game, Game>();
-// 攻撃の時計と識別子だけを投影する。HP・全体時計・本体のキャラは実Gameに残す。
+// 攻撃の時計・識別子・難易度を投影する。HP・全体時計・本体のキャラは実Gameに残す。
 export function repriseView(game: Game): Game {
-  if (game.phase?.pattern !== 'owlDawn' || !game.minervaReprise || repriseLocal(game.phaseFrame) >= REPRISE_TIME) return game;
+  if (game.phase?.pattern !== 'owlDawn' || !game.minervaReprise || game.minervaReprise.prayer) return game;
   let view = views.get(game);
   if (!view) {
     view = new Proxy(game, {
       get(target, property) {
         if (property === 'phase') return REPRISES[target.minervaReprise!.index].phase;
-        if (property === 'phaseFrame') return 105 + repriseLocal(target.phaseFrame) - REPRISE_PREPARE;
+        if (property === 'phaseFrame') return 105 + repriseLocal(target.phaseFrame, target.minervaReprise!) - REPRISE_PREPARE;
+        if (property === 'difficulty') return repriseDifficulty(target.difficulty);
         const value = Reflect.get(target, property, target);
         return typeof value === 'function' ? value.bind(target) : value;
       },

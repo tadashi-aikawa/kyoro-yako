@@ -13,7 +13,7 @@ import { KISS_CHARGE, KISS_FADE, KISS_ORIGIN, KISS_POSE_END, kissEdgeWarning, ki
 import { THUNDER_FADE, THUNDER_HOLD, thunderGround, thunderPath, thunderScene } from './patterns/jinrai-thunder';
 import { dawnPrayerStep, eyeX, PRAYER_CHARGE, PRAYER_FIRE } from './patterns/minerva';
 import { STAR_FLIGHT_TIME, STAR_TRAIL_WARNING } from './patterns/minerva-flight';
-import { gravityScene, SOCRATIC_SYMBOLS, socraticScene } from './patterns/minerva-inquiry';
+import { gravityScene } from './patterns/minerva-inquiry';
 import { REPRISE_PREPARE, REPRISES, repriseLocal } from './patterns/minerva-reprise';
 import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-ring';
 import { bogs, enterScene, KEY_ROWS, keyPosition, vimScene } from './patterns/neo';
@@ -285,13 +285,12 @@ export class Renderer {
     }
     this.claudineFinaleBackdrop(game);
     this.minervaEcho(game);
-    if (game.phase?.pattern === 'question') this.minervaTelegraphs(game);
     if (game.phase && game.boss) {
       const thunder = thunderScene(game);
       const [x, y] = game.bossXY;
       const burst = game.phase.pattern === 'jinraiDash' ? dashBurstStep(game.phaseFrame) : -1;
       const seal = burst >= BURST_MOVE && burst < BURST_RETURN;
-      const prayer = game.phase.pattern === 'owlDawn' ? dawnPrayerStep(game.phaseFrame) : -1;
+      const prayer = game.phase.pattern === 'owlDawn' ? dawnPrayerStep(game.phaseFrame, game.minervaReprise) : -1;
       const praying = prayer >= 0 && prayer < PRAYER_CHARGE;
       const channeling = prayer >= 0 && prayer < PRAYER_CHARGE + PRAYER_FIRE;
       const sweepLevel = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
@@ -366,7 +365,8 @@ export class Renderer {
         const kissing = kiss >= 0 && kiss < KISS_POSE_END;
         const tilt = channeling || seal || thunder?.charging || sweepCharging || kissing || rose >= 0 ? 0 : Math.cos(game.phaseFrame * 0.012) * 0.045;
         const pose = updateBossMotion(this.bossMotion, `${game.boss}:${game.phase.name}`, game.frame, x);
-        const casting = !!game.galaxyFlash || isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
+        const summoning = game.phase.pattern === 'owlDawn' && game.minervaReprise && !game.minervaReprise.prayer && repriseLocal(game.phaseFrame, game.minervaReprise) < REPRISE_PREPARE;
+        const casting = !!summoning || !!game.galaxyFlash || isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
         const spriteId = rose >= FINALE_CHARGE ? 'claudine-finale' : kissing ? 'jinrai-kiss' : bossSpriteId(game.boss, rose >= 0 || casting ? 'cast' : pose, game.frame);
         const bossSprite = this.readySprite(game, spriteId);
         c.save();
@@ -379,7 +379,7 @@ export class Renderer {
       c.fillStyle = '#e4aeea'; c.fillRect(17, 8, 346 * Math.max(0, game.phaseHp / game.phaseMaxHp), 9);
       this.text(NAMES[game.boss], 18, 29, 12, '#f9ebff');
       this.text('★'.repeat(game.remainingSpells), 330, 29, 12, '#ffe1a7', 'right');
-      if (game.phase.pattern === 'owlDawn' && game.minervaReprise && dawnPrayerStep(game.phaseFrame) < 0) {
+      if (game.phase.pattern === 'owlDawn' && game.minervaReprise && dawnPrayerStep(game.phaseFrame, game.minervaReprise) < 0) {
         this.text(`再演「${REPRISES[game.minervaReprise.index].phase.name}」`, 330, 29, 10, '#ffe5b7', 'right');
       }
       this.text(Number.isFinite(game.phase.duration) ? `${Math.ceil((game.phase.duration * 60 - game.phaseFrame) / 60)}` : '∞', 367, 29, 14, '#fff', 'right');
@@ -391,7 +391,8 @@ export class Renderer {
     this.jinraiSpellTelegraphs(attack);
     this.stageTelegraphs(attack);
     this.galaxyFlash(game);
-    if (game.phase?.pattern !== 'question') this.minervaTelegraphs(game);
+    this.minervaTelegraphs(game);
+    this.minervaSummon(game);
     this.obsidiaGraph(game);
     game.bullets.forEach((b) => { this.bullet(b); });
     for (const ring of game.interviewRings) this.interviewRing(ring);
@@ -1016,13 +1017,39 @@ export class Renderer {
 
   private minervaEcho(game: Game): void {
     if (game.phase?.pattern !== 'owlDawn' || !game.minervaReprise) return;
-    const local = repriseLocal(game.phaseFrame);
-    const opacity = local < 18 ? local / 18 * 0.28 : local < REPRISE_PREPARE
-      ? 0.28 - (local - 18) / (REPRISE_PREPARE - 18) * 0.16 : Math.max(0, (105 - local) / 45) * 0.12;
+    const local = repriseLocal(game.phaseFrame, game.minervaReprise);
+    if (dawnPrayerStep(game.phaseFrame, game.minervaReprise) >= 0) return;
+    const opacity = Math.max(0, Math.min(1, (local - 60) / 48)) * (0.58 + Math.sin(game.frame * 0.035) * 0.04);
     if (!opacity) return;
     const source = REPRISES[game.minervaReprise.index];
     const sprite = this.readySprite(game, bossSpriteId(source.boss, 'cast', game.frame));
-    this.fieldCharacter(game, sprite, 192, 205, 170, 0, opacity);
+    const [x, y] = game.bossXY;
+    const side = game.minervaReprise.index % 2 ? -1 : 1;
+    const ghostX = Math.max(60, Math.min(324, x + side * 34));
+    // 顔を技名の帯より下に置き、本体の肩へ重ねて背面に浮かべる。
+    this.fieldCharacter(game, sprite, ghostX, Math.max(154, y + 12) + Math.sin(game.frame * 0.04) * 4, 112, side * 0.045, opacity);
+  }
+
+  private minervaSummon(game: Game): void {
+    const reprise = game.minervaReprise;
+    if (game.phase?.pattern !== 'owlDawn' || !reprise || reprise.prayer) return;
+    const local = repriseLocal(game.phaseFrame, reprise);
+    if (local >= REPRISE_PREPARE) return;
+    const [x, y] = game.bossXY, c = this.ctx;
+    const progress = local / REPRISE_PREPARE;
+    c.save(); c.globalAlpha = Math.min(1, local / 18, (REPRISE_PREPARE - local) / 18);
+    this.magic(x, y + 18, local * 2, '#ffe4ad', 30 + Math.sin(progress * Math.PI) * 22, 0.7);
+    // 口を開いた小袋から光が立ち上がり、背後の霊へ集まる。
+    c.fillStyle = '#70505c'; c.strokeStyle = '#e6c58f'; c.lineWidth = 1.3;
+    c.beginPath(); c.moveTo(x + 12, y + 9); c.bezierCurveTo(x + 6, y + 29, x + 32, y + 29, x + 27, y + 9); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#fff4c6'; c.beginPath(); c.ellipse(x + 19.5, y + 9, 8, 3, 0, 0, Math.PI * 2); c.fill();
+    for (let i = 0; i < 18; i++) {
+      const rise = (progress * 1.7 + i / 18) % 1;
+      const angle = local * 0.055 + i * 2.4;
+      const width = 5 + rise * 30;
+      notebookStar(c, x + 19 + Math.cos(angle) * width, y + 8 - rise * 74, 1.5 + (1 - rise) * 2, '#fff0ce');
+    }
+    c.restore();
   }
 
   private minervaTelegraphs(game: Game): void {
@@ -1049,21 +1076,6 @@ export class Renderer {
         c.lineTo(b.x + b.vx * 24, b.y + b.vy * 24); c.stroke();
       });
     }
-    if (pattern === 'question' && t >= 0) {
-      const scene = socraticScene(game.phaseFrame, game.difficulty);
-      c.fillStyle = '#100b20e8'; c.fillRect(8, 90, 128, 54); c.fillRect(248, 90, 128, 54);
-      for (const [row, symbol] of scene.rows.entries()) this.text(`${SOCRATIC_SYMBOLS[symbol]} → ${SOCRATIC_SYMBOLS[scene.mapping[symbol]]}`,
-        row % 2 ? 312 : 72, 104 + Math.floor(row / 2) * 23, 18, '#ffe6a0', 'center');
-      this.text(`${SOCRATIC_SYMBOLS[scene.source]} を2回変換すると？`, 192, 175, 13, '#fff4d5', 'center');
-      const revealed = scene.local >= scene.reveal;
-      for (let lane = 0; lane < 3; lane++) {
-        const correct = revealed && lane === scene.lane;
-        c.strokeStyle = correct ? '#9de6d4aa' : revealed ? '#efa7bf66' : '#d9ccad44'; c.lineWidth = correct ? 2 : 1;
-        c.setLineDash(revealed ? [] : [5, 8]); c.strokeRect(lane * 128 + 1, 210, 126, 236); c.setLineDash([]);
-        if (correct) { c.fillStyle = '#71dbc611'; c.fillRect(lane * 128 + 2, 212, 124, 234); }
-        this.text(SOCRATIC_SYMBOLS[scene.gates[lane]], lane * 128 + 64, 200, 22, correct ? '#baffea' : '#ffedbf', 'center');
-      }
-    }
     if (pattern === 'gravityShift') {
       const gravity = gravityScene(game.phaseFrame, game.difficulty);
       if (gravity.visible) {
@@ -1088,7 +1100,10 @@ export class Renderer {
     }
     if (pattern === 'recall') {
       const source = game.bullets.objects.find(b => b.active && b.motion === 'recall');
-      if (source) this.magic(source.targetX, source.targetY, game.frame, '#ffe3b4', 16, 0.5);
+      if (source) {
+        const [x, y] = game.bossXY;
+        this.magic(x, y, game.frame, '#ffe3b4', 16, 0.5);
+      }
     }
     if (pattern === 'recall') game.bullets.forEach((b) => {
       if (b.motion !== 'recall') return;

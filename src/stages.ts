@@ -75,8 +75,6 @@ export const STAGES: Stage[] = [
     phases: [
       phase(5, '通常攻撃・仮説の星図', 'normal', 'minervaStarFan'),
       phase(5, 'セブンフォールド・サーベイ', 'spell', 'sevenRings'),
-      phase(5, '通常攻撃・観測の螺旋', 'normal', 'minervaStarRings'),
-      phase(5, 'ソクラティック・メソッド', 'spell', 'question'),
       phase(5, '通常攻撃・再検討', 'normal', 'minervaStarFan'),
       phase(5, 'グラビティ・シフト', 'spell', 'gravityShift'),
       phase(5, '通常攻撃・観測の焦点', 'normal', 'minervaStarRings'),

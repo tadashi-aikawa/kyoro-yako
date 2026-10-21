@@ -15,7 +15,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 function flight(difficulty: Game['difficulty'] = 'normal'): Game {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
-  game.difficulty = difficulty; game.startStage(5); game.startBoss(false, 10);
+  game.difficulty = difficulty; game.startStage(5); game.startBoss(false, 8);
   return game;
 }
 function of(game: Game, motion: Bullet['motion']): Bullet[] { return game.bullets.objects.filter((b) => b.active && b.motion === motion); }
@@ -154,6 +154,6 @@ it('ポーズで羽ばたきと予告が止まり、技切替・ステージ開�
   expect(game.scene).toBe('pause'); for (let i = 0; i < 60; i++) game.update();
   expect(game.bullets.objects.filter((b) => b.active).map((b) => [b.age, b.x, b.y, b.delay])).toEqual(before);
   game.scene = 'stage'; game.skipPhase(); expect(game.bullets.count).toBe(0);
-  game.startBoss(false, 10); game.phaseFrame = 104; game.update(); expect(game.bullets.count).toBeGreaterThan(0);
+  game.startBoss(false, 8); game.phaseFrame = 104; game.update(); expect(game.bullets.count).toBeGreaterThan(0);
   game.startStage(1); expect(game.bullets.count).toBe(0);
 });

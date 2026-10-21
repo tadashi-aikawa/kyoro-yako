@@ -35,7 +35,7 @@ it.each(difficulties)('サーベイの%sは七重の輪を保って解放し、�
 });
 
 it.each(difficulties)('サーベイの両端とパノプティコンの下半分は%sで1px刻みの固定点にも弾が届く', (difficulty) => {
-  for (const index of [1, 7]) {
+  for (const index of [1, 5]) {
     const game = fight(index, difficulty);
     const rows = [320, 398, 430];
     const touched = rows.map(() => new Set<number>());
@@ -59,8 +59,8 @@ it.each(difficulties)('サーベイの両端とパノプティコンの下半分
   }
 });
 
-it.each(difficulties)('リトラクションの%sは下半分まで進み、一拍止まって同じ原点へ連続的に戻る', (difficulty) => {
-  const game = fight(9, difficulty); game.phaseFrame = 104; game.update();
+it.each(difficulties)('リトラクションの%sは場外で止まり、移動中の本体へ一定速度で帰る', (difficulty) => {
+  const game = fight(7, difficulty); game.phaseFrame = 104; game.update();
   const bullet = game.bullets.objects.filter(b => b.active && b.motion === 'recall' && b.vy > 0)
     .sort((a, b) => b.vy * b.gridRow - a.vy * a.gridRow)[0];
   const origin = [bullet.targetX, bullet.targetY];
@@ -69,21 +69,26 @@ it.each(difficulties)('リトラクションの%sは下半分まで進み、一�
   const stop = [bullet.x, bullet.y];
   while (bullet.age < bullet.releaseAt - 1) {
     game.update(); expect([bullet.x, bullet.y]).toEqual(stop);
+    expect([bullet.targetX, bullet.targetY]).toEqual(game.bossPosition());
   }
-  let previousDistance = Math.hypot(bullet.x - origin[0], bullet.y - origin[1]);
+  expect(Math.hypot(bullet.targetX - origin[0], bullet.targetY - origin[1])).toBeGreaterThan(20);
+  const deadline = game.phaseFrame + 500;
   while (bullet.active) {
     const before = [bullet.x, bullet.y]; game.update();
+    expect(game.phaseFrame).toBeLessThan(deadline);
     expect(Math.hypot(bullet.x - before[0], bullet.y - before[1])).toBeLessThanOrEqual(bullet.sway + 0.001);
-    const distance = Math.hypot(bullet.x - origin[0], bullet.y - origin[1]);
-    expect(distance).toBeLessThanOrEqual(previousDistance + 0.001);
-    expect([bullet.targetX, bullet.targetY]).toEqual(origin);
-    previousDistance = distance;
+    expect([bullet.targetX, bullet.targetY]).toEqual(game.bossPosition());
+    if (bullet.active) {
+      const angle = Math.atan2(bullet.targetY - before[1], bullet.targetX - before[0]);
+      expect(bullet.vx).toBeCloseTo(Math.cos(angle) * bullet.sway);
+      expect(bullet.vy).toBeCloseTo(Math.sin(angle) * bullet.sway);
+    }
   }
-  expect(previousDistance).toBeLessThanOrEqual(bullet.sway);
+  expect(Math.hypot(bullet.x - bullet.targetX, bullet.y - bullet.targetY)).toBeLessThanOrEqual(bullet.sway);
 });
 
 it.each(difficulties)('フライトの%sはHPで早く増員し、段階を保持し、3羽への切替を最低2秒空ける', (difficulty) => {
-  const game = fight(10, difficulty); game.phaseFrame = 104; game.update();
+  const game = fight(8, difficulty); game.phaseFrame = 104; game.update();
   const first = game.bullets.objects.find(b => b.active && b.motion === 'starOwl')!;
   game.phaseHp = game.phaseMaxHp * 0.3; game.update();
   expect(game.minervaFlightPairStart).toBe(106);
@@ -101,12 +106,12 @@ it.each(difficulties)('フライトの%sはHPで早く増員し、段階を保�
   }
   game.phaseHp = game.phaseMaxHp; game.update();
   expect(game.minervaFlightPairStart).toBe(106); expect(game.minervaFlightThirdStart).toBe(226);
-  game.startBoss(false, 10);
+  game.startBoss(false, 8);
   expect(game.minervaFlightPairStart).toBe(-1); expect(game.minervaFlightThirdStart).toBe(-1);
 });
 
 it.each(difficulties)('インクワイアリーの%sはHPで早めても輪を連射せず、発射済みの輪と色・回転順を保つ', (difficulty) => {
-  const game = fight(11, difficulty); const level = difficulties.indexOf(difficulty);
+  const game = fight(9, difficulty); const level = difficulties.indexOf(difficulty);
   game.phaseFrame = 104; game.update();
   const first = game.interviewRings[0]; const opening = first.opening;
   game.phaseHp = game.phaseMaxHp * 0.4; game.update();
@@ -121,12 +126,12 @@ it.each(difficulties)('インクワイアリーの%sはHPで早めても輪を�
   const second = game.interviewRings[1];
   expect(second.color).toBe(1); expect(second.spin * first.spin).toBeLessThan(0);
   expect(second.delay).toBe(MINERVA_WARNING[level] - 1);
-  game.startBoss(false, 11);
+  game.startBoss(false, 9);
   expect(game.minervaInterviewLateStart).toBe(-1); expect(game.minervaInterviewWave).toBe(0);
 });
 
 it.each(difficulties)('フライトの%sはボムでHP条件を満たしても増員を捨てず、ボム明けに手元から飛び立つ', (difficulty) => {
-  const game = fight(10, difficulty); game.phaseFrame = 104;
+  const game = fight(8, difficulty); game.phaseFrame = 104;
   game.phaseHp = game.phaseMaxHp * 0.3; game.bombFrames = 30;
   while (game.bombFrames > 1) {
     game.update();
@@ -139,7 +144,7 @@ it.each(difficulties)('フライトの%sはボムでHP条件を満たしても�
 });
 
 it.each(difficulties)('フライトの%sは遅れて加わった3羽目と次の2羽も異なる道を飛ぶ', (difficulty) => {
-  const game = fight(10, difficulty); game.phaseFrame = 104;
+  const game = fight(8, difficulty); game.phaseFrame = 104;
   game.phaseHp = game.phaseMaxHp * 0.74; game.update();
   while (game.phaseFrame < 350) game.update();
   game.phaseHp = game.phaseMaxHp * 0.35; game.update();

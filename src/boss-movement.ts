@@ -80,10 +80,9 @@ const MOVEMENTS: Record<string, Movement> = {
   minervaStarFan: patrol([[124, 0], [260, 14]], 96, 136),
   minervaStarRings: curve(80, 16, 660, 'eight'),
   sevenRings: curve(70, 10, 840, 'ellipse'),
-  question: curve(18, 4, 720, 'ellipse'),
   gravityShift: patrol([[136, -16], [248, -16]], 84, 150),
   owlEye: curve(64, 12, 720, 'eight'),
-  recall: patrol([[140, -10], [244, -10]], 100, 200, true),
+  recall: curve(100, 12, 510, 'ellipse'),
   starFlight: patrol([[112, -12], [192, 12], [272, -12]], 108, 120),
 };
 

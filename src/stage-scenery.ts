@@ -1,5 +1,6 @@
 import type { Game } from './game';
 import { FIELD } from './rules';
+import { STAGES } from './stages';
 
 const TAU = Math.PI * 2;
 
@@ -118,7 +119,7 @@ export function drawScenery(c: CanvasRenderingContext2D, game: Game): void {
   } else {
     const dawn = c.createLinearGradient(0, 0, 0, FIELD.h);
     dawn.addColorStop(0, '#1a203c'); dawn.addColorStop(0.6, '#604359'); dawn.addColorStop(1, '#cc856c');
-    const finale = game.boss === 'minerva' ? Math.max(0, Math.min(1, (game.phaseIndex + game.phaseFrame / 3600) / 13)) : 0;
+    const finale = game.boss === 'minerva' ? Math.max(0, Math.min(1, (game.phaseIndex + game.phaseFrame / 3600) / STAGES[4].phases.length)) : 0;
     c.globalAlpha = Math.min(1, game.stageFrame / 6000) * 0.2 + finale * 0.22;
     c.fillStyle = dawn; c.fillRect(0, 0, FIELD.w, FIELD.h); c.globalAlpha = 1;
     tiles(distance, 0.25, 240, (y, index) => {

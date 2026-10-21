@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { dawnPrayerStep, emitMinerva, eyeX, INTERVIEW_PERIOD, INTERVIEW_SPEED, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE, PRAYER_PERIOD } from './patterns/minerva';
-import { REPRISE_TIME } from './patterns/minerva-reprise';
 import { interviewRingBlocksShot, interviewRingDistance, updateInterviewRings } from './patterns/minerva-ring';
 import { STAGES } from './stages';
 
@@ -18,10 +17,10 @@ function phase(index: number, difficulty: Game['difficulty'] = 'normal'): Game {
   return game;
 }
 
-it('5面は通常5回とスペル8枚を設計順に持ち、全番号に直行できる', () => {
+it('5面は通常4回とスペル7枚を設計順に持ち、全番号に直行できる', () => {
   const phases = STAGES[4].phases;
-  expect(phases).toHaveLength(13);
-  expect(phases.filter((p) => p.spell)).toHaveLength(8);
+  expect(phases).toHaveLength(11);
+  expect(phases.filter((p) => p.spell)).toHaveLength(7);
   for (let index = 0; index < phases.length; index++) {
     vi.stubGlobal('location', { search: `?boss=5&phase=${index}` });
     const game = new Game();
@@ -29,7 +28,7 @@ it('5面は通常5回とスペル8枚を設計順に持ち、全番号に直行�
     expect(game.phaseIndex).toBe(index);
   }
   expect(phases.map((p) => p.pattern)).toEqual([
-    'minervaStarFan', 'sevenRings', 'minervaStarRings', 'question', 'minervaStarFan', 'gravityShift',
+    'minervaStarFan', 'sevenRings', 'minervaStarFan', 'gravityShift',
     'minervaStarRings', 'owlEye', 'minervaStarFan', 'recall', 'starFlight', 'interview', 'owlDawn',
   ]);
 });
@@ -42,7 +41,7 @@ it('視線は左右へ等速で往復し、当たる弾だけ停止する', () =
   expect(eyeX(0)).toBe(32);
   expect(eyeX(60) - eyeX(0)).toBe(eyeX(120) - eyeX(60));
   expect(eyeX(180) - eyeX(120)).toBe(eyeX(240) - eyeX(180));
-  const game = phase(7);
+  const game = phase(5);
   const watched = game.spawnBullet(32, 200, 0, 1, 1)!;
   watched.motion = 'eyeFreeze';
   const free = game.spawnBullet(320, 200, 0, 1, 1)!;
@@ -57,7 +56,7 @@ it('視線は左右へ等速で往復し、当たる弾だけ停止する', () =
 });
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('エンドレス・インクワイアリーは%sで発射間に上下左右へ動き、自機には追従せず、出した輪は動かさない', (difficulty) => {
-  const game = phase(11, difficulty); const other = phase(11, difficulty);
+  const game = phase(9, difficulty); const other = phase(9, difficulty);
   other.px = 25; other.py = 35;
   const origins = new Map<object, [number, number]>();
   const xs: number[] = [], ys: number[] = [];
@@ -84,7 +83,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('エンドレス・イ�
 });
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('エンドレス・インクワイアリーの輪は%sで予告後に拡大しながら穴ごと回転する', (difficulty) => {
-  const game = phase(11, difficulty); game.phaseFrame = 105;
+  const game = phase(9, difficulty); game.phaseFrame = 105;
   emitMinerva(game, 'interview');
   const ring = game.interviewRings[0]; const angle = ring.gap;
   for (let i = 0; i < MINERVA_WARNING[['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty)]; i++) updateInterviewRings(game);
@@ -98,7 +97,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('エンドレス・イ�
 });
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('エンドレス・インクワイアリーは%sでも連続した輪に穴が1か所だけあり、序盤は次の穴へ移動する時間がある', (difficulty) => {
-  const game = phase(11, difficulty);
+  const game = phase(9, difficulty);
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
   const centers: number[] = [];
   for (let wave = 0; 105 + wave * INTERVIEW_PERIOD[level] <= 1800; wave++) {
@@ -126,7 +125,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('エンドレス・イ�
 });
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('エンドレス・インクワイアリーは%sで残り30秒未満から放出間隔を半分にし、回転方向の交互を保つ', (difficulty) => {
-  const game = phase(11, difficulty);
+  const game = phase(9, difficulty);
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
   const period = INTERVIEW_PERIOD[level];
   let wave = 0;
@@ -146,7 +145,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('エンドレス・イ�
 });
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('エンドレス・インクワイアリーは%sで下側の定位置を脅かし、60秒間少数の輪だけで動く', (difficulty) => {
-  const game = phase(11, difficulty);
+  const game = phase(9, difficulty);
   const probes = [24, 108, 192, 276, 360].map((x) => [x, 398]);
   const hits = probes.map(() => false);
   let maxRings = 0;
@@ -163,7 +162,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('エンドレス・イ�
 });
 
 it('連続した輪は予告中に当たらず、円弧の端まで判定し、穴と無敵中は当たらない', () => {
-  const game = phase(11); game.invincible = false; game.invulnFrames = 0;
+  const game = phase(9); game.invincible = false; game.invulnFrames = 0;
   game.px = 192; game.py = 398;
   // 発射フレームに合わせる。
   game.phaseFrame = 105; emitMinerva(game, 'interview');
@@ -181,14 +180,14 @@ it('連続した輪は予告中に当たらず、円弧の端まで判定し、�
 });
 
 it('輪のかすりは1本につき1回だけ加点し、技の切り替えとステージ開始で輪を消す', () => {
-  const game = phase(11); game.invincible = false; game.invulnFrames = 0;
+  const game = phase(9); game.invincible = false; game.invulnFrames = 0;
   game.px = 192; game.py = 398; game.phaseFrame = 105;
   emitMinerva(game, 'interview');
   Object.assign(game.interviewRings[0], { x: 192, y: 223, radius: 165, speed: 0, gap: 0, delay: 0 });
   updateInterviewRings(game); updateInterviewRings(game);
   expect(game.graze).toBe(1); expect(game.score).toBe(100); expect(game.pendingHit).toBe(-1);
   game.skipPhase(); expect(game.interviewRings).toHaveLength(0);
-  game.startBoss(false, 11); game.phaseFrame = 105; emitMinerva(game, 'interview');
+  game.startBoss(false, 9); game.phaseFrame = 105; emitMinerva(game, 'interview');
   expect(game.interviewRings).toHaveLength(1);
   game.startStage(1); expect(game.interviewRings).toHaveLength(0);
 });
@@ -198,7 +197,7 @@ it.each([
   { gap: Math.PI / 2, delay: 0, launched: true, blocked: false },
   { gap: 0, delay: 10, launched: false, blocked: false },
 ])('回廊のシールドは実体を遮り穴と予告を通す: %j', ({ gap, delay, launched, blocked }) => {
-  const game = phase(11); game.phaseFrame = 104;
+  const game = phase(9); game.phaseFrame = 104;
   game.interviewRings.push({ x: 192, y: 132, radius: 100, speed: 0, spin: 0, gap, opening: 0.54, color: 0, delay, launched, grazed: false });
   const shot = game.shots.acquire()!;
   // 1フレームで輪を跨いでボスへ届くショットでも、先に輪へ当たる。
@@ -210,7 +209,7 @@ it.each([
 });
 
 it('シールドの丸い端をかするショットも止まり、穴の内側のショットは止まらない', () => {
-  const game = phase(11); game.phaseFrame = 105; emitMinerva(game, 'interview');
+  const game = phase(9); game.phaseFrame = 105; emitMinerva(game, 'interview');
   const ring = { ...game.interviewRings[0], x: 0, y: 0, radius: 100, gap: Math.PI / 2, opening: Math.PI / 2, delay: 0, launched: true };
   expect(interviewRingBlocksShot(ring, 75, 85, 75, 55, 3)).toBe(true);
   expect(interviewRingBlocksShot(ring, 60, 85, 60, 75, 3)).toBe(false);
@@ -220,7 +219,7 @@ it('シールドの丸い端をかするショットも止まり、穴の内側�
 });
 
 it('終符は時間が経っても終わらず、HPを削るとクリアになる', () => {
-  const game = phase(12);
+  const game = phase(10);
   for (let i = 0; i < 7200; i++) game.update();
   expect(game.phase?.pattern).toBe('owlDawn');
   expect(game.phase?.duration).toBe(Infinity);
@@ -230,15 +229,16 @@ it('終符は時間が経っても終わらず、HPを削るとクリアにな�
   expect(game.collectionFrames).toBe(180);
 });
 
-it('終符の祈りは元の溜めと発散を保ち、再演と交互に繰り返す', () => {
-  const game = phase(12);
-  const start = 105 + REPRISE_TIME;
-  while (game.phaseFrame < start) game.update();
+it('終符の祈りは元の溜めと発散を保ち、再演3回の後に挟む', () => {
+  vi.spyOn(Math, 'random').mockReturnValue(0.99);
+  const game = phase(10);
+  game.phaseFrame = 104; game.update();
+  for (let i = 0; i < 3; i++) { game.phaseHp -= game.phaseMaxHp * 0.05 + 0.000001; game.update(); }
   const position: [number, number] = [192, 132];
   let bullets = 0;
   for (let i = 1; i < PRAYER_PERIOD; i++) {
     const before = game.bossXY; game.update();
-    const step = dawnPrayerStep(game.phaseFrame);
+    const step = dawnPrayerStep(game.phaseFrame, game.minervaReprise);
     if (step >= 60 && step < PRAYER_CHARGE + PRAYER_FIRE) expect(game.bossXY).toEqual(position);
     expect(Math.hypot(game.bossXY[0] - before[0], game.bossXY[1] - before[1])).toBeLessThan(4.5);
     const newOrbs = game.bullets.objects.filter(b => b.active && b.age === 1 && b.kind === 'orb');
@@ -250,12 +250,15 @@ it('終符の祈りは元の溜めと発散を保ち、再演と交互に繰り�
   expect(bullets).toBe(420);
   expect(game.bossXY).not.toEqual(position);
   game.update();
-  expect(dawnPrayerStep(game.phaseFrame)).toBe(-1);
-  expect(game.minervaReprise?.cycle).toBe(1);
+  expect(dawnPrayerStep(game.phaseFrame, game.minervaReprise)).toBe(0);
+  expect(game.minervaReprise?.cycle).toBe(3);
+  game.phaseHp -= game.phaseMaxHp * 0.05 + 0.000001; game.update();
+  expect(dawnPrayerStep(game.phaseFrame, game.minervaReprise)).toBe(-1);
+  expect(game.minervaReprise?.cycle).toBe(4);
 });
 
 it('Lunaticの各スペルを進めても弾プールを飽和させない', () => {
-  for (const index of [1, 3, 5, 7, 9, 10, 11, 12]) {
+  for (const index of [1, 3, 5, 7, 8, 9, 10]) {
     const game = phase(index, 'lunatic');
     let max = 0;
     for (let frame = 0; frame < 3599; frame++) {

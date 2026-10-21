@@ -2,7 +2,7 @@ import type { Game } from '../game';
 import { DIFFICULTY, density } from '../rules';
 import { emitDawn } from './minerva-dawn';
 import { emitStarFlight } from './minerva-flight';
-import { emitGravity, emitSocratic } from './minerva-inquiry';
+import { emitGravity } from './minerva-inquiry';
 
 export { dawnPosition, dawnPrayerStep, PRAYER_CHARGE, PRAYER_FIRE, PRAYER_PERIOD } from './minerva-dawn';
 export const MINERVA_WARNING = [90, 70, 55, 42] as const;
@@ -31,7 +31,6 @@ export function eyeX(t: number): number {
 }
 
 export function emitMinerva(game: Game, pattern: string): void {
-  if (pattern === 'question') { emitSocratic(game); return; }
   if (pattern === 'gravityShift') { emitGravity(game); return; }
   if (pattern === 'owlDawn') { emitDawn(game); return; }
   const t = game.phaseFrame - 105;
@@ -70,13 +69,13 @@ export function emitMinerva(game: Game, pattern: string): void {
     }
   }
   if (pattern === 'recall' && t % [480, 420, 390, 360][level] === 0) {
-    const n = count(40);
+    const n = Math.max(40, count(40));
     const wave = Math.floor(t / [480, 420, 390, 360][level]);
     const speed = [4.5, 5.1, 5.7, 6.3][level], warning = [60, 48, 42, 36][level];
     for (let i = 0; i < n; i++) {
-      const angle = i * Math.PI * 2 / n + wave * 0.13;
+      const angle = i * Math.PI * 2 / n + wave * 0.37;
       const dx = Math.cos(angle), dy = Math.sin(angle);
-      // 全方向とも画面外まで出す。外側で待ち、同じ射線を戻って端も横切る。
+      // 全方向とも画面外まで出す。外側で待ち、移動中の本体へ帰る。
       const edgeX = Math.abs(dx) < 0.001 ? Infinity : ((dx > 0 ? 432 : -48) - x) / dx;
       const edgeY = Math.abs(dy) < 0.001 ? Infinity : ((dy > 0 ? 496 : -48) - y) / dy;
       const outFrames = Math.max(1, Math.ceil(Math.min(edgeX, edgeY) / speed));
@@ -84,7 +83,8 @@ export function emitMinerva(game: Game, pattern: string): void {
       if (b) { b.motion = 'recall'; b.targetX = x; b.targetY = y;
         b.delay = warning; b.gridRow = warning + outFrames + 1;
         b.releaseAt = b.gridRow + [60, 54, 48, 42][level]; b.sway = [3.2, 3.6, 4, 4.4][level]; b.gridColumn = i;
-        b.fadeAt = b.releaseAt + Math.ceil(outFrames * speed / b.sway) + 60; }
+        // 場外からの距離上限と本体の最大速度を見込み、帰還途中で消さない。
+        b.fadeAt = b.releaseAt + Math.ceil(700 / (b.sway - 1.6)) + 60; }
     }
   }
   if (pattern === 'starFlight') emitStarFlight(game);

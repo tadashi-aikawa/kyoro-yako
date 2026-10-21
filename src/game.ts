@@ -18,7 +18,7 @@ import { type Thunderbolt, type Thunderstorm, thunderPosition } from './patterns
 import { dawnPosition, emitMinerva, eyeX, interviewPosition } from './patterns/minerva';
 import { updateStarFlightSource } from './patterns/minerva-flight';
 import { gravityScene } from './patterns/minerva-inquiry';
-import { REPRISES, type Reprise, repriseView } from './patterns/minerva-reprise';
+import { REPRISE_PREPARE, REPRISES, type Reprise, repriseLocal, repriseView } from './patterns/minerva-reprise';
 import { type InterviewRing, interviewRingBlocksShot, updateInterviewRings } from './patterns/minerva-ring';
 import { emitNeo, inBog, updateVimBullet, type VimAttack } from './patterns/neo';
 import { emitNeoEncore, encoreBogTime } from './patterns/neo-encore';
@@ -370,7 +370,7 @@ export class Game {
       else this.updateWaves();
     }
     updateInterviewRings(this);
-    updateObsidiaGraph(this);
+    updateObsidiaGraph(this.attackContext());
     this.updateShots();
     this.updateClones();
     this.updateBullets();
@@ -799,7 +799,8 @@ export class Game {
 
   private updateBullets(): void {
     const attack = this.attackContext(), attackFrame = attack.phaseFrame;
-    const sakuraLevel = attack.phase?.pattern === 'jinraiSakura' ? ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty) : -1;
+    const attackLevel = ['easy', 'normal', 'hard', 'lunatic'].indexOf(attack.difficulty);
+    const sakuraLevel = attack.phase?.pattern === 'jinraiSakura' ? attackLevel : -1;
     const sakuraTime = attackFrame - 105;
     const windFrame = sakuraTime >= SAKURA_PERIOD ? (sakuraTime - SAKURA_PERIOD) % SAKURA_PERIOD : -1;
     this.bullets.forEach((b) => {
@@ -834,7 +835,7 @@ export class Game {
       }
       if (b.motion === 'gridSnap') {
         if (b.age < b.releaseAt) { b.x += (b.targetX - b.x) * 0.2; b.y += (b.targetY - b.y) * 0.2; }
-        else { b.x = b.targetX; b.y = b.targetY; b.vy = [0.85, 1.05, 1.25, 1.45][['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty)]; b.motion = 'normal'; }
+        else { b.x = b.targetX; b.y = b.targetY; b.vy = [0.85, 1.05, 1.25, 1.45][attackLevel]; b.motion = 'normal'; }
       }
       if (b.motion === 'etoileOrbit') {
         const angle = b.swayPhase + b.age * b.swayRate;
@@ -868,22 +869,25 @@ export class Game {
       }
       if (b.motion === 'jinraiHold' && b.releaseAt > 0 && attackFrame >= b.releaseAt) {
         const angle = Math.atan2(b.targetY - b.y, b.targetX - b.x);
-        const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty);
-        const speed = 0.95 + level * 0.14;
+        const speed = 0.95 + attackLevel * 0.14;
         b.vx = Math.cos(angle) * speed; b.vy = Math.sin(angle) * speed;
         b.motion = 'normal';
       }
       if (b.motion === 'recall') {
         if (b.age === b.gridRow) { b.vx = 0; b.vy = 0; }
+        // 場外で待つ間から本体を追い、帰還先を発射地点に固定しない。
+        if (b.age >= b.gridRow) [b.targetX, b.targetY] = this.bossPosition();
         if (b.age === b.releaseAt) {
           if (b.gridColumn === 0) this.audio.play('turn');
-          const angle = Math.atan2(b.targetY - b.y, b.targetX - b.x);
-          b.vx = Math.cos(angle) * b.sway; b.vy = Math.sin(angle) * b.sway;
           // 戻りは星に変えるが、当たり判定は往路と同じままにする。
           b.kind = 'star';
         }
-        if (b.age >= b.releaseAt && Math.hypot(b.targetX - b.x, b.targetY - b.y) <= b.sway) {
-          b.active = false; return;
+        if (b.age >= b.releaseAt) {
+          if (Math.hypot(b.targetX - b.x, b.targetY - b.y) <= b.sway) {
+            b.active = false; return;
+          }
+          const angle = Math.atan2(b.targetY - b.y, b.targetX - b.x);
+          b.vx = Math.cos(angle) * b.sway; b.vy = Math.sin(angle) * b.sway;
         }
       } else if (b.motion === 'wing') b.vy += Math.sin(b.age * 0.13) * 0.003;
       if (b.motion === 'minervaRing') {
@@ -970,7 +974,8 @@ export class Game {
   }
 
   private damageBoss(damage: number): void {
-    this.phaseHp -= damage * (this.phase?.pattern === 'jinraiDash' ? 2 : 1);
+    if (this.phase?.pattern === 'owlDawn' && this.minervaReprise && !this.minervaReprise.prayer && repriseLocal(this.phaseFrame, this.minervaReprise) < REPRISE_PREPARE) return;
+    this.phaseHp -= damage * (this.phase?.pattern === 'owlDawn' ? 2 / 3 : this.phase?.pattern === 'jinraiDash' ? 2 : 1);
   }
 
   private updateShots(): void {
@@ -1101,7 +1106,7 @@ export class Game {
     }
   }
 
-  private spawnItem(x: number, y: number, kind: ItemKind, auto: boolean): Item | undefined {
+  spawnItem(x: number, y: number, kind: ItemKind, auto: boolean): Item | undefined {
     const item = this.items.acquire(); if (!item) return;
     Object.assign(item, { x, y, vx: (Math.random() - 0.5) * 1.2, vy: -1.2, kind, auto, manual: false });
     return item;

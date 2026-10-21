@@ -122,7 +122,7 @@ it.each([1, 2, 3, 4, 5])('%s面のスペルは開始後も発射の構えを繰�
 
 it('遅延した輪は予告中に構えを開始せず、発射で構え、ポーズとフェーズ切替も追従する', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
-  game.startStage(5); game.startBoss(false, 11);
+  game.startStage(5); game.startBoss(false, 9);
   for (let i = 0; i < 174; i++) game.update();
   expect(game.bossCastFrame).toBe(-Infinity);
   game.update();
