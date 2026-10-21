@@ -7,9 +7,10 @@ import { KISS_CHARGE, KISS_FADE, KISS_LIFE, KISS_PERIOD, kissEdgeWarning, update
 import { bulletSpeed } from './rules';
 import { MID_PHASE, STAGES } from './stages';
 
+const listeners: Record<string, (event: { code: string; repeat: boolean; preventDefault: () => void }) => void> = {};
 beforeEach(() => {
   vi.stubGlobal('location', { search: '' });
-  vi.stubGlobal('window', { addEventListener: () => {} });
+  vi.stubGlobal('window', { addEventListener: (kind: string, listener: typeof listeners[string]) => { listeners[kind] = listener; } });
   vi.stubGlobal('Image', class { src = ''; complete = true; naturalWidth = 0; });
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -307,8 +308,28 @@ it('忍術で消えている間はショットが本体のいた場所を通り�
   while (game.phaseFrame < 929) game.update();
   shot.x = 192; shot.y = 224;
   game.update();
-  expect(game.phaseHp).toBe(hp - 10);
+  expect(game.phaseHp).toBe(hp - 20);
   expect(shot.active).toBe(false);
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('迅雷一閃だけショットとボムの初撃・継続ダメージが2倍になる: %s', (difficulty) => {
+  for (let index = 0; index < STAGES[3].phases.length; index++) {
+    const game = phase(index); game.difficulty = difficulty;
+    const multiplier = index === 10 ? 2 : 1;
+    const hp = game.phaseHp;
+    const [x, y] = game.bossXY;
+    Object.assign(game.shots.acquire()!, { x, y, vx: 0, vy: 0, damage: 1.35, radius: 3, homing: false });
+    game.update();
+    expect(hp - game.phaseHp, `phase ${index} shot`).toBeCloseTo(1.35 * multiplier);
+    const afterShot = game.phaseHp;
+    game.frame = 108;
+    listeners.keydown({ code: 'KeyX', repeat: false, preventDefault: () => {} });
+    game.update(); game.keys.delete('KeyX');
+    expect(afterShot - game.phaseHp, `phase ${index} bomb`).toBe(36 * multiplier);
+    const afterBomb = game.phaseHp;
+    game.update();
+    expect(afterBomb - game.phaseHp, `phase ${index} bomb tick`).toBe(2.5 * multiplier);
+  }
 });
 
 it('一閃は16px間隔の列に切れ目を作り、停止後に光って時間差で飛ぶ', () => {

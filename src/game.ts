@@ -356,7 +356,7 @@ export class Game {
       this.clearBullets();
       if (this.frame % 10 === 0) {
         this.enemies.forEach((enemy) => { enemy.hp -= 2; enemy.hitFrames = 8; });
-        if (this.phase) this.phaseHp -= 2.5;
+        if (this.phase) this.damageBoss(2.5);
       }
     }
     if (!collecting) {
@@ -440,7 +440,7 @@ export class Game {
     this.audio.play('bomb');
     this.clearBullets();
     this.enemies.forEach((enemy) => { enemy.hp -= 24; enemy.hitFrames = 8; });
-    if (this.phase) this.phaseHp -= 36;
+    if (this.phase) this.damageBoss(36);
     this.message = '書いて残す七重の頁';
     this.messageFrames = 110;
   }
@@ -953,6 +953,10 @@ export class Game {
     });
   }
 
+  private damageBoss(damage: number): void {
+    this.phaseHp -= damage * (this.phase?.pattern === 'jinraiDash' ? 2 : 1);
+  }
+
   private updateShots(): void {
     const letters = this.phase?.pattern === 'enter' && this.bombFrames <= 0
       ? this.bullets.objects.filter((b) => b.active && b.motion === 'enterLine' && b.delay <= 0) : undefined;
@@ -973,7 +977,7 @@ export class Game {
       if (s.y < -10 || s.x < -15 || s.x > FIELD.w + 15) { s.active = false; return; }
       if (this.phase && !(this.phase.pattern === 'jinraiDash' && burstVisibility(dashBurstStep(this.phaseFrame)) < 1)) {
         if (this.bossTargets().some(([bx, by]) => circlesHit(s.x, s.y, s.radius, bx, by, 20))) {
-          if (this.phase.pattern !== 'final' && this.phase.pattern !== 'owlDawn') this.phaseHp -= s.damage;
+          if (this.phase.pattern !== 'final' && this.phase.pattern !== 'owlDawn') this.damageBoss(s.damage);
           s.active = false; this.spark(s.x, s.y, '#ffe2ac', 1); return;
         }
       }
