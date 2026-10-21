@@ -3,6 +3,9 @@ import { circlesHit, DIFFICULTY, density } from '../rules';
 import { emitStarFlight } from './minerva-flight';
 
 export const MINERVA_WARNING = [90, 70, 55, 42] as const;
+export const SEVEN_PERIOD = [540, 450, 390, 360] as const;
+export const SEVEN_OPENING = [72, 64, 56, 48] as const;
+export function sevenLane(wave: number): number { return 192 + Math.sin(wave * 0.85) * 90; }
 export const HYPOTHESIS_PERIOD = [210, 185, 165, 145] as const;
 export const EYE_PERIOD = 240;
 export const HYPOTHESIS_COLUMNS = [7, 10, 12, 14] as const;
@@ -105,20 +108,24 @@ export function emitMinerva(game: Game, pattern: string): void {
       game.spawnBullet(cx, cy, Math.cos(angle) * speed, Math.sin(angle) * speed, color, kind);
     }
   };
-  if (pattern === 'sevenRings' && t % interval(330) === 0) {
+  if (pattern === 'sevenRings' && t % SEVEN_PERIOD[level] === 0) {
+    const wave = Math.floor(t / SEVEN_PERIOD[level]);
     for (let layer = 0; layer < 7; layer++) {
       const radius = 76 + layer * 18;
       const n = count(20 + layer * 2);
       const direction = layer % 2 ? -1 : 1;
-      const gap = (Math.floor(t / interval(330)) * 3 + layer * 4) % n;
+      const gap = (wave * 3 + layer * 4) % n;
       for (let i = 0; i < n; i++) {
         if ((i - gap + n) % n < 2) continue;
-        const angle = i * Math.PI * 2 / n + layer * 0.14;
-        const b = game.spawnBullet(192 + Math.cos(angle) * radius, 220 + Math.sin(angle) * radius,
+        const angle = i * Math.PI * 2 / n + layer * 0.14 + wave * 0.37;
+        const bx = 192 + Math.cos(angle) * radius;
+        if (Math.abs(bx - sevenLane(wave)) < SEVEN_OPENING[level] / 2 + 6.5) continue;
+        const b = game.spawnBullet(bx, 220 + Math.sin(angle) * radius,
           -Math.cos(angle) * 0.45 * unit - Math.sin(angle) * direction * 0.17 * unit,
           -Math.sin(angle) * 0.45 * unit + Math.cos(angle) * direction * 0.17 * unit, layer % 4, 'orb');
         if (b) { b.motion = 'minervaRing'; b.delay = warning; b.spin = direction * 0.003;
-          b.releaseAt = warning + [120, 96, 80, 64][level]; b.swayPhase = angle; }
+          b.releaseAt = warning + [120, 96, 80, 64][level]; b.swayPhase = angle;
+          b.targetX = sevenLane(wave); b.sway = SEVEN_OPENING[level] / 2; }
       }
     }
   }
@@ -152,28 +159,44 @@ export function emitMinerva(game: Game, pattern: string): void {
     const row = Math.floor(t / [42, 32, 26, 22][level]);
     for (let i = 0; i < n; i++) {
       if (i === row % n) continue;
-      const stagger = i > 0 && i < n - 1 ? Math.sin(row * 1.1) * 368 / (n - 1) * 0.4 : 0;
-      const b = game.spawnBullet(8 + i * 368 / (n - 1) + stagger, 36, 0, [1.15, 1.5, 1.8, 2.1][level], i % 2 ? 1 : 2, 'orb');
+      const stagger = Math.sin(row * 1.1) * 366 / (n - 1) * 0.42;
+      const bx = Math.max(9, Math.min(375, 9 + i * 366 / (n - 1) + stagger));
+      const b = game.spawnBullet(bx, 36, 0, [1.15, 1.5, 1.8, 2.1][level], i % 2 ? 1 : 2, 'orb');
       if (b) { b.motion = 'eyeFreeze'; b.delay = warning; b.radius = 4; }
     }
   }
-  if (pattern === 'recall' && t % interval(150) === 0) {
-    const n = count(54);
+  if (pattern === 'recall' && t % [480, 420, 390, 360][level] === 0) {
+    const n = count(40);
+    const wave = Math.floor(t / [480, 420, 390, 360][level]);
+    const gap = Math.PI / 2 + Math.sin(wave * 0.9) * 0.65;
+    const speed = [2.1, 2.4, 2.7, 3.0][level];
     for (let i = 0; i < n; i++) {
-      const angle = i * Math.PI * 2 / n + t * 0.01;
-      const b = game.spawnBullet(x, y, Math.cos(angle) * 1.35 * unit, Math.sin(angle) * 1.35 * unit, i % 4, 'orb');
-      if (b) { b.motion = 'recall'; b.targetX = x; b.targetY = y; b.releaseAt = [126, 105, 95, 87][level]; b.gridRow = [84, 66, 56, 48][level]; }
+      const angle = i * Math.PI * 2 / n + wave * 0.13;
+      if (Math.abs(Math.atan2(Math.sin(angle - gap), Math.cos(angle - gap))) < [0.22, 0.18, 0.15, 0.13][level]) continue;
+      const dx = Math.cos(angle), dy = Math.sin(angle);
+      // 画面の縁で止め、上・横へ放った弾も画面外削除の前に引き戻す。
+      const edgeX = Math.abs(dx) < 0.001 ? Infinity : ((dx > 0 ? 372 : 12) - x) / dx;
+      const edgeY = Math.abs(dy) < 0.001 ? Infinity : ((dy > 0 ? 432 : 24) - y) / dy;
+      const outFrames = Math.max(1, Math.floor(Math.min(310, edgeX, edgeY) / speed));
+      const b = game.spawnBullet(x, y, dx * speed, dy * speed, i % 4, 'orb');
+      if (b) { b.motion = 'recall'; b.targetX = x; b.targetY = y;
+        b.gridRow = outFrames; b.releaseAt = outFrames + [60, 54, 48, 42][level]; b.sway = speed * 1.1; b.gridColumn = i; }
     }
   }
   if (pattern === 'starFlight') emitStarFlight(game);
-  const interviewThreshold = ((game.phase?.duration ?? 60) - 30) * 60;
-  const interviewLate = game.phaseFrame > interviewThreshold;
-  const interviewPeriod = INTERVIEW_PERIOD[level] / (interviewLate ? 2 : 1);
-  if (pattern === 'interview' && t % interviewPeriod === 0) {
-    // 切替前に飛ばした半周期を引き、回転方向・穴の向き・色の順番を引き継ぐ。
-    const skipped = interviewLate
-      ? Math.floor((interviewThreshold - 105) / interviewPeriod) - Math.floor((interviewThreshold - 105) / INTERVIEW_PERIOD[level]) : 0;
-    const wave = Math.floor(t / interviewPeriod) - skipped;
+  if (pattern === 'interview') {
+    const threshold = ((game.phase?.duration ?? 60) - 30) * 60;
+    if (game.minervaInterviewLateStart < 0 && (game.phaseFrame > threshold || game.phaseHp <= game.phaseMaxHp * 0.4)) {
+      game.minervaInterviewLateStart = game.phaseFrame;
+      const half = INTERVIEW_PERIOD[level] / 2;
+      // 元の発射グリッドを保つ。HPで早めても直前の輪から最低半周期は空く。
+      const next = 105 + Math.ceil(t / half) * half;
+      game.minervaInterviewNextShot = Math.min(game.minervaInterviewNextShot, next);
+    }
+    if (game.phaseFrame < game.minervaInterviewNextShot) return;
+    const interviewPeriod = INTERVIEW_PERIOD[level] / (game.minervaInterviewLateStart >= 0 ? 2 : 1);
+    const wave = game.minervaInterviewWave++;
+    game.minervaInterviewNextShot = game.phaseFrame + interviewPeriod;
     // 下側の画面内へ穴を向ける。輪ごとに左右を変え、下端での撃ち続けを通さない。
     const gap = Math.atan2(420 - y, 192 + Math.sin(wave * 1.05 + 0.6) * 135 - x);
     // 数百発を重ねず、描画・更新・当たり判定を輪1本で扱う。

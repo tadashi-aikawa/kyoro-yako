@@ -203,9 +203,10 @@ it('新しいスペルはキー弾・星輪・疑問符・巻き戻し・羽ば�
   game.startBoss(false, 9); game.phaseFrame = 104; game.update();
   const recalled = game.bullets.objects.find((bullet) => bullet.active && bullet.motion === 'recall');
   expect(recalled).toBeDefined();
-  for (let i = 0; i < 104; i++) game.update();
+  while (recalled!.age < recalled!.releaseAt) game.update();
   expect(recalled?.kind).toBe('star');
-  expect(recalled?.motion).toBe('normal');
+  expect(recalled?.motion).toBe('recall');
+  while (recalled!.active) game.update();
 
   game.startBoss(false, 12); game.phaseFrame = 104; game.update();
   expect(game.bullets.objects.filter((bullet) => bullet.active && bullet.motion === 'wing').length).toBeGreaterThan(20);

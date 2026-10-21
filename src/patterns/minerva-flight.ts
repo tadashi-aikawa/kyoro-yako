@@ -22,20 +22,34 @@ export function starFlightPoint(age: number, originX: number, originY: number, s
 export function emitStarFlight(game: Game): void {
   if (game.bombFrames > 0) return;
   const duration = game.phase?.duration ?? 60;
-  const pairStart = (duration - 45) * 60;
-  const thirdStart = (duration - 20) * 60;
+  if (game.minervaFlightPairStart < 0 && (game.phaseFrame >= (duration - 45) * 60 || game.phaseHp <= game.phaseMaxHp * 0.75)) {
+    game.minervaFlightPairStart = game.phaseFrame;
+  }
+  if (game.minervaFlightThirdStart < 0 && game.minervaFlightPairStart >= 0 && game.phaseFrame >= game.minervaFlightPairStart + 120 &&
+    (game.phaseFrame >= (duration - 20) * 60 || game.phaseHp <= game.phaseMaxHp * 0.35)) {
+    game.minervaFlightThirdStart = game.phaseFrame;
+  }
+  const pairStart = game.minervaFlightPairStart;
+  const thirdStart = game.minervaFlightThirdStart;
   // 2羽への切替では周期を揃え直す。3羽目は既存の飛行を続けたまま手元から加える。
-  const starts = [game.phaseFrame < pairStart ? 105 : pairStart, pairStart, thirdStart];
+  const starts = [pairStart < 0 ? 105 : pairStart, pairStart, thirdStart];
   const [x, y] = game.bossPosition();
   let launched = false;
   for (let slot = 0; slot < starts.length; slot++) {
+    if (starts[slot] < 0) continue;
     const t = game.phaseFrame - starts[slot];
     if (t < 0 || t % STAR_FLIGHT_PERIOD !== 0) continue;
     const wave = Math.floor(t / STAR_FLIGHT_PERIOD);
+    // HPで早く2羽へ切り替えても、飛行中の1羽を重複して出さない。
+    if (slot === 0 && game.bullets.objects.some(b => b.active && b.motion === 'starOwl' && b.gridColumn === 0)) continue;
+    const side = (wave + slot) % 2 ? -1 : 1;
+    const peer = game.bullets.objects.find(b => b.active && b.motion === 'starOwl' && b.gridColumn !== slot && b.sway === side);
+    // 同じ側を飛ぶ既存の鳥とは旋回数を変える。飛行の休止中なら次の2羽と異なる道にする。
+    const curve = peer ? peer.gridRow + 1 : slot === 2 ? Math.floor((game.phaseFrame - pairStart) / STAR_FLIGHT_PERIOD) : wave;
     const owl = game.spawnBullet(x + 16, y - 6, 0, 0, slot === 1 ? 0 : 2, 'star');
     if (!owl) continue;
     Object.assign(owl, { motion: 'starOwl', radius: 0, targetX: x + 16, targetY: y - 6,
-      gridColumn: slot, gridRow: wave, sway: (wave + slot) % 2 ? -1 : 1, launchSoundPending: false });
+      gridColumn: slot, gridRow: curve, sway: side, launchSoundPending: false });
     launched = true;
   }
   if (launched) { game.triggerBossCast(); game.audio.play('wind'); }

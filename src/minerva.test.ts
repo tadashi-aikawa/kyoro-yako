@@ -384,7 +384,7 @@ it('全スペルが自機のいる下半分へ届き、下端が常設の安全�
 it('七重の輪は収縮後に予告付きで落ち、自機の高さを横切る', () => {
   const game = phase(1);
   game.phaseFrame = 104; game.update();
-  const ring = game.bullets.objects.find((b) => b.active && b.motion === 'minervaRing')!;
+  const ring = game.bullets.objects.find((b) => b.active && b.motion === 'minervaRing' && b.x < 90)!;
   expect(ring.releaseAt).toBeGreaterThan(ring.delay);
   for (let i = 1; i < ring.releaseAt; i++) game.update();
   expect(ring.motion).toBe('normal');

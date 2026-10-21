@@ -11,7 +11,7 @@ import { BURST_MOVE, BURST_RETURN, BURST_SHOTS, burstVisibility, dashBurstStep }
 import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_CHARGE, KISS_FADE, KISS_ORIGIN, KISS_POSE_END, kissEdgeWarning, kissStep } from './patterns/jinrai-kiss';
 import { THUNDER_FADE, THUNDER_HOLD, thunderGround, thunderPath, thunderScene } from './patterns/jinrai-thunder';
-import { DAWN_PERIOD, dawnLane, dawnPrayerStep, eyeX, HYPOTHESIS_COLUMNS, HYPOTHESIS_PERIOD, hypothesisBrightness, hypothesisSide, hypothesisX, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE } from './patterns/minerva';
+import { DAWN_PERIOD, dawnLane, dawnPrayerStep, eyeX, HYPOTHESIS_COLUMNS, HYPOTHESIS_PERIOD, hypothesisBrightness, hypothesisSide, hypothesisX, MINERVA_WARNING, PRAYER_CHARGE, PRAYER_FIRE, SEVEN_OPENING, SEVEN_PERIOD, sevenLane } from './patterns/minerva';
 import { STAR_FLIGHT_TIME, STAR_TRAIL_WARNING } from './patterns/minerva-flight';
 import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-ring';
 import { bogs, enterScene, KEY_ROWS, keyPosition, vimScene } from './patterns/neo';
@@ -1022,6 +1022,15 @@ export class Renderer {
     const c = this.ctx;
     c.save();
     if (pattern === 'sevenRings') {
+      if (t >= 0) {
+        const lane = sevenLane(Math.floor(t / SEVEN_PERIOD[level]));
+        const half = SEVEN_OPENING[level] / 2;
+        c.strokeStyle = '#ffe2a488'; c.lineWidth = 1; c.setLineDash([5, 7]);
+        for (const edge of [lane - half, lane + half]) {
+          c.beginPath(); c.moveTo(edge, 270); c.lineTo(edge, FIELD.h); c.stroke();
+        }
+        c.setLineDash([]);
+      }
       game.bullets.forEach((b) => {
         if (b.motion !== 'minervaRing') return;
         if (b.delay <= 0 && b.releaseAt - b.age <= 30) {
@@ -1067,7 +1076,7 @@ export class Renderer {
       c.fillStyle = '#382039'; c.beginPath(); c.arc(x, 29, 8, 0, Math.PI * 2); c.fill();
     }
     if (pattern === 'recall') game.bullets.forEach((b) => {
-      if (b.motion !== 'recall' || b.age < b.gridRow - warning * 0.55 || b.age >= b.gridRow) return;
+      if (b.motion !== 'recall' || b.age < b.gridRow || b.age >= b.releaseAt) return;
       c.strokeStyle = '#fff0bf88'; c.lineWidth = 1.5;
       c.beginPath(); c.moveTo(b.x, b.y); c.lineTo(b.targetX, b.targetY); c.stroke();
     });

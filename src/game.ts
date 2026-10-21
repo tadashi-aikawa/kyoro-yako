@@ -89,6 +89,11 @@ export class Game {
   phaseIndex = -1;
   phase?: Phase;
   phaseFrame = 0;
+  minervaFlightPairStart = -1;
+  minervaFlightThirdStart = -1;
+  minervaInterviewLateStart = -1;
+  minervaInterviewNextShot = 105;
+  minervaInterviewWave = 0;
   bossCastFrame = -Infinity;
   private bossEntry: [number, number] = [192, 77];
   phaseHp = 0;
@@ -568,6 +573,11 @@ export class Game {
     this.phase = phase;
     this.keyboardWord = '';
     this.phaseFrame = 0;
+    this.minervaFlightPairStart = -1;
+    this.minervaFlightThirdStart = -1;
+    this.minervaInterviewLateStart = -1;
+    this.minervaInterviewNextShot = 105;
+    this.minervaInterviewWave = 0;
     this.lastBossShotFrame = -1;
     this.bossCastFrame = -Infinity;
     this.encoreCount = 0;
@@ -861,23 +871,29 @@ export class Game {
           b.motion = 'normal';
         }
       } else if (b.motion === 'recall') {
-        if (b.age === b.gridRow) { b.vx *= -1.7; b.vy *= -1.7; }
+        if (b.age === b.gridRow) { b.vx = 0; b.vy = 0; }
         if (b.age === b.releaseAt) {
-          this.audio.play('turn');
-          b.x = b.targetX; b.y = b.targetY;
-          const angle = Math.atan2(-b.vy, -b.vx) + Math.PI / 7;
-          const speed = [1.7, 2.2, 2.55, 2.9][['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty)];
-          b.vx = Math.cos(angle) * speed; b.vy = Math.sin(angle) * speed;
-          b.motion = 'normal'; b.kind = 'star';
+          if (b.gridColumn === 0) this.audio.play('turn');
+          const angle = Math.atan2(b.targetY - b.y, b.targetX - b.x);
+          b.vx = Math.cos(angle) * b.sway; b.vy = Math.sin(angle) * b.sway;
+          // 戻りは星に変えるが、当たり判定は往路と同じままにする。
+          b.kind = 'star';
+        }
+        if (b.age >= b.releaseAt && Math.hypot(b.targetX - b.x, b.targetY - b.y) <= b.sway) {
+          b.active = false; return;
         }
       } else if (b.motion === 'wing') b.vy += Math.sin(b.age * 0.13) * 0.003;
       if (b.motion === 'minervaRing') {
         const nextX = b.vx * Math.cos(b.spin) - b.vy * Math.sin(b.spin);
         b.vy = b.vx * Math.sin(b.spin) + b.vy * Math.cos(b.spin);
         b.vx = nextX;
+        // 収縮中から全層で同じ通路を開け、落下するまで幅を保つ。
+        if (Math.abs(b.x - b.targetX) < b.sway + b.radius + 2.5) {
+          b.active = false; return;
+        }
         if (b.age === b.releaseAt) {
           this.audio.play('turn');
-          b.motion = 'normal'; b.vx = Math.sin(b.swayPhase) * 0.35;
+          b.motion = 'normal'; b.vx = Math.sign(b.x - b.targetX) * 0.55;
           b.vy = [1.25, 1.65, 1.95, 2.25][['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty)];
         }
       }
