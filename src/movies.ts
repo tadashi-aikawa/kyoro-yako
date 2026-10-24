@@ -1,8 +1,9 @@
-export const MOVIES = ['opening', 'lastboss', 'ending-1', 'ending-2', 'ending-3'] as const;
+export const MOVIES = ['opening', 'lastboss', 'jinrai-gift', 'ending-1', 'ending-2', 'ending-3'] as const;
 export type MovieName = typeof MOVIES[number];
 export const MOVIE_SETTINGS: Record<MovieName, { audio: boolean }> = {
   opening: { audio: true },
   lastboss: { audio: false },
+  'jinrai-gift': { audio: false },
   'ending-1': { audio: false },
   'ending-2': { audio: false },
   'ending-3': { audio: false },

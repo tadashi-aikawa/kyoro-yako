@@ -168,7 +168,9 @@ it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ�
   game.startBoss(false, 10);
   game.skipPhase();
   while (game.collectionFrames > 0) game.update();
+  for (let i = 0; i < 40; i++) game.update(); // 未配置動画と黒フェードを終える。
   for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
+  while (game.scene === 'gift') game.update();
   expect(game.scene).toBe('clear');
   expect(game.unlockedStages).toBe(5);
   press(game, 'KeyZ');

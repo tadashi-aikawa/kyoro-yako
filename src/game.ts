@@ -30,13 +30,13 @@ import { autoCollect, bulletContact, bulletSpeed, circlesHit, type Difficulty, d
 import { type BossId, midPhases, NAMES, type Phase, STAGES } from './stages';
 import { readRecords } from './story';
 
-export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'stage' | 'arrival' | 'transition' | 'dialogue' | 'clear' | 'pause' | 'gameover' | 'movie' | 'ending' | 'credits';
+export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'stage' | 'arrival' | 'transition' | 'dialogue' | 'gift' | 'clear' | 'pause' | 'gameover' | 'movie' | 'ending' | 'credits';
 export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'starOwl' | 'starTrail' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'chappyBloom' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
 export interface JinraiLaser { x: number; y: number; angle: number; age: number; warning: number; life: number; speed: number; }
 export interface Shot { active: boolean; x: number; y: number; vx: number; vy: number; damage: number; radius: number; homing: boolean; }
 export type WaveKind = 'arc' | 'ring' | 'cross' | 'threeWay' | 'return' | 'sweep' | 'pincer' | 'serpent' | 'orbit' | 'chevron';
 export interface Enemy { active: boolean; x: number; y: number; vx: number; vy: number; hp: number; age: number; hitFrames: number; color: number; kind: WaveKind; originX: number; originY: number; side: number; slot: number; }
-export interface Item { active: boolean; x: number; y: number; vx: number; vy: number; kind: ItemKind; auto: boolean; manual: boolean; }
+export interface Item { active: boolean; x: number; y: number; vx: number; vy: number; kind: ItemKind; auto: boolean; manual: boolean; gift: boolean; launchFrames: number; }
 export interface Particle { active: boolean; x: number; y: number; vx: number; vy: number; age: number; life: number; color: string; size: number; }
 export interface Clone { active: boolean; x: number; y: number; vx: number; vy: number; age: number; }
 
@@ -47,7 +47,7 @@ export const SAKURA_GUST = 90;
 export const SAKURA_SWIRL = 24;
 const makeShot = (): Shot => ({ active: false, x: 0, y: 0, vx: 0, vy: -9, damage: 1, radius: 2, homing: false });
 const makeEnemy = (): Enemy => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, hp: 5, age: 0, hitFrames: 0, color: 0, kind: 'return', originX: 0, originY: 0, side: 1, slot: 0 });
-const makeItem = (): Item => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, kind: 'point', auto: false, manual: false });
+const makeItem = (): Item => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, kind: 'point', auto: false, manual: false, gift: false, launchFrames: 0 });
 const makeParticle = (): Particle => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, age: 0, life: 30, color: '#fff', size: 2 });
 const makeClone = (): Clone => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, age: 0 });
 export const PLAYERS: PlayerId[] = ['mimiko'];
@@ -64,9 +64,11 @@ export class Game {
   stageIntroFrame = 180;
   arrivalFrame = 0;
   private arrivalFromWhite = false;
-  transition?: 'lastboss-in' | 'lastboss-out';
+  transition?: 'lastboss-in' | 'lastboss-out' | 'jinrai-gift-in' | 'jinrai-gift-out';
   transitionFrame = 0;
-  private transitionWhiteStart = 0;
+  private transitionFadeStart = 0;
+  private dialogueBlackFrames = 0;
+  giftFrame = 0;
   endingFrame = 0;
   private endingRevealed = false;
   creditsFrame = 0;
@@ -120,7 +122,7 @@ export class Game {
   messageFrames = 0;
   lines: Line[] = [];
   lineIndex = 0;
-  afterDialogue: 'boss' | 'mid' | 'stage' | 'clear' = 'stage';
+  afterDialogue: 'boss' | 'mid' | 'stage' | 'clear' | 'gift' = 'stage';
   clearBonus = 0;
   fps = 60;
   practice = false;
@@ -226,9 +228,11 @@ export class Game {
     const movie = this.params.get('movie') as MovieName;
     if (MOVIES.includes(movie)) {
       if (movie === 'lastboss') this.stage = 5;
+      if (movie === 'jinrai-gift') this.stage = 4;
       this.startMovies([movie], () => {
         if (movie === 'opening') this.startStage(1);
         else if (movie === 'lastboss') this.startConversation('minerva', 'before', 'boss', true);
+        else if (movie === 'jinrai-gift') this.startGiftConversation();
         else this.startEnding();
       });
       return;
@@ -281,12 +285,13 @@ export class Game {
     else if (this.scene === 'arrival') this.updateArrival();
     else if (this.scene === 'transition') this.updateTransition();
     else if (this.scene === 'dialogue') this.updateDialogue();
+    else if (this.scene === 'gift') this.updateGift();
     else if (this.scene === 'movie') {
       if (this.just('KeyZ') || this.just('KeyX')) {
-        if (this.movieName === 'lastboss') {
-          this.transitionWhiteStart = this.movieWhiteAlpha;
+        if (this.movieName === 'lastboss' || this.movieName === 'jinrai-gift') {
+          this.transitionFadeStart = this.movieName === 'lastboss' ? this.movieWhiteAlpha : this.blackAlpha;
           this.movies.freeze();
-          this.transition = 'lastboss-out'; this.transitionFrame = 0; this.scene = 'transition';
+          this.transition = this.movieName === 'lastboss' ? 'lastboss-out' : 'jinrai-gift-out'; this.transitionFrame = 0; this.scene = 'transition';
         } else this.finishMovies();
       }
     }
@@ -303,13 +308,14 @@ export class Game {
       return;
     }
     let cue: BgmCue | null;
-    if (this.scene === 'movie') cue = this.movieName && this.movies.usesAudio(this.movieName) ? null : this.movieName === 'opening' ? 'stage-gate' : this.movieName === 'lastboss' ? 'boss-minerva' : 'ending';
-    else if (this.scene === 'transition') cue = 'boss-minerva';
+    if (this.scene === 'movie') cue = this.movieName && this.movies.usesAudio(this.movieName) ? null : this.movieName === 'opening' ? 'stage-gate' : this.movieName === 'lastboss' ? 'boss-minerva' : this.movieName === 'jinrai-gift' ? 'boss-jinrai' : 'ending';
+    else if (this.scene === 'transition') cue = this.transition?.startsWith('jinrai-gift') ? 'boss-jinrai' : 'boss-minerva';
+    else if (this.scene === 'gift') cue = 'boss-jinrai';
     else if (this.scene === 'arrival') cue = this.midboss ? STAGES[this.stage - 1].bgm : `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else if (this.scene === 'clear') cue = null;
     else if (this.scene === 'ending' || this.scene === 'credits') cue = 'ending';
     else if (['title', 'difficulty', 'player', 'practice', 'option', 'help', 'notebook'].includes(this.scene)) cue = 'title';
-    else if (this.scene === 'dialogue' && (this.afterDialogue === 'boss' || this.afterDialogue === 'clear')) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
+    else if (this.scene === 'dialogue' && (this.afterDialogue === 'boss' || this.afterDialogue === 'clear' || this.afterDialogue === 'gift')) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else if ((this.phase || this.collectionFrames > 0) && !this.midboss) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else cue = STAGES[this.stage - 1].bgm;
     this.bgm.sync(cue, false);
@@ -429,7 +435,13 @@ export class Game {
         this.transition = undefined;
         this.startMovies(['lastboss'], () => this.startConversation('minerva', 'before', 'boss', true));
       }
-    } else if (this.transitionFrame >= 30) {
+    } else if (this.transition === 'jinrai-gift-in') {
+      this.updatePlayer(false);
+      if (this.transitionFrame >= 20) {
+        this.transition = undefined;
+        this.startMovies(['jinrai-gift'], () => this.startGiftConversation());
+      }
+    } else if (this.transitionFrame >= (this.transition === 'jinrai-gift-out' ? 20 : 30)) {
       this.transition = undefined;
       this.finishMovies();
     }
@@ -437,17 +449,33 @@ export class Game {
 
   get movieWhiteAlpha(): number {
     if (this.movieName !== 'lastboss') return 0;
+    return this.movieFadeAlpha(0.5);
+  }
+
+  private movieFadeAlpha(seconds: number): number {
     const video = this.movies.current;
     const time = video?.currentTime ?? 0;
     const remaining = video && Number.isFinite(video.duration) ? video.duration - time : Infinity;
-    return Math.max(0, Math.min(1, 1 - time / 0.5), Math.min(1, 1 - remaining / 0.5));
+    return Math.max(0, Math.min(1, 1 - time / seconds), Math.min(1, 1 - remaining / seconds));
   }
 
   get whiteAlpha(): number {
     if (this.scene === 'movie') return this.movieWhiteAlpha;
-    if (this.scene === 'transition') return this.transition === 'lastboss-in' ? Math.min(1, this.transitionFrame / 45) : this.transitionWhiteStart + (1 - this.transitionWhiteStart) * Math.min(1, this.transitionFrame / 30);
+    if (this.scene === 'transition' && this.transition?.startsWith('lastboss')) return this.transition === 'lastboss-in' ? Math.min(1, this.transitionFrame / 45) : this.transitionFadeStart + (1 - this.transitionFadeStart) * Math.min(1, this.transitionFrame / 30);
     if ((this.scene === 'arrival' || (this.scene === 'pause' && this.resumeScene === 'arrival')) && this.arrivalFromWhite) return Math.max(0, 1 - this.arrivalFrame / 30);
     return 0;
+  }
+
+  get blackAlpha(): number {
+    if (this.scene === 'movie' && this.movieName === 'jinrai-gift') return this.movieFadeAlpha(20 / 60);
+    if (this.scene === 'transition' && this.transition?.startsWith('jinrai-gift')) return this.transition === 'jinrai-gift-in' ? Math.min(1, this.transitionFrame / 20) : this.transitionFadeStart + (1 - this.transitionFadeStart) * Math.min(1, this.transitionFrame / 20);
+    if (this.scene === 'dialogue' || (this.scene === 'pause' && this.resumeScene === 'dialogue')) return this.dialogueBlackFrames / 20;
+    return 0;
+  }
+
+  private startGiftConversation(): void {
+    this.startConversation('jinrai', 'after', 'gift');
+    this.dialogueBlackFrames = 20;
   }
 
   private startArrival(boss: BossId, mid: boolean, fromWhite = false): void {
@@ -474,11 +502,13 @@ export class Game {
     this.movieName = undefined;
     this.movieDone = undefined;
     this.transition = undefined;
+    this.dialogueBlackFrames = 0; this.giftFrame = 0;
     this.arrivalFrame = 0; this.arrivalFromWhite = false;
     this.stage = stage;
     this.stageFrame = 0;
     this.stageIntroFrame = this.presentation ? 0 : 180;
     if (stage === 5) this.movies.preload(['lastboss', ...ENDING_MOVIES]);
+    if (stage === 4) this.movies.preload(['jinrai-gift']);
     this.sceneryDistance = 0;
     this.midbossElapsedFrames = 0;
     this.collectionFrames = 0;
@@ -530,7 +560,7 @@ export class Game {
     this.updateBullets();
     this.updateEnemies();
     this.updateItems();
-    this.particles.forEach((particle) => { particle.x += particle.vx; particle.y += particle.vy; particle.age++; if (particle.age >= particle.life) particle.active = false; });
+    this.updateParticles();
     if (this.pendingHit >= 0) {
       this.pendingHit++;
       if (this.pendingHit >= 8) this.commitHit();
@@ -684,7 +714,7 @@ export class Game {
     }
   }
 
-  private startConversation(boss: BossId, moment: 'before' | 'after', next: 'boss' | 'mid' | 'stage' | 'clear', fromWhite = false): void {
+  private startConversation(boss: BossId, moment: 'before' | 'after', next: 'boss' | 'mid' | 'stage' | 'clear' | 'gift', fromWhite = false): void {
     this.clearBullets(); this.enemies.clear(); this.shots.clear(); this.clones.clear();
     this.boss = boss;
     if (next === 'boss') this.midboss = false;
@@ -696,6 +726,7 @@ export class Game {
   }
 
   private updateDialogue(): void {
+    if (this.dialogueBlackFrames > 0) { this.dialogueBlackFrames--; return; }
     if (this.held('ControlLeft') || this.held('ControlRight')) {
       if (this.frame % 5 === 0) this.nextLine();
     } else if (this.accept()) this.nextLine();
@@ -709,6 +740,30 @@ export class Game {
     if (this.afterDialogue === 'mid') this.startBoss(true, 0);
     if (this.afterDialogue === 'stage') { this.scene = 'stage'; this.boss = undefined; }
     if (this.afterDialogue === 'clear') this.finishStage();
+    if (this.afterDialogue === 'gift') this.startGift();
+  }
+
+  private startGift(): void {
+    this.clearEncounter();
+    this.clearBonus = this.calculateClearBonus();
+    this.giftFrame = 0;
+    this.scene = 'gift';
+    const kinds: ItemKind[] = ['life', 'bomb', 'life', 'radiant', 'bomb', 'life', 'bomb'];
+    const [x, y] = this.bossPosition();
+    kinds.forEach((kind, index) => {
+      const item = this.spawnItem(x, y, kind, true);
+      if (item) Object.assign(item, { gift: true, launchFrames: 50, vx: (index - 3) * 0.8, vy: -1.8 - (3 - Math.abs(index - 3)) * 0.2 });
+    });
+  }
+
+  private updateGift(): void {
+    if (this.just('Escape')) { this.resumeScene = 'gift'; this.scene = 'pause'; this.menu = 0; return; }
+    this.sceneryDistance += 1.8;
+    this.updatePlayer(false);
+    this.updateItems();
+    this.updateParticles();
+    this.giftFrame++;
+    if (!this.items.objects.some((item) => item.active && item.gift)) this.finishStage(this.clearBonus);
   }
 
   private startMidboss(): void {
@@ -824,7 +879,10 @@ export class Game {
       } else { this.boss = undefined; this.scene = 'stage'; }
       return;
     }
-    this.startConversation(STAGES[this.stage - 1].boss, 'after', 'clear');
+    if (this.stage === 4) {
+      this.clearEncounter();
+      this.transition = 'jinrai-gift-in'; this.transitionFrame = 0; this.scene = 'transition';
+    } else this.startConversation(STAGES[this.stage - 1].boss, 'after', 'clear');
   }
 
   private supplyPhaseItems(): void {
@@ -876,6 +934,7 @@ export class Game {
   }
 
   bossPosition(): [number, number] {
+    if (this.scene === 'gift' || (this.scene === 'pause' && this.resumeScene === 'gift')) return [192, 77];
     if (this.scene === 'arrival' || (this.scene === 'pause' && this.resumeScene === 'arrival')) {
       const progress = Math.min(1, this.arrivalFrame / 60);
       const target = this.midboss ? 132 : 77;
@@ -1275,7 +1334,7 @@ export class Game {
 
   spawnItem(x: number, y: number, kind: ItemKind, auto: boolean): Item | undefined {
     const item = this.items.acquire(); if (!item) return;
-    Object.assign(item, { x, y, vx: (Math.random() - 0.5) * 1.2, vy: -1.2, kind, auto, manual: false });
+    Object.assign(item, { x, y, vx: (Math.random() - 0.5) * 1.2, vy: -1.2, kind, auto, manual: false, gift: false, launchFrames: 0 });
     return item;
   }
 
@@ -1283,24 +1342,31 @@ export class Game {
     const focused = this.held('ShiftLeft') || this.held('ShiftRight');
     this.items.forEach((item) => {
       const dist = Math.hypot(item.x - this.px, item.y - this.py);
+      const launching = item.launchFrames > 0;
       const seeking = item.auto || (!item.manual && autoCollect(this.py)) || dist < (focused ? 84 : 37);
-      if (seeking) {
+      if (launching) { item.launchFrames--; item.vy += 0.09; }
+      else if (seeking) {
         const rate = item.auto ? 0.22 : 0.16;
         item.vx += (this.px - item.x) * rate / 10;
         item.vy += (this.py - item.y) * rate / 10;
         item.vx *= 0.92; item.vy *= 0.92;
+        // 餞別は遠距離でも加速しすぎず、通常の回収に近い速さでゆっくり寄せる。
+        if (item.gift) {
+          const speed = Math.hypot(item.vx, item.vy);
+          if (speed > 4) { item.vx *= 4 / speed; item.vy *= 4 / speed; }
+        }
       } else item.vy = Math.min(2.2, item.vy + 0.035);
       item.x += item.vx; item.y += item.vy;
       if (item.manual && (item.x < 12 || item.x > FIELD.w - 12)) {
         item.x = Math.max(12, Math.min(FIELD.w - 12, item.x));
         item.vx *= -1;
       }
-      if (dist < 11) { this.collectItem(item); item.active = false; }
-      if (item.y > FIELD.h + 20) item.active = false;
+      if (item.y > FIELD.h + 20 || (item.gift && (item.x < -20 || item.x > FIELD.w + 20 || item.y < -20))) { item.active = false; return; }
+      if (!launching && dist < 11) { this.collectItem(item); item.active = false; }
     });
   }
 
-  private collectItem(item: Pick<Item, 'kind' | 'y'>): void {
+  private collectItem(item: Pick<Item, 'kind' | 'y' | 'gift'>): void {
     this.audio.play('item');
     switch (item.kind) {
       case 'small': this.power = Math.min(MAX_POWER, Math.round((this.power + 0.05) * 100) / 100); this.addScore(100); break;
@@ -1309,6 +1375,7 @@ export class Game {
       case 'bomb': this.bombs = Math.min(MAX_BOMBS, this.bombs + 1); break;
       case 'life': this.lives++; this.audio.play('extend'); break;
       case 'radiant':
+        if (item.gift) this.power = MAX_POWER;
         // 被弾前に落ちた羽根でも、Powerを戻すだけで最高形態が復活しないようにする。
         if (this.power < MAX_POWER) this.power = Math.min(MAX_POWER, this.power + 1);
         else if (this.awakened) this.addScore(this.point);
@@ -1339,8 +1406,16 @@ export class Game {
     }
   }
 
-  private finishStage(): void {
-    this.clearBonus = this.stage * 1_000_000 + this.lives * 200_000 + this.bombs * 60_000 + Math.floor(this.power * 100_000) + this.point * 10 + this.graze * 100;
+  private updateParticles(): void {
+    this.particles.forEach((particle) => { particle.x += particle.vx; particle.y += particle.vy; particle.age++; if (particle.age >= particle.life) particle.active = false; });
+  }
+
+  private calculateClearBonus(): number {
+    return this.stage * 1_000_000 + this.lives * 200_000 + this.bombs * 60_000 + Math.floor(this.power * 100_000) + this.point * 10 + this.graze * 100;
+  }
+
+  private finishStage(bonus = this.calculateClearBonus()): void {
+    this.clearBonus = bonus;
     this.addScore(this.clearBonus);
     this.unlocked = Math.max(this.unlocked, Math.min(STAGES.length, this.stage + 1));
     safeSave('owlery-unlocked', String(this.unlocked));
@@ -1353,7 +1428,7 @@ export class Game {
   }
 
   get debugState(): Record<string, string | number | null> {
-    const effects = { movie: this.movieName ?? null, stageFrame: this.stageFrame, stageIntroFrame: this.stageIntroFrame, arrivalFrame: this.arrivalFrame, transition: this.transition ?? null, transitionFrame: this.transitionFrame, whiteAlpha: this.whiteAlpha, phaseFrame: this.phaseFrame, endingFrame: this.endingFrame, creditsFrame: this.creditsFrame };
+    const effects = { movie: this.movieName ?? null, stageFrame: this.stageFrame, stageIntroFrame: this.stageIntroFrame, arrivalFrame: this.arrivalFrame, transition: this.transition ?? null, transitionFrame: this.transitionFrame, whiteAlpha: this.whiteAlpha, blackAlpha: this.blackAlpha, giftFrame: this.giftFrame, giftItems: this.items.objects.filter((item) => item.active && item.gift).length, phaseFrame: this.phaseFrame, endingFrame: this.endingFrame, creditsFrame: this.creditsFrame };
     return { ...effects, scene: this.scene, stage: this.stage, boss: this.boss ? NAMES[this.boss] : null, bossRole: this.boss ? this.midboss ? 'midboss' : 'boss' : null, phase: this.phase ? this.phaseIndex : -1, spell: this.phase?.spell ? this.phase.name : null, phaseRemainingSeconds: this.phase ? Number.isFinite(this.phase.duration) ? Math.max(0, (this.phase.duration * 60 - this.phaseFrame) / 60) : '∞' : null, phaseHpRatio: this.phase ? Math.max(0, this.phaseHp / this.phaseMaxHp) : null, bullets: this.bullets.count, graphNodes: this.graphNodes.length, graphEdges: this.graphEdges.length, reprise: this.minervaReprise ? REPRISES[this.minervaReprise.index].phase.name : null, score: this.score, power: this.power, maxform: Number(this.awakened), lives: this.lives, bombs: this.bombs, fps: this.fps, bgm: this.bgm.cue };
   }
 

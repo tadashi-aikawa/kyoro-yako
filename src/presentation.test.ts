@@ -138,7 +138,7 @@ it.each(['KeyZ', 'KeyX'])('%sでエンディング動画の残り全部をスキ
 it.each(MOVIES)('?movie=%sは指定した1本だけを再生する', (name) => {
   vi.stubGlobal('location', { search: `?movie=${name}` }); const game = new Game();
   expect(game.movieName).toBe(name); video(name).emit('ended');
-  expect(game.scene).toBe(name === 'opening' ? 'stage' : name === 'lastboss' ? 'arrival' : 'ending');
+  expect(game.scene).toBe(name === 'opening' ? 'stage' : name === 'lastboss' ? 'arrival' : name === 'jinrai-gift' ? 'dialogue' : 'ending');
   expect(game.movieName).toBeUndefined();
   expect(videos.filter((entry) => entry.play.mock.calls.length > 0)).toHaveLength(1);
 });

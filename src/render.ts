@@ -76,11 +76,11 @@ export class Renderer {
   draw(game: Game): void {
     const c = this.ctx;
     c.fillStyle = '#080817'; c.fillRect(0, 0, 640, 480);
-    if (game.scene === 'movie' || (game.scene === 'transition' && game.transition === 'lastboss-out')) {
+    if (game.scene === 'movie' || (game.scene === 'transition' && (game.transition === 'lastboss-out' || game.transition === 'jinrai-gift-out'))) {
       c.fillStyle = '#000'; c.fillRect(0, 0, 640, 480);
       const video = game.movies.current;
       if (video && video.readyState >= 2) c.drawImage(video, 0, 60, 640, 360);
-      this.whiteFade(game.whiteAlpha);
+      this.fade(game.whiteAlpha, '#fff'); this.fade(game.blackAlpha, '#000');
       return;
     }
     if (game.scene === 'title' || game.scene === 'difficulty' || game.scene === 'player' || game.scene === 'practice' || game.scene === 'option' || game.scene === 'help' || game.scene === 'notebook') {
@@ -91,16 +91,16 @@ export class Renderer {
     this.drawField(game);
     this.drawPanel(game);
     if (game.scene === 'dialogue') this.drawDialogue(game);
-    if (game.scene === 'pause') this.whiteFade(game.whiteAlpha);
+    if (game.scene === 'pause') { this.fade(game.whiteAlpha, '#fff'); this.fade(game.blackAlpha, '#000'); }
     if (game.scene === 'clear' || game.scene === 'pause' || game.scene === 'gameover') this.drawOverlay(game);
     if (import.meta.env.DEV) { this.text(`FPS ${game.fps.toFixed(0)}`, 37, 456, 9, '#ccd4ee'); }
-    if (game.scene !== 'pause') this.whiteFade(game.whiteAlpha);
+    if (game.scene !== 'pause') { this.fade(game.whiteAlpha, '#fff'); this.fade(game.blackAlpha, '#000'); }
   }
 
-  private whiteFade(alpha: number): void {
+  private fade(alpha: number, color: string): void {
     if (alpha <= 0) return;
     const c = this.ctx;
-    c.save(); c.globalAlpha = alpha; c.fillStyle = '#fff'; c.fillRect(0, 0, 640, 480); c.restore();
+    c.save(); c.globalAlpha = alpha; c.fillStyle = color; c.fillRect(0, 0, 640, 480); c.restore();
   }
 
   private text(value: string, x: number, y: number, size = 14, color = '#fff', align: CanvasTextAlign = 'left', shadowBlur = 4): void {
@@ -295,7 +295,7 @@ export class Renderer {
     c.beginPath(); c.rect(0, 0, FIELD.w, FIELD.h); c.clip();
     drawScenery(c, game);
     const beforeTalk = game.scene === 'dialogue' && (game.afterDialogue === 'boss' || game.afterDialogue === 'mid');
-    if (game.boss && !game.phase && (game.scene === 'arrival' || beforeTalk || (game.scene === 'pause' && game.resumeScene === 'arrival'))) {
+    if (game.boss && !game.phase && (game.scene === 'arrival' || beforeTalk || game.scene === 'gift' || (game.scene === 'pause' && (game.resumeScene === 'arrival' || game.resumeScene === 'gift')))) {
       const [x, y] = game.bossXY;
       this.fieldCharacter(game, this.readySprite(game, game.boss), x, y, 64, 0);
     }

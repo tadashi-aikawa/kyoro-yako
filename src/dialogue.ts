@@ -40,8 +40,8 @@ const lines: Record<BossId, { before: Line[]; after: Line[] }> = {
       { who: 'jinrai', text: 'ほな、この雷の向こうへ来はる？ まだ誰も置いていかへん。' },
     ],
     after: [
-      { who: 'jinrai', text: '……よう来たな。灯りは預けるえ。天文台で、約束の続きを聞いてき。' },
-      { who: 'mimiko', text: '守られてた帰り道。今度は、みんなで朝を見られるようにするの。' },
+      { who: 'jinrai', text: '上はもっときついえ。これ持ってき。あんさんやったら、きっと届くやろ。' },
+      { who: 'mimiko', text: 'あ、ありがとうなの……餞別、大事に受け取るのね。' },
     ],
   },
   chappy: {
