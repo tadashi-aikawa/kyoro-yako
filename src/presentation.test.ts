@@ -67,9 +67,9 @@ it('OptionのBGM音量を先読み済み・再生中の動画へ反映する', (
   press(game, 'KeyX'); expect(game.bgm.cue).toBe('stage-gate');
 });
 
-it('保存済みのBGM音量を動画の再生開始前に反映する', () => {
+it.each(['opening', 'lastboss'])('保存済みのBGM音量を%sの再生開始前に反映する', (name) => {
   vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'owlery-bgm-volume' ? '25' : null });
-  vi.stubGlobal('location', { search: '?movie=opening' });
+  vi.stubGlobal('location', { search: `?movie=${name}` });
   const game = new Game(); expect(game.movies.current?.volume).toBe(0.25);
 });
 
@@ -82,14 +82,10 @@ it('openingを音なし設定に変えると動画をミュートし、道中BGM
   } finally { MOVIE_SETTINGS.opening.audio = original; }
 });
 
-it('lastbossを音あり設定に変えてもBGMは登場開始まで止める', () => {
-  const original = MOVIE_SETTINGS.lastboss.audio;
-  MOVIE_SETTINGS.lastboss.audio = true;
-  try {
-    vi.stubGlobal('location', { search: '?movie=lastboss' }); const game = new Game();
-    expect(video('lastboss').muted).toBe(false); expect(game.bgm.cue).toBeNull();
-    video('lastboss').emit('ended'); expect(game.bgm.cue).toBe('boss-minerva');
-  } finally { MOVIE_SETTINGS.lastboss.audio = original; }
+it('lastbossは動画の音を使い、BGMは登場開始まで止める', () => {
+  vi.stubGlobal('location', { search: '?movie=lastboss' }); const game = new Game();
+  expect(video('lastboss').muted).toBe(false); expect(game.bgm.cue).toBeNull();
+  video('lastboss').emit('ended'); expect(game.bgm.cue).toBe('boss-minerva');
 });
 
 it.each(['?stage=2', '?boss=3&phase=1', '?stage=5'])('直行%sでopeningを再生しない', (search) => {
@@ -112,7 +108,7 @@ it('5面開始で残り4本を先読みし、道中終了後にlastbossを挟ん
   expect(game.debugState).toMatchObject({ scene: 'transition', transition: 'lastboss-in', transitionFrame: 0, bgm: null });
   run(game, 44); expect(game.bgm.cue).toBeNull(); game.update();
   expect(game.debugState).toMatchObject({ scene: 'movie', movie: 'lastboss', bgm: null });
-  expect(video('lastboss').muted).toBe(true);
+  expect(video('lastboss').muted).toBe(false);
   expect(game.phase).toBeUndefined();
   run(game, 60); expect(game.bgm.cue).toBeNull();
   video('lastboss').emit('ended');
@@ -203,15 +199,21 @@ it('autoplay制限以外のplay失敗では直ちに次の場面へ進む', asyn
   expect(game.scene).toBe('stage'); expect(game.movieName).toBeUndefined();
 });
 
-it('音あり動画のNotAllowedErrorは無音で1度だけ再試行し、BGMを流す', async () => {
+it.each(['opening', 'lastboss'] as const)('%sのNotAllowedErrorは無音で1度だけ再試行し、場面のBGM設定を保つ', async (name) => {
   const game = new Game();
-  video('opening').play.mockRejectedValueOnce(new DOMException('autoplay blocked', 'NotAllowedError'));
-  press(game); press(game); expect(game.bgm.cue).toBeNull();
+  if (name === 'lastboss') game.startStage(5);
+  video(name).play.mockRejectedValueOnce(new DOMException('autoplay blocked', 'NotAllowedError'));
+  if (name === 'lastboss') {
+    game.stageIntroFrame = 180; game.stageFrame = 2899; game.midbossElapsedFrames = 6000;
+    run(game, 46);
+  } else { press(game); press(game); }
+  expect(game.bgm.cue).toBeNull();
   await vi.advanceTimersByTimeAsync(0); game.update();
-  expect(video('opening').play).toHaveBeenCalledTimes(2);
-  expect(video('opening').muted).toBe(true); expect(game.scene).toBe('movie');
-  expect(game.bgm.cue).toBe('stage-gate'); expect(game.movies.usesAudio('opening')).toBe(false);
-  video('opening').emit('ended'); expect(game.scene).toBe('stage');
+  expect(video(name).play).toHaveBeenCalledTimes(2);
+  expect(video(name).muted).toBe(true); expect(game.scene).toBe('movie');
+  expect(game.bgm.cue).toBe(name === 'opening' ? 'stage-gate' : null); expect(game.movies.usesAudio(name)).toBe(false);
+  video(name).emit('ended'); expect(game.scene).toBe(name === 'opening' ? 'stage' : 'arrival');
+  expect(game.bgm.cue).toBe(name === 'opening' ? 'stage-gate' : 'boss-minerva');
 });
 
 it.each(['NotAllowedError', 'NotSupportedError'])('無音での再試行も%sなら次の場面へ進む', async (name) => {
@@ -224,10 +226,10 @@ it.each(['NotAllowedError', 'NotSupportedError'])('無音での再試行も%sな
 });
 
 it('もともと無音の動画はNotAllowedErrorでも再試行しない', async () => {
-  const player = new MoviePlayer(); player.preload(['lastboss']); const done = vi.fn();
-  video('lastboss').play.mockRejectedValue(new DOMException('blocked', 'NotAllowedError'));
-  player.play('lastboss', done); await vi.advanceTimersByTimeAsync(0);
-  expect(video('lastboss').play).toHaveBeenCalledOnce(); expect(done).toHaveBeenCalledOnce();
+  const player = new MoviePlayer(); player.preload(['jinrai-gift']); const done = vi.fn();
+  video('jinrai-gift').play.mockRejectedValue(new DOMException('blocked', 'NotAllowedError'));
+  player.play('jinrai-gift', done); await vi.advanceTimersByTimeAsync(0);
+  expect(video('jinrai-gift').play).toHaveBeenCalledOnce(); expect(done).toHaveBeenCalledOnce();
 });
 
 it('playが同期的にNotAllowedErrorを投げても無音で再試行する', async () => {

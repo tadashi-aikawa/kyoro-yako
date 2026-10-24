@@ -2,7 +2,7 @@ export const MOVIES = ['opening', 'lastboss', 'jinrai-gift', 'ending-1', 'ending
 export type MovieName = typeof MOVIES[number];
 export const MOVIE_SETTINGS: Record<MovieName, { audio: boolean }> = {
   opening: { audio: true },
-  lastboss: { audio: false },
+  lastboss: { audio: true },
   'jinrai-gift': { audio: false },
   'ending-1': { audio: false },
   'ending-2': { audio: false },

@@ -310,7 +310,7 @@ export class Game {
       return;
     }
     let cue: BgmCue | null;
-    // ラスボス前は白フェードと動画を無音にし、arrivalでミネルヴァの曲を始める。
+    // ラスボス前は白フェードと動画中のBGMを止め、arrivalでミネルヴァの曲を始める。
     if (this.scene === 'movie') cue = this.movieName === 'lastboss' || (this.movieName && this.movies.usesAudio(this.movieName)) ? null : this.movieName === 'opening' ? 'stage-gate' : this.movieName === 'jinrai-gift' ? 'boss-jinrai' : 'ending';
     else if (this.scene === 'transition') cue = this.transition?.startsWith('jinrai-gift') ? 'boss-jinrai' : null;
     else if (this.scene === 'gift') cue = 'boss-jinrai';

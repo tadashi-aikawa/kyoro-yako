@@ -68,16 +68,17 @@ owleryのAIメンバーとエトキチが登場する、縦スクロールの弾
 
 - 曲ファイルと場面の対応は `docs/bgm.md` に従う。MP3は `public/assets/bgm/` に配置する
 - メニューはtitle、道中と中ボスは各ステージ曲を流す。ボス戦前会話から撃破後会話までは各ボス曲を流す。ステージクリアでは停止し、エンディングとスタッフロールはendingを流す
-- 5面の道中終了時は、白フェード開始でstage-dawnを約1秒かけて無音へクロスフェードする。lastbossと動画後の白フェードはBGMも無音とし、ミネルヴァの登場演出開始でboss-minervaを流す
+- 5面の道中終了時は、白フェード開始でstage-dawnを約1秒かけて無音へクロスフェードする。lastbossは動画の音声(AAC)をそのまま流し、動画中のBGMは止める。動画後の白フェード中もBGMは無音とし、ミネルヴァの登場演出開始でboss-minervaを流す
     - 動画が未配置・再生失敗・スキップの場合と、`?movie=lastboss`・`?stage=5&from=boss`でも同じ順に切り替える
 - 曲の切り替えは約1秒のクロスフェードでつなぐ。デコード後の波形から、先頭と末尾に0.3秒以上続く-45dBFS未満の無音を曲ごとに検出して除く。0.2秒以下の短い音が無音を分断する場合は一続きの無音として扱う。ループは有音区間の末尾約2秒と頭をクロスフェードでつなぐ。ポーズ・ゲームオーバー中は音量を下げる
 - 最初のキー入力後に再生を開始する。必要になった曲だけ取得・デコードして使い回す。未配置の曲は無音で進める
 - Optionで効果音とBGMの音量を別々に設定する。BGMの既定は60%。どちらもlocalStorageへ保存し、失敗時は既定値で動く
-- 動画ごとの音の有無は `src/movies.ts` の `MOVIE_SETTINGS` に従う。openingは音あり、lastboss・jinrai-gift・ending-1〜3は無音で再生する
+- 動画ごとの音の有無は `src/movies.ts` の `MOVIE_SETTINGS` に従う。opening・lastbossは音あり、jinrai-gift・ending-1〜3は無音で再生する
     - 音ありの動画ではBGMを約1秒かけて無音へクロスフェードする。動画の音量はOptionのBGM音量に追従する
     - 動画の終了・スキップ・再生失敗後は次の場面の曲へ切り替える
-    - lastbossはBGMも無音にする。ほかの無音動画ではBGMを流す。openingを無音設定にした場合はstage-gate、jinrai-giftはboss-jinrai、ending-1〜3はendingを使う
-    - 音あり動画が `NotAllowedError` で再生拒否された場合は、無音にして1回だけ再試行する。再試行中は無音動画と同じBGMを流す
+    - 無音動画ではBGMを流す。openingを無音設定にした場合はstage-gate、jinrai-giftはboss-jinrai、ending-1〜3はendingを使う
+        - 例外: lastbossは音の設定によらずBGMを止める
+    - 音あり動画が `NotAllowedError` で再生拒否された場合は、無音にして1回だけ再試行する。再試行中はopeningではstage-gateを流し、lastbossではBGMを止めたままにする
     - `?bgm=0` ではBGMと動画の音をともに無効にする
 
 ## ゲームの流れ

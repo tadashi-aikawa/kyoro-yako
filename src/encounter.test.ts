@@ -112,7 +112,7 @@ it('5面は45フレームで白へ進み、動画の前後30フレームを白�
   expect(game.transition).toBe('lastboss-in'); expect(game.whiteAlpha).toBe(0);
   run(game, 22); expect(game.whiteAlpha).toBeCloseTo(22 / 45);
   run(game, 23); expect(game.scene).toBe('movie'); expect(game.whiteAlpha).toBe(1);
-  const video = lastbossVideo(); expect(video.muted).toBe(true); expect(game.bgm.cue).toBeNull();
+  const video = lastbossVideo(); expect(video.muted).toBe(false); expect(game.bgm.cue).toBeNull();
   video.currentTime = 0.25; expect(game.whiteAlpha).toBe(0.5);
   video.currentTime = 0.5; expect(game.whiteAlpha).toBe(0);
   video.currentTime = 9.75; expect(game.whiteAlpha).toBe(0.5);
