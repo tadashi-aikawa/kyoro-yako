@@ -310,7 +310,7 @@ export class Renderer {
       const attack = game.attackContext();
       const clones = attack.phase?.pattern === 'jinraiClone' && (attack === game || attack.phaseFrame >= 105) ? jinraiCloneScene(attack.phaseFrame, attack.phase.duration) : undefined;
       const [x, y] = game.bossXY;
-      const burst = game.phase.pattern === 'jinraiDash' ? dashBurstStep(game.phaseFrame) : -1;
+      const burst = game.phase.pattern === 'jinraiDash' ? dashBurstStep(game) : -1;
       const seal = burst >= BURST_MOVE && burst < BURST_RETURN;
       const prayer = game.phase.pattern === 'owlDawn' ? dawnPrayerStep(game.phaseFrame, game.minervaReprise) : -1;
       const praying = prayer >= 0 && prayer < PRAYER_CHARGE;
@@ -587,7 +587,7 @@ export class Renderer {
       }
     }
     if (pattern === 'jinraiDash' && t >= 0) {
-      const burst = dashBurstStep(game.phaseFrame);
+      const burst = dashBurstStep(game);
       if (burst >= 0 && burst < 24) this.ninjaSmoke(game.jinraiBurstFromX, game.jinraiBurstFromY, burst);
       if (burst >= BURST_MOVE && burst < BURST_MOVE + 24) this.ninjaSmoke(192, 224, burst - BURST_MOVE);
       if (game.phaseFrame < game.jinraiBurstFlashUntil) this.burstLightning(game.phaseFrame, game.jinraiBurstFlashUntil - game.phaseFrame);

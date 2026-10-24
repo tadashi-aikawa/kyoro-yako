@@ -23,7 +23,7 @@ it('全フェーズは面と種類の共通式から体力と制限時間を得�
   for (const [index, stage] of STAGES.entries()) {
     for (const phase of stage.phases) {
       expect(phase.hp).toBe(phaseHp(index + 1, phase.kind));
-      expect(phase.duration).toBe(phase.kind === 'survival' ? 60 : PHASE_LIMIT[phase.kind]);
+      expect(phase.duration).toBe(phase.pattern === 'jinraiDash' ? Infinity : phase.kind === 'survival' ? 60 : PHASE_LIMIT[phase.kind]);
       if (phase.kind !== 'survival') expect(phase.hp / STAGE_DPS[index]).toBeCloseTo(phase.kind === 'normal' ? 14 : phase.kind === 'finale' ? 60 : 25, 0);
     }
     const mid = midPhases(stage.mid, index + 1)[0];

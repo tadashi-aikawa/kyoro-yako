@@ -150,6 +150,8 @@ export class Game {
   jinraiDashY = 115;
   jinraiDashDirection = 1;
   jinraiDashFlashUntil = 0;
+  jinraiBurstStartFrame = -1;
+  jinraiBurstCount = 0;
   jinraiBurstFromX = 192;
   jinraiBurstFromY = 132;
   jinraiBurstFlashUntil = 0;
@@ -813,6 +815,8 @@ export class Game {
     this.jinraiDashY = 115;
     this.jinraiDashDirection = 1;
     this.jinraiDashFlashUntil = 0;
+    this.jinraiBurstStartFrame = -1;
+    this.jinraiBurstCount = 0;
     this.jinraiBurstFromX = 192;
     this.jinraiBurstFromY = 132;
     this.jinraiBurstFlashUntil = 0;
@@ -952,7 +956,7 @@ export class Game {
       return [body.x, body.y];
     }
     if (this.phase?.pattern === 'jinraiDash') {
-      const step = dashBurstStep(this.phaseFrame);
+      const step = dashBurstStep(this);
       return step >= 0 ? burstPosition(this, step) : dashPosition(this);
     }
     if (this.phase?.pattern === 'flash') return [192 + Math.sin(this.phaseFrame * 0.052) * 120, 132];
@@ -1224,7 +1228,7 @@ export class Game {
         s.active = false; this.spark(s.x, s.y, '#c7ddff', 1); return;
       }
       if (s.y < -10 || s.x < -15 || s.x > FIELD.w + 15) { s.active = false; return; }
-      if (this.phase && !(this.phase.pattern === 'jinraiDash' && burstVisibility(dashBurstStep(this.phaseFrame)) < 1)) {
+      if (this.phase && !(this.phase.pattern === 'jinraiDash' && burstVisibility(dashBurstStep(this)) < 1)) {
         if (this.bossTargets().some(([bx, by]) => circlesHit(s.x, s.y, s.radius, bx, by, 20))) {
           if (this.phase.pattern !== 'final') this.damageBoss(s.damage);
           s.active = false; this.spark(s.x, s.y, '#ffe2ac', 1); return;

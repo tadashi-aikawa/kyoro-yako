@@ -12,8 +12,11 @@ export const BURST_RETURN = 96;
 export const BURST_SPEED = 5.6;
 export const BURST_PETAL_RATIO = 0.92;
 const BURST_DURATION = 120;
-// 開始15秒から8秒ごと。煙で消え、中央へ瞬間移動して三連発散する。
-export function dashBurstStep(frame: number): number { return frame >= 900 && (frame - 900) % 480 < BURST_DURATION ? (frame - 900) % 480 : -1; }
+// 前回の発散開始から8秒以上経ち、横断・往復を終えた区切りで三連発散する。
+export function dashBurstStep(game: Game): number {
+  const elapsed = game.phaseFrame - game.jinraiBurstStartFrame;
+  return game.jinraiBurstStartFrame >= 0 && elapsed >= 0 && elapsed < BURST_DURATION ? elapsed : -1;
+}
 export function burstVisibility(step: number): number {
   if (step < 0 || step >= BURST_MOVE + 10) return 1;
   if (step < 6) return 1 - step / 6;
@@ -132,9 +135,18 @@ export function emitJinraiPattern(game: Game, pattern: string, t: number): void 
   }
 
   function emitJinraiDash(game: Game, level: number): void {
-    const burst = dashBurstStep(game.phaseFrame);
+    const lowHp = game.phaseHp <= game.phaseMaxHp * 0.5;
+    const crossingEnd = game.jinraiDashTick === (game.jinraiDashDouble ? 169 : 89);
+    const burstReady = game.jinraiBurstStartFrame < 0 || game.phaseFrame - game.jinraiBurstStartFrame >= 480;
+    if (lowHp && burstReady && crossingEnd) {
+      game.jinraiBurstStartFrame = game.phaseFrame;
+      game.jinraiBurstCount++;
+    }
+    const burst = dashBurstStep(game);
     if (burst >= 0) {
       if (burst === 0) {
+        // 発散への切替時に発射待ちの列を残さない。
+        game.bullets.forEach((b) => { if (b.motion === 'jinraiHold') b.active = false; });
         [game.jinraiBurstFromX, game.jinraiBurstFromY] = dashPosition(game);
         game.audio.play('ninpo');
         game.spark(game.jinraiBurstFromX, game.jinraiBurstFromY, '#d8c9ec', 22);
@@ -145,7 +157,7 @@ export function emitJinraiPattern(game: Game, pattern: string, t: number): void 
         game.jinraiBurstFlashUntil = game.phaseFrame + 12;
         game.spark(192, 224, '#fff3b0', 32);
         const n = [24, 32, 40, 48][level];
-        const offset = (burst - BURST_SHOTS[0]) * 0.02 + Math.floor((game.phaseFrame - 900) / 480) * 0.3;
+        const offset = (burst - BURST_SHOTS[0]) * 0.02 + (game.jinraiBurstCount - 1) * 0.3;
         // 通常攻撃(5.1×unit)より気持ち速く。花びらも通常攻撃を下回らない速さで後を追う。
         const speed = bulletSpeed(game.difficulty, BURST_SPEED);
         for (let i = 0; i < n; i++) {
@@ -162,7 +174,7 @@ export function emitJinraiPattern(game: Game, pattern: string, t: number): void 
     game.jinraiDashTick++;
     if (game.jinraiDashTick === 0 || game.jinraiDashTick >= (game.jinraiDashDouble ? 170 : 90)) {
       game.jinraiDashTick = 0;
-      game.jinraiDashDouble = game.phaseHp <= game.phaseMaxHp * 0.5;
+      game.jinraiDashDouble = lowHp;
     }
     const tick = game.jinraiDashTick;
     const local = tick - (game.jinraiDashDouble && tick >= 85 ? 85 : 0);

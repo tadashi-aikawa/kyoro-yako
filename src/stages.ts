@@ -67,7 +67,7 @@ export const STAGES: Stage[] = [
       phase(4, '夜桜の舞', 'spell', 'jinraiSakura'),
       phase(4, '花影', 'spell', 'jinraiClone'),
       phase(4, '花吹雪', 'spell', 'jinraiPetal'),
-      phase(4, '迅雷一閃', 'spell', 'jinraiDash'),
+      phase(4, '迅雷一閃', 'spell', 'jinraiDash', Infinity),
     ],
   },
   {

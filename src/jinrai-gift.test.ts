@@ -59,7 +59,13 @@ it.each([false, true])('4面本ボス撃破は回収→黒→動画→会話→�
   video().currentTime = 5; expect(game.blackAlpha).toBe(0);
   video().currentTime = 10 - 10 / 60; expect(game.blackAlpha).toBeCloseTo(0.5);
   video().emit('ended'); expect(game.scene).toBe('dialogue'); expect(game.blackAlpha).toBe(1);
-  expect(game.afterDialogue).toBe('gift'); expect(game.boss).toBe('jinrai'); expect(game.lines).toHaveLength(2);
+  expect(game.afterDialogue).toBe('gift'); expect(game.boss).toBe('jinrai');
+  expect(game.lines).toEqual([
+    { who: 'jinrai', text: '……ふふ、やられたわ。あんさん、ええ一撃やったえ。' },
+    { who: 'mimiko', text: 'ふわっ。……あたしも、まだ胸がどきどきしてるの。' },
+    { who: 'jinrai', text: '上はもっときついえ。これ持ってき。あんさんやったら、きっと届くやろ。' },
+    { who: 'mimiko', text: 'あ、ありがとうなの……餞別、大事に受け取るのね。' },
+  ]);
   press(game); expect(game.lineIndex).toBe(0); run(game, 19); expect(game.blackAlpha).toBe(0);
   for (let i = 0; i < game.lines.length; i++) press(game);
   expect(game.scene).toBe('gift'); expect(game.bossXY).toEqual([192, 77]); expect(game.bgm.cue).toBe('boss-jinrai');
