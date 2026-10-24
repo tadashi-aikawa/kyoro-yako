@@ -105,7 +105,7 @@ it.each(['defeat', 'timeout'] as const)('5面エトキチは%sで3技を順に�
   game.stageFrame = ending === 'timeout' ? 2899 : 4369;
   game.update();
   expect(game.scene).toBe('transition');
-  for (let frame = 0; frame < 45 + 80; frame++) game.update();
+  for (let frame = 0; frame < 90 + 150 + 60 + 120; frame++) game.update();
   expect(game.scene).toBe('dialogue');
   expect(game.afterDialogue).toBe('boss');
   expect(game.bgm.cue).toBe('boss-minerva');
@@ -154,7 +154,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('5面中ボスの全技�
   }
   expect(enemiesAppeared).toBe(true);
   expect(game.scene).toBe('transition');
-  for (let frame = 0; frame < 45 + 80; frame++) game.update();
+  for (let frame = 0; frame < 90 + 150 + 60 + 120; frame++) game.update();
   expect(game.scene).toBe('dialogue');
   expect(game.afterDialogue).toBe('boss');
   expect(game.bgm.cue).toBe('boss-minerva');

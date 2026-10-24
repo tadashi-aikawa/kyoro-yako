@@ -147,3 +147,65 @@ it('曲末と曲頭を2秒重ねてループする', async () => {
     vi.useRealTimers();
   }
 });
+
+it('演出倍率とポーズ倍率を独立に掛け、道中曲を再開せず下げた音量からボス曲へ1秒でつなぐ', async () => {
+  vi.useFakeTimers();
+  try {
+    const gains: Array<{ value: number; setValueAtTime: ReturnType<typeof vi.fn>; linearRampToValueAtTime: ReturnType<typeof vi.fn>; cancelScheduledValues: ReturnType<typeof vi.fn> }> = [];
+    const fetchMock = vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(1) }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('AudioContext', class {
+      state = 'running'; currentTime = 10; destination = {};
+      createGain() {
+        const gain = {
+          value: 1,
+          setValueAtTime: vi.fn((value: number) => { gain.value = value; }),
+          linearRampToValueAtTime: vi.fn((value: number) => { gain.value = value; }),
+          cancelScheduledValues: vi.fn(),
+        };
+        gains.push(gain);
+        return { gain, connect: (destination: unknown) => destination, disconnect: () => {} };
+      }
+      createBufferSource() { return { connect: (destination: unknown) => destination, start: () => {}, stop: () => {}, disconnect: () => {} }; }
+      async decodeAudioData() { return sampleBuffer([new Float32Array(10_000).fill(0.2)], 1000); }
+    });
+    const bgm = new BgmPlayer(false, 60);
+    bgm.sync('stage-dawn', false); bgm.unlock();
+    await vi.advanceTimersByTimeAsync(0);
+    const [master, stage] = gains;
+    bgm.sync('stage-dawn', false, 0.35);
+    expect(stage.linearRampToValueAtTime).toHaveBeenLastCalledWith(0.35, 11);
+    expect(bgm.effectiveVolume).toBe(0.21); expect(fetchMock).toHaveBeenCalledOnce();
+    bgm.sync('stage-dawn', true, bgm.sceneVolumeMultiplier);
+    expect(master.linearRampToValueAtTime).toHaveBeenLastCalledWith(0.21, 10.12);
+    expect(bgm.effectiveVolume).toBeCloseTo(0.0735);
+    bgm.setVolume(80); expect(bgm.effectiveVolume).toBeCloseTo(0.098);
+    bgm.sync('stage-dawn', false, 0.35);
+    expect(bgm.effectiveVolume).toBeCloseTo(0.28);
+    const gainCount = gains.length;
+    bgm.preload('boss-minerva');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(gains).toHaveLength(gainCount);
+    expect(bgm.cue).toBe('stage-dawn');
+    stage.linearRampToValueAtTime.mockClear();
+    bgm.sync('boss-minerva', false);
+    // 先読み済みならPromiseの待機を挟まず、同じ呼び出しでクロスフェードを始める。
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(stage.setValueAtTime).toHaveBeenLastCalledWith(0.35, 10);
+    expect(stage.linearRampToValueAtTime.mock.calls).toEqual([[0, 11]]);
+    expect(gains[gainCount].linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 11);
+    bgm.sync(null, false); await vi.advanceTimersByTimeAsync(1100);
+  } finally { vi.clearAllTimers(); vi.useRealTimers(); }
+});
+
+it.each(['pause', 'gameover'] as const)('%s中も演出倍率を保ち、その上からポーズの減衰を掛ける', (scene) => {
+  const game = new Game();
+  game.bgm.sync('stage-dawn', false, 0.35);
+  game.scene = scene;
+  for (let frame = 0; frame < 3; frame++) {
+    game.update();
+    expect(game.bgm.sceneVolumeMultiplier).toBe(0.35);
+    expect(game.bgm.effectiveVolume).toBeCloseTo(0.0735);
+  }
+});

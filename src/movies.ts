@@ -2,7 +2,7 @@ export const MOVIES = ['opening', 'lastboss', 'jinrai-gift', 'ending-1', 'ending
 export type MovieName = typeof MOVIES[number];
 export const MOVIE_SETTINGS: Record<MovieName, { audio: boolean }> = {
   opening: { audio: true },
-  lastboss: { audio: true },
+  lastboss: { audio: false },
   'jinrai-gift': { audio: false },
   'ending-1': { audio: false },
   'ending-2': { audio: false },
@@ -48,7 +48,7 @@ export class MoviePlayer {
     return video;
   }
 
-  play(name: MovieName, done: () => void): void {
+  play(name: MovieName, done: () => void, holdLastFrame = false): void {
     this.stop();
     const video = this.video(name);
     if (!video || video.error) { done(); return; }
@@ -65,7 +65,7 @@ export class MoviePlayer {
       this.current = undefined;
       this.cancel = undefined;
     };
-    const finish = () => { if (active) { cleanup(); done(); } };
+    const finish = () => { if (active) { cleanup(); if (holdLastFrame) this.current = video; done(); } };
     const timeout = () => { clearTimeout(timer); timer = setTimeout(finish, 1000); };
     const rejected = (error: unknown) => {
       if (!active) return;

@@ -91,53 +91,82 @@ it.each([0, 1, 2, 3, 4, 5, 6, 7])('道中最後の被弾猶予%sは登場開始�
     game.midbossElapsedFrames = 6000; game.stageFrame = role === 'midboss' ? 2449 : role === 'lastboss' ? 2899 : 4899;
     game.pendingHit = pending; game.invulnFrames = 0; game.update();
     expect(game.pendingHit).toBe(-1);
-    if (role === 'lastboss') { run(game, 45); (game.movies.current as unknown as Video).emit('ended'); }
-    run(game, 80); expect(game.scene).toBe('dialogue');
+    if (role === 'lastboss') { run(game, 90); (game.movies.current as unknown as Video).emit('ended'); run(game, 210); }
+    run(game, role === 'lastboss' ? 120 : 80); expect(game.scene).toBe('dialogue');
     for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
     run(game, 8); expect(game.scene).toBe('stage'); expect(game.lives).toBe(2); expect(game.pendingHit).toBe(-1);
   }
 });
 
-it.each([0, 15, 29])('白からの登場%sフレーム目にポーズしても白を保ち、解除後にフェードを再開する', (frame) => {
-  const game = fromBoss(); run(game, 165); lastbossVideo().emit('ended'); run(game, frame);
+it.each([0, 60, 119])('白からの登場%sフレーム目にポーズしても白を保ち、解除後にフェードを再開する', (frame) => {
+  const game = fromBoss(); run(game, 120 + 90); lastbossVideo().emit('ended'); run(game, 210 + frame);
   const alpha = game.whiteAlpha; press(game, 'Escape');
   expect(game.scene).toBe('pause'); expect(game.whiteAlpha).toBe(alpha);
   run(game, 120); expect(game.whiteAlpha).toBe(alpha); expect(game.arrivalFrame).toBe(frame);
   press(game, 'Escape'); expect(game.scene).toBe('arrival'); expect(game.whiteAlpha).toBe(alpha);
-  game.update(); expect(game.whiteAlpha).toBeCloseTo(Math.max(0, 1 - (frame + 1) / 30));
+  game.update(); expect(game.whiteAlpha).toBeCloseTo(Math.max(0, 1 - (frame + 1) / 120));
 });
 
-it('5面は45フレームで白へ進み、動画の前後30フレームを白とクロスフェードする', () => {
+it('5面は90フレームで白へ進み、動画後は150フレームで白へ溶け、60フレーム保持して120フレームで明ける', () => {
   const game = fromBoss(); run(game, 120);
+  const preload = vi.spyOn(game.bgm, 'preload');
   expect(game.transition).toBe('lastboss-in'); expect(game.whiteAlpha).toBe(0);
-  run(game, 22); expect(game.whiteAlpha).toBeCloseTo(22 / 45);
-  run(game, 23); expect(game.scene).toBe('movie'); expect(game.whiteAlpha).toBe(1);
-  const video = lastbossVideo(); expect(video.muted).toBe(false); expect(game.bgm.cue).toBeNull();
-  video.currentTime = 0.25; expect(game.whiteAlpha).toBe(0.5);
-  video.currentTime = 0.5; expect(game.whiteAlpha).toBe(0);
-  video.currentTime = 9.75; expect(game.whiteAlpha).toBe(0.5);
+  run(game, 45); expect(game.whiteAlpha).toBe(0.5);
+  run(game, 44); expect(game.scene).toBe('transition'); expect(game.whiteAlpha).toBeCloseTo(89 / 90);
+  game.update(); expect(game.scene).toBe('movie'); expect(game.whiteAlpha).toBe(1);
+  const video = lastbossVideo(); expect(video.muted).toBe(true); expect(game.bgm.cue).toBe('stage-dawn');
+  video.currentTime = 0.75; expect(game.whiteAlpha).toBe(0.5);
+  video.currentTime = 89 / 60; expect(game.whiteAlpha).toBeCloseTo(1 / 90);
+  video.currentTime = 1.5; expect(game.whiteAlpha).toBe(0);
+  video.currentTime = 9.75; expect(game.whiteAlpha).toBe(0);
   video.currentTime = 10; video.emit('ended');
+  expect(game.transition).toBe('lastboss-out'); expect(game.whiteAlpha).toBe(0);
+  expect(game.movies.current).toBe(video);
+  run(game, 75); expect(game.whiteAlpha).toBe(0.5);
+  expect(preload).not.toHaveBeenCalled();
+  run(game, 75); expect(game.transition).toBe('lastboss-hold'); expect(game.whiteAlpha).toBe(1);
+  expect(preload).toHaveBeenCalledExactlyOnceWith('boss-minerva');
+  expect(game.bgm.cue).toBe('stage-dawn');
+  expect(game.movies.current).toBeUndefined();
+  run(game, 59); expect(game.transition).toBe('lastboss-hold'); expect(game.whiteAlpha).toBe(1);
+  game.update();
   expect(game.scene).toBe('arrival'); expect(game.whiteAlpha).toBe(1); expect(game.boss).toBe('minerva');
-  run(game, 15); expect(game.whiteAlpha).toBe(0.5); run(game, 15); expect(game.whiteAlpha).toBe(0);
-  run(game, 50); expect(game.scene).toBe('dialogue'); expect(game.afterDialogue).toBe('boss');
+  run(game, 60); expect(game.whiteAlpha).toBe(0.5);
+  run(game, 59); expect(game.scene).toBe('arrival'); expect(game.whiteAlpha).toBeCloseTo(1 / 120);
+  game.update(); expect(game.whiteAlpha).toBe(0);
+  expect(game.scene).toBe('dialogue'); expect(game.afterDialogue).toBe('boss');
 });
 
-it.each(['KeyZ', 'KeyX'])('lastbossの%sスキップでも映像を止めて30フレームで白へ進む', async (key) => {
-  const game = fromBoss(); run(game, 165); await vi.advanceTimersByTimeAsync(0);
+it.each(['KeyZ', 'KeyX'])('lastbossの%sスキップでも映像を止めて150フレームで白へ進む', async (key) => {
+  const game = fromBoss(); run(game, 120 + 90); await vi.advanceTimersByTimeAsync(0);
   const video = lastbossVideo(); video.currentTime = 4;
   video.emit('waiting'); vi.advanceTimersByTime(990);
   press(game, key); expect(game.scene).toBe('transition'); expect(game.transition).toBe('lastboss-out');
   expect(game.movies.current).toBe(video); expect(video.pause).toHaveBeenCalled();
   vi.advanceTimersByTime(20); video.emit('ended'); expect(game.scene).toBe('transition');
-  run(game, 15); expect(game.whiteAlpha).toBe(0.5);
-  run(game, 15); expect(game.scene).toBe('arrival'); expect(game.whiteAlpha).toBe(1);
-  expect(game.movies.current).toBeUndefined(); run(game, 80); expect(game.scene).toBe('dialogue');
+  run(game, 75); expect(game.whiteAlpha).toBe(0.5);
+  run(game, 75); expect(game.transition).toBe('lastboss-hold'); expect(game.whiteAlpha).toBe(1);
+  expect(game.movies.current).toBeUndefined(); run(game, 60 + 120); expect(game.scene).toBe('dialogue');
 });
 
-it('lastboss未配置でも45フレームの白フェード後にミネルヴァ登場へ進む', () => {
-  vi.stubGlobal('document', undefined); const game = fromBoss(); run(game, 165);
+it('lastboss未配置でも白フェードと白保持後にミネルヴァ登場へ進む', () => {
+  vi.stubGlobal('document', undefined); const game = fromBoss(); run(game, 120 + 90);
+  expect(game.transition).toBe('lastboss-out'); expect(game.whiteAlpha).toBe(1);
+  run(game, 150); expect(game.transition).toBe('lastboss-hold'); expect(game.whiteAlpha).toBe(1);
+  run(game, 60);
   expect(game.scene).toBe('arrival'); expect(game.whiteAlpha).toBe(1);
-  run(game, 80); expect(game.scene).toBe('dialogue');
+  run(game, 120); expect(game.scene).toBe('dialogue');
+});
+
+it.each([{ time: 0, alpha: 1 }, { time: 0.75, alpha: 0.5 }, { time: 1.5, alpha: 0 }])('動画冒頭の白明け中time=$timeのスキップでも白が跳ばず、従来の時間配分で登場へ進む', ({ time, alpha }) => {
+  const game = fromBoss(); run(game, 120 + 90);
+  lastbossVideo().currentTime = time;
+  expect(game.whiteAlpha).toBe(alpha);
+  press(game, 'KeyX');
+  expect(game.transition).toBe('lastboss-out'); expect(game.whiteAlpha).toBe(alpha);
+  run(game, 149); expect(game.transition).toBe('lastboss-out');
+  game.update(); expect(game.transition).toBe('lastboss-hold'); expect(game.whiteAlpha).toBe(1);
+  run(game, 60); expect(game.scene).toBe('arrival'); expect(game.arrivalFrame).toBe(0);
 });
 
 it('撃破後の会話では登場演出を繰り返さない', () => {

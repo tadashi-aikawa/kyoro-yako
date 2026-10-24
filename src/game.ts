@@ -64,7 +64,7 @@ export class Game {
   stageIntroFrame = 180;
   arrivalFrame = 0;
   private arrivalFromWhite = false;
-  transition?: 'lastboss-in' | 'lastboss-out' | 'jinrai-gift-in' | 'jinrai-gift-out';
+  transition?: 'lastboss-in' | 'lastboss-out' | 'lastboss-hold' | 'jinrai-gift-in' | 'jinrai-gift-out';
   transitionFrame = 0;
   private transitionFadeStart = 0;
   private dialogueBlackFrames = 0;
@@ -291,9 +291,12 @@ export class Game {
     else if (this.scene === 'movie') {
       if (this.just('KeyZ') || this.just('KeyX')) {
         if (this.movieName === 'lastboss' || this.movieName === 'jinrai-gift') {
-          this.transitionFadeStart = this.movieName === 'lastboss' ? this.movieWhiteAlpha : this.blackAlpha;
-          this.movies.freeze();
-          this.transition = this.movieName === 'lastboss' ? 'lastboss-out' : 'jinrai-gift-out'; this.transitionFrame = 0; this.scene = 'transition';
+          if (this.movieName === 'lastboss') this.startLastbossOut();
+          else {
+            this.transitionFadeStart = this.blackAlpha;
+            this.movies.freeze();
+            this.transition = 'jinrai-gift-out'; this.transitionFrame = 0; this.scene = 'transition';
+          }
         } else this.finishMovies();
       }
     }
@@ -306,13 +309,13 @@ export class Game {
     this.movies.setVolume(this.optionBgmVolume);
     if (this.scene === 'title') this.movies.preload(['opening']);
     if (this.scene === 'pause' || this.scene === 'gameover') {
-      this.bgm.sync(this.bgm.cue, true);
+      this.bgm.sync(this.bgm.cue, true, this.bgm.sceneVolumeMultiplier);
       return;
     }
     let cue: BgmCue | null;
-    // ラスボス前は白フェードと動画中のBGMを止め、arrivalでミネルヴァの曲を始める。
-    if (this.scene === 'movie') cue = this.movieName === 'lastboss' || (this.movieName && this.movies.usesAudio(this.movieName)) ? null : this.movieName === 'opening' ? 'stage-gate' : this.movieName === 'jinrai-gift' ? 'boss-jinrai' : 'ending';
-    else if (this.scene === 'transition') cue = this.transition?.startsWith('jinrai-gift') ? 'boss-jinrai' : null;
+    const lastbossQuiet = (this.scene === 'movie' && this.movieName === 'lastboss') || (this.scene === 'transition' && !!this.transition?.startsWith('lastboss'));
+    if (this.scene === 'movie') cue = this.movieName === 'lastboss' ? 'stage-dawn' : this.movieName && this.movies.usesAudio(this.movieName) ? null : this.movieName === 'opening' ? 'stage-gate' : this.movieName === 'jinrai-gift' ? 'boss-jinrai' : 'ending';
+    else if (this.scene === 'transition') cue = lastbossQuiet ? 'stage-dawn' : this.transition?.startsWith('jinrai-gift') ? 'boss-jinrai' : null;
     else if (this.scene === 'gift') cue = 'boss-jinrai';
     else if (this.scene === 'arrival') cue = this.midboss ? STAGES[this.stage - 1].bgm : `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else if (this.scene === 'clear') cue = null;
@@ -321,7 +324,7 @@ export class Game {
     else if (this.scene === 'dialogue' && (this.afterDialogue === 'boss' || this.afterDialogue === 'clear' || this.afterDialogue === 'gift')) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else if ((this.phase || this.collectionFrames > 0) && !this.midboss) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else cue = STAGES[this.stage - 1].bgm;
-    this.bgm.sync(cue, false);
+    this.bgm.sync(cue, false, lastbossQuiet ? 0.35 : 1);
   }
 
   private updateMenu(): void {
@@ -400,11 +403,15 @@ export class Game {
   private startMovies(names: readonly MovieName[], done: () => void): void {
     this.movieDone = done;
     const next = (index: number) => {
-      if (index >= names.length) { this.finishMovies(); return; }
+      if (index >= names.length) {
+        if (this.movieName === 'lastboss') this.startLastbossOut();
+        else this.finishMovies();
+        return;
+      }
       this.scene = 'movie';
       this.movieName = names[index];
       this.syncBgm();
-      this.movies.play(names[index], () => next(index + 1));
+      this.movies.play(names[index], () => next(index + 1), names[index] === 'lastboss');
     };
     next(0);
   }
@@ -428,15 +435,33 @@ export class Game {
     this.transition = 'lastboss-in'; this.transitionFrame = 0; this.scene = 'transition';
   }
 
+  private startLastbossOut(): void {
+    this.transitionFadeStart = this.movies.current ? this.movieWhiteAlpha : 1;
+    this.movies.freeze();
+    this.transition = 'lastboss-out'; this.transitionFrame = 0; this.scene = 'transition';
+    this.syncBgm();
+  }
+
   private updateTransition(): void {
     this.transitionFrame++;
     if (this.transition === 'lastboss-in') {
       this.sceneryDistance += 1.8;
       if (this.invulnFrames > 0) this.invulnFrames--;
       this.updatePlayer(false);
-      if (this.transitionFrame >= 45) {
+      if (this.transitionFrame >= 90) {
         this.transition = undefined;
         this.startMovies(['lastboss'], () => this.startConversation('minerva', 'before', 'boss', true));
+      }
+    } else if (this.transition === 'lastboss-out') {
+      if (this.transitionFrame >= 150) {
+        this.movies.stop(); this.movieName = undefined;
+        this.transition = 'lastboss-hold'; this.transitionFrame = 0;
+        this.bgm.preload('boss-minerva');
+      }
+    } else if (this.transition === 'lastboss-hold') {
+      if (this.transitionFrame >= 60) {
+        this.transition = undefined;
+        this.finishMovies();
       }
     } else if (this.transition === 'jinrai-gift-in') {
       this.updatePlayer(false);
@@ -444,7 +469,7 @@ export class Game {
         this.transition = undefined;
         this.startMovies(['jinrai-gift'], () => this.startGiftConversation());
       }
-    } else if (this.transitionFrame >= (this.transition === 'jinrai-gift-out' ? 20 : 30)) {
+    } else if (this.transitionFrame >= 20) {
       this.transition = undefined;
       this.finishMovies();
     }
@@ -452,7 +477,7 @@ export class Game {
 
   get movieWhiteAlpha(): number {
     if (this.movieName !== 'lastboss') return 0;
-    return this.movieFadeAlpha(0.5);
+    return Math.max(0, Math.min(1, 1 - (this.movies.current?.currentTime ?? 0) / 1.5));
   }
 
   private movieFadeAlpha(seconds: number): number {
@@ -464,8 +489,8 @@ export class Game {
 
   get whiteAlpha(): number {
     if (this.scene === 'movie') return this.movieWhiteAlpha;
-    if (this.scene === 'transition' && this.transition?.startsWith('lastboss')) return this.transition === 'lastboss-in' ? Math.min(1, this.transitionFrame / 45) : this.transitionFadeStart + (1 - this.transitionFadeStart) * Math.min(1, this.transitionFrame / 30);
-    if ((this.scene === 'arrival' || (this.scene === 'pause' && this.resumeScene === 'arrival')) && this.arrivalFromWhite) return Math.max(0, 1 - this.arrivalFrame / 30);
+    if (this.scene === 'transition' && this.transition?.startsWith('lastboss')) return this.transition === 'lastboss-hold' ? 1 : this.transition === 'lastboss-in' ? Math.min(1, this.transitionFrame / 90) : this.transitionFadeStart + (1 - this.transitionFadeStart) * Math.min(1, this.transitionFrame / 150);
+    if ((this.scene === 'arrival' || (this.scene === 'pause' && this.resumeScene === 'arrival')) && this.arrivalFromWhite) return Math.max(0, 1 - this.arrivalFrame / 120);
     return 0;
   }
 
@@ -493,7 +518,7 @@ export class Game {
     this.sceneryDistance += 1.8;
     if (this.invulnFrames > 0) this.invulnFrames--;
     this.updatePlayer(false);
-    if (++this.arrivalFrame >= 80) this.scene = 'dialogue';
+    if (++this.arrivalFrame >= (this.arrivalFromWhite ? 120 : 80)) this.scene = 'dialogue';
   }
 
   private startEnding(): void { this.scene = 'ending'; this.endingFrame = 0; this.endingRevealed = false; }
@@ -1433,7 +1458,8 @@ export class Game {
   }
 
   get debugState(): Record<string, string | number | null> {
-    const effects = { movie: this.movieName ?? null, stageFrame: this.stageFrame, stageIntroFrame: this.stageIntroFrame, arrivalFrame: this.arrivalFrame, transition: this.transition ?? null, transitionFrame: this.transitionFrame, whiteAlpha: this.whiteAlpha, blackAlpha: this.blackAlpha, giftFrame: this.giftFrame, giftItems: this.items.objects.filter((item) => item.active && item.gift).length, phaseFrame: this.phaseFrame, endingFrame: this.endingFrame, creditsFrame: this.creditsFrame };
+    const audio = { bgmVolume: this.bgm.effectiveVolume };
+    const effects = { ...audio, movie: this.movieName ?? null, stageFrame: this.stageFrame, stageIntroFrame: this.stageIntroFrame, arrivalFrame: this.arrivalFrame, transition: this.transition ?? null, transitionFrame: this.transitionFrame, whiteAlpha: this.whiteAlpha, blackAlpha: this.blackAlpha, giftFrame: this.giftFrame, giftItems: this.items.objects.filter((item) => item.active && item.gift).length, phaseFrame: this.phaseFrame, endingFrame: this.endingFrame, creditsFrame: this.creditsFrame };
     return { ...effects, scene: this.scene, stage: this.stage, boss: this.boss ? NAMES[this.boss] : null, bossRole: this.boss ? this.midboss ? 'midboss' : 'boss' : null, phase: this.phase ? this.phaseIndex : -1, spell: this.phase?.spell ? this.phase.name : null, phaseRemainingSeconds: this.phase ? Number.isFinite(this.phase.duration) ? Math.max(0, (this.phase.duration * 60 - this.phaseFrame) / 60) : '∞' : null, phaseHpRatio: this.phase ? Math.max(0, this.phaseHp / this.phaseMaxHp) : null, bullets: this.bullets.count, graphNodes: this.graphNodes.length, graphEdges: this.graphEdges.length, reprise: this.minervaReprise ? REPRISES[this.minervaReprise.index].phase.name : null, score: this.score, power: this.power, maxform: Number(this.awakened), lives: this.lives, bombs: this.bombs, fps: this.fps, bgm: this.bgm.cue };
   }
 
