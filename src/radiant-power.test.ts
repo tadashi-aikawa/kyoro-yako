@@ -12,7 +12,7 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 function start(power = 5): Game {
-  const game = new Game(); game.audio.volume = 0;
+  const game = new Game(false); game.audio.volume = 0;
   game.startStage(1); game.power = power;
   return game;
 }

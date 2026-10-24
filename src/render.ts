@@ -76,6 +76,13 @@ export class Renderer {
   draw(game: Game): void {
     const c = this.ctx;
     c.fillStyle = '#080817'; c.fillRect(0, 0, 640, 480);
+    if (game.scene === 'movie' || (game.scene === 'transition' && game.transition === 'lastboss-out')) {
+      c.fillStyle = '#000'; c.fillRect(0, 0, 640, 480);
+      const video = game.movies.current;
+      if (video && video.readyState >= 2) c.drawImage(video, 0, 60, 640, 360);
+      this.whiteFade(game.whiteAlpha);
+      return;
+    }
     if (game.scene === 'title' || game.scene === 'difficulty' || game.scene === 'player' || game.scene === 'practice' || game.scene === 'option' || game.scene === 'help' || game.scene === 'notebook') {
       this.drawMenu(game);
       return;
@@ -84,15 +91,23 @@ export class Renderer {
     this.drawField(game);
     this.drawPanel(game);
     if (game.scene === 'dialogue') this.drawDialogue(game);
+    if (game.scene === 'pause') this.whiteFade(game.whiteAlpha);
     if (game.scene === 'clear' || game.scene === 'pause' || game.scene === 'gameover') this.drawOverlay(game);
     if (import.meta.env.DEV) { this.text(`FPS ${game.fps.toFixed(0)}`, 37, 456, 9, '#ccd4ee'); }
+    if (game.scene !== 'pause') this.whiteFade(game.whiteAlpha);
   }
 
-  private text(value: string, x: number, y: number, size = 14, color = '#fff', align: CanvasTextAlign = 'left'): void {
+  private whiteFade(alpha: number): void {
+    if (alpha <= 0) return;
+    const c = this.ctx;
+    c.save(); c.globalAlpha = alpha; c.fillStyle = '#fff'; c.fillRect(0, 0, 640, 480); c.restore();
+  }
+
+  private text(value: string, x: number, y: number, size = 14, color = '#fff', align: CanvasTextAlign = 'left', shadowBlur = 4): void {
     const c = this.ctx;
     c.font = `${size}px "Hiragino Mincho ProN", "Yu Mincho", serif`;
     c.textAlign = align; c.textBaseline = 'middle';
-    c.shadowColor = '#080714'; c.shadowBlur = 4;
+    c.shadowColor = '#080714'; c.shadowBlur = shadowBlur;
     c.fillStyle = color; c.fillText(value, x, y);
     c.shadowBlur = 0;
   }
@@ -279,6 +294,11 @@ export class Renderer {
     c.save(); c.translate(FIELD.x, FIELD.y);
     c.beginPath(); c.rect(0, 0, FIELD.w, FIELD.h); c.clip();
     drawScenery(c, game);
+    const beforeTalk = game.scene === 'dialogue' && (game.afterDialogue === 'boss' || game.afterDialogue === 'mid');
+    if (game.boss && !game.phase && (game.scene === 'arrival' || beforeTalk || (game.scene === 'pause' && game.resumeScene === 'arrival'))) {
+      const [x, y] = game.bossXY;
+      this.fieldCharacter(game, this.readySprite(game, game.boss), x, y, 64, 0);
+    }
     if (game.phase?.spell) {
       c.fillStyle = '#06031977'; c.fillRect(0, 0, FIELD.w, FIELD.h);
       this.magic(192, 80, game.frame, stage.colors[2], 130, 0.25);
@@ -431,6 +451,7 @@ export class Renderer {
     }
     if (game.flash > 0) { c.fillStyle = `rgba(255,255,255,${game.flash / 50})`; c.fillRect(0, 0, FIELD.w, FIELD.h); }
     if (!thunder) this.focusMarker(game);
+    if (game.stageIntroFrame < 180) this.stageIntro(game);
     c.restore();
     c.strokeStyle = '#b5a8d4'; c.lineWidth = 2; c.strokeRect(FIELD.x, FIELD.y, FIELD.w, FIELD.h);
   }
@@ -1237,6 +1258,28 @@ export class Renderer {
     c.restore();
   }
 
+  private stageIntro(game: Game): void {
+    const c = this.ctx;
+    const age = game.stageIntroFrame;
+    const curtain = 60 * Math.max(0, 1 - age / 45);
+    c.save();
+    c.fillStyle = '#03040b';
+    c.fillRect(0, 0, FIELD.w, curtain);
+    c.fillRect(0, FIELD.h - curtain, FIELD.w, curtain);
+    const [japanese, english] = STAGES[game.stage - 1].title.split('〜').map((part) => part.trim());
+    const fade = Math.min(1, (180 - age) / 30);
+    const lines = [`S T A G E   ${game.stage}`, japanese, english];
+    const wash = c.createLinearGradient(0, 0, FIELD.w, 0);
+    wash.addColorStop(0, '#080b1800'); wash.addColorStop(0.3, '#080b18bb'); wash.addColorStop(0.7, '#080b18bb'); wash.addColorStop(1, '#080b1800');
+    c.globalAlpha = Math.min(1, age / 30) * fade;
+    c.fillStyle = wash; c.fillRect(0, 150, FIELD.w, 128);
+    lines.forEach((line, index) => {
+      c.globalAlpha = Math.max(0, Math.min(1, (age - index * 30) / 30)) * fade;
+      this.text(line, FIELD.w / 2, [173, 213, 253][index], [12, 29, 12][index], index === 1 ? '#fff5db' : STAGES[game.stage - 1].colors[2], 'center');
+    });
+    c.restore();
+  }
+
   private cutin(game: Game): void {
     const c = this.ctx;
     const age = 100 - game.cutin;
@@ -1389,18 +1432,33 @@ export class Renderer {
 
   private drawEnding(game: Game): void {
     const c = this.ctx; const gradient = c.createLinearGradient(0, 0, 640, 480);
-    gradient.addColorStop(0, '#282644'); gradient.addColorStop(1, '#e2a47e'); c.fillStyle = gradient; c.fillRect(0, 0, 640, 480);
-    this.stars(game.frame, 640, 480, 0.2);
+    const dawn = game.scene === 'credits' ? 1 : Math.min(1, game.endingFrame / 600);
+    const blend = (night: number[], morning: number[], progress = dawn) => `rgb(${night.map((value, i) => Math.round(value + (morning[i] - value) * progress)).join(',')})`;
+    gradient.addColorStop(0, blend([40, 38, 68], [226, 164, 126]));
+    gradient.addColorStop(1, blend([62, 49, 80], [250, 218, 166]));
+    c.fillStyle = gradient; c.fillRect(0, 0, 640, 480);
+    this.stars(game.frame, 640, 480, 0.45 * (1 - dawn));
     if (game.scene === 'ending') {
+      const transition = Math.max(0, Math.min(1, (game.endingFrame - 300) / 120));
+      const ink = blend([255, 241, 203], [60, 40, 60], transition);
+      const shadow = 4 * (1 - transition);
       this.image(game, `${game.player}-stand`, 30, 58, 230, 365, 0.85);
-      this.text('ENDING', 415, 73, 31, '#fff1cb', 'center');
-      game.endingLines.forEach((line, i) => { this.text(line, 266, 146 + i * 44, 14, '#fff'); });
-      this.text('Z  スタッフロールへ', 584, 451, 12, '#f8e9d9', 'right');
+      this.text('ENDING', 415, 73, 31, ink, 'center', shadow);
+      game.endingLines.forEach((line, i) => { c.globalAlpha = game.endingLineAlpha(i); this.text(line, 266, 146 + i * 44, 14, ink, 'left', shadow); });
+      c.globalAlpha = 1;
+      this.text(game.endingComplete ? 'Z  スタッフロールへ' : 'Z  すべて読む', 584, 451, 12, ink, 'right', shadow);
     } else {
-      this.text(GAME_TITLE, 320, 84, 36, '#fff1cb', 'center');
-      this.uiText('弾幕シューティング / owlery', 320, 126, 12, '#f1dcc9', 'center');
-      ['企画・仕様  チャッピー', '制作・調整  迅雷 / Codex', 'キャラクター  owleryのみんな', 'エトキチ  エトキチの大冒険より', '遊んでくれたあなたへ、ありがとう。'].forEach((line, i) => { this.uiText(line, 320, 187 + i * 40, 16, '#fff', 'center'); });
-      this.text('Z  タイトルへ', 320, 449, 12, '#f8e9d9', 'center');
+      const lines = ['企画・仕様  チャッピー', '制作・調整  迅雷 / Codex', 'キャラクター  owleryのみんな', 'エトキチ  エトキチの大冒険より', '遊んでくれたあなたへ、ありがとう。'];
+      const rowGap = 48;
+      const distance = 520 + 132 + (lines.length - 1) * rowGap / 2 - 240;
+      const y = 520 - Math.min(1, game.creditsFrame / 1500) * distance;
+      const ink = '#3c283c';
+      c.save(); c.globalAlpha = Math.max(0, Math.min(1, (y - 24) / 36));
+      this.text(GAME_TITLE, 320, y, 36, ink, 'center', 0);
+      this.uiText('弾幕シューティング / owlery', 320, y + 52, 12, ink, 'center');
+      c.restore();
+      lines.forEach((line, i) => { this.uiText(line, 320, y + 132 + i * rowGap, 16, ink, 'center'); });
+      if (game.creditsFrame < 1500) this.text('Z  早送り    X  スキップ', 584, 451, 12, ink, 'right', 0);
     }
   }
 }

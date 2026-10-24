@@ -104,15 +104,19 @@ it.each(['defeat', 'timeout'] as const)('5面エトキチは%sで3技を順に�
   game.midbossElapsedFrames = ending === 'timeout' ? 8100 : 4000;
   game.stageFrame = ending === 'timeout' ? 2899 : 4369;
   game.update();
+  expect(game.scene).toBe('transition');
+  for (let frame = 0; frame < 45 + 80; frame++) game.update();
   expect(game.scene).toBe('dialogue');
   expect(game.afterDialogue).toBe('boss');
   expect(game.bgm.cue).toBe('boss-minerva');
 });
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('5面中ボスの全技を%sで時間切れにしても、回収と会話を経て本ボス戦が始まる', (difficulty) => {
-  const game = new Game(); game.audio.volume = 0; game.invincible = true; game.difficulty = difficulty;
+  const game = new Game(false); game.audio.volume = 0; game.invincible = true; game.difficulty = difficulty;
   game.startStage(5); game.stageFrame = 2449;
   game.update();
+  expect(game.scene).toBe('arrival');
+  for (let frame = 0; frame < 80; frame++) game.update();
   expect(game.scene).toBe('dialogue');
   expect(game.afterDialogue).toBe('mid');
   for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
@@ -149,6 +153,8 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('5面中ボスの全技�
     enemiesAppeared ||= game.enemies.count > 0;
   }
   expect(enemiesAppeared).toBe(true);
+  expect(game.scene).toBe('transition');
+  for (let frame = 0; frame < 45 + 80; frame++) game.update();
   expect(game.scene).toBe('dialogue');
   expect(game.afterDialogue).toBe('boss');
   expect(game.bgm.cue).toBe('boss-minerva');

@@ -9,7 +9,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 function start(power: number, focus = false): Game {
-  const game = new Game(); game.audio.volume = 0;
+  const game = new Game(false); game.audio.volume = 0;
   game.startStage(1); game.power = power; game.autoshot = true;
   if (focus) game.keys.add('ShiftLeft');
   return game;
