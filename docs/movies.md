@@ -1,0 +1,70 @@
+# ムービーの生成手順(Geminiアプリの動画生成)
+
+Geminiアプリの動画生成で5本を作り、MP4で保存する。1本は最長10秒。つなぎの編集は要らず、ゲーム側が順に再生する。
+
+## 生成の設定
+
+1. gemini.google.com を開き、入力欄の「ツール」から「動画を作成」を選ぶ
+2. 横長(16:9)にする
+3. 表の参照画像をアップロードし、プロンプトを貼って生成する
+4. 顔や構図が崩れた版は捨てて作り直す。文字・字幕・ロゴが入った版も捨てる
+5. 保存したMP4を `public/assets/movies/` に、表のファイル名で置く
+
+- 音は使わない。ゲーム側で動画を無音にし、BGMを流す
+- 文字は極力入れない。全プロンプトの末尾で文字・字幕・ロゴを禁じている
+- 画面比は16:9。ゲームの4:3の画面には上下に帯を付けて収める
+
+## 参照画像
+
+| 画像 | パス | 用途 |
+|---|---|---|
+| キービジュアル | `public/assets/title/key-visual.webp` | 塔の外観と5人の配置、絵柄 |
+| みみこの立ち絵 | `public/assets/members/mimiko-stand.webp` | みみこの姿 |
+
+## 本リスト
+
+| # | ファイル名 | 流す場面 | 参照画像 |
+|---|---|---|---|
+| 1 | `opening.mp4` | 難易度を選んだ直後、ステージ1の前 | キービジュアル、みみこ |
+| 2 | `lastboss.mp4` | 5面の道中が終わり、ミネルヴァの会話の前 | キービジュアル |
+| 3 | `ending-1.mp4` | 5面クリア後、エンディングの1本目 | みみこ |
+| 4 | `ending-2.mp4` | エンディングの2本目 | キービジュアル |
+| 5 | `ending-3.mp4` | エンディングの3本目 | キービジュアル、みみこ |
+
+## 共通の指定
+
+各プロンプトの末尾に、次の一文を付けている。
+
+> Anime illustration style matching the reference image, soft painterly lighting, slow smooth camera movement, 16:9. No text, no letters, no captions, no subtitles, no logos, no watermark.
+
+## プロンプト
+
+### opening.mp4
+
+```text
+Night scene at the stone gate at the foot of a tall, ancient owl tower under a deep starry sky, warm lantern light at the gate, cherry petals drifting. A single sealed letter flutters in the wind past the gate and rises toward the tower. A small round grey-green owl plush with a yellow beak, the same character as the reference image, flaps up after the letter. The camera slowly tilts up along the tower toward its glowing windows and the moon. Anime illustration style matching the reference image, soft painterly lighting, slow smooth camera movement, 16:9. No text, no letters, no captions, no subtitles, no logos, no watermark.
+```
+
+### lastboss.mp4
+
+```text
+Inside the top floor of an ancient owl tower, a huge ornate double door of an old observatory slowly swings open toward the camera. Beyond the door: a great brass telescope, star charts, bookshelves, and a tall window where the night sky is just beginning to pale into crimson and platinum before dawn. Floating dust and faint golden sparkles in the air. No people in the shot. The camera slowly pushes forward through the opening door. Anime illustration style matching the reference image, soft painterly lighting, slow smooth camera movement, 16:9. No text, no letters, no captions, no subtitles, no logos, no watermark.
+```
+
+### ending-1.mp4
+
+```text
+Morning sunlight slowly fills an old observatory at the top of a tower, pouring through a tall window over a brass telescope and star charts. On a wooden desk sits a small round grey-green owl plush with a yellow beak, the same character as the reference image. It gently closes a small notebook with both wings and looks up toward the light, content. Dust motes glow in the sunbeam. Calm, warm, peaceful. Anime illustration style matching the reference image, soft painterly lighting, slow smooth camera movement, 16:9. No text, no letters, no captions, no subtitles, no logos, no watermark.
+```
+
+### ending-2.mp4
+
+```text
+Wide exterior shot of the tall owl tower from the reference image at sunrise, the sky glowing orange and gold, cherry petals and loose pages drifting in the morning breeze. On the balconies of the tower, the five girls from the reference image lean out and wave and laugh toward the camera, seen from a distance so their faces stay small. The camera slowly drifts upward and back, revealing the whole tower in the morning light. Joyful, warm, nostalgic. Anime illustration style matching the reference image, soft painterly lighting, slow smooth camera movement, 16:9. No text, no letters, no captions, no subtitles, no logos, no watermark.
+```
+
+### ending-3.mp4
+
+```text
+A sealed letter gently lands on a small round table on the rooftop of the owl tower from the reference image, bathed in bright morning light, with teacups and a few fallen cherry petals around it. Then a small round grey-green owl plush with a yellow beak, the same character as the reference image, lifts off from the rooftop and flies up into the wide, clear morning sky. The camera follows it upward, the tower falling away below, ending on the bright sky with soft clouds. Hopeful and serene. Anime illustration style matching the reference image, soft painterly lighting, slow smooth camera movement, 16:9. No text, no letters, no captions, no subtitles, no logos, no watermark.
+```

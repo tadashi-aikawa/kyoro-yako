@@ -111,6 +111,8 @@ Final boss theme for a wise, calm and curious scholar who is the owl goddess of 
 
 ### ending.mp3
 
+エンディングムービー(約30秒)・エンディングの文・スタッフロールの3段に合わせ、静かな導入からメロディが開いて余韻へ向かう構成を指定している。
+
 ```text
-Ending theme after a long night: morning sunlight over a quiet owl tower, friends laughing together. Warm, gentle and nostalgic, acoustic piano with soft strings and a light flute melody, major key, around 80 BPM, peaceful and heartwarming. Instrumental only, no vocals. Japanese game soundtrack with a memorable melody.
+Ending theme for a Japanese bullet-hell shooting game, played over the ending movie, the epilogue text and the staff roll, after a long night spent climbing a tall owl tower. Structure: a quiet, gentle intro of about 30 seconds with solo piano and soft strings, like morning sunlight slowly filling an old observatory; then the main melody blooms, warm and nostalgic, with a bright synth trumpet and piano lead over lush strings and light drums, friends reunited at dawn; finally it settles into a calm, lingering outro. Major key, around 95 BPM, 2 to 3 minutes long. Instrumental only, no vocals. A catchy, memorable melody that echoes the heroic style of the stage themes.
 ```
