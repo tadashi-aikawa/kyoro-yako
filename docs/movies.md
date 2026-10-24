@@ -32,7 +32,7 @@ Geminiアプリの動画生成で5本を作り、MP4で保存する。1本は最
 |---|---|---|---|---|
 | 1 | `opening.mp4` | あり | 難易度を選んだ直後、ステージ1の前 | みみこ(キービジュアルは渡さない。塔の全容と他のメンバーが映り込むため) |
 | 2 | `lastboss.mp4` | なし | 5面の道中が終わり、ミネルヴァの会話の前 | みみこ、ミネルヴァの立ち絵(キービジュアルは渡さない) |
-| 6 | `jinrai-gift.mp4` | なし | 4面で迅雷を倒した直後、撃破後の会話の前 | 迅雷の立ち絵、みみこの立ち絵 |
+| 6 | `jinrai-gift.mp4` | なし | 4面で迅雷を倒した直後、撃破後の会話の前。迅雷一閃の最後の攻防でみみこがとどめを刺す | 迅雷の立ち絵、みみこの立ち絵(みみこの形が崩れた版は捨てる) |
 | 3 | `ending-1.mp4` | なし | 5面クリア後、エンディングの1本目 | みみこ |
 | 4 | `ending-2.mp4` | なし | エンディングの2本目 | キービジュアル |
 | 5 | `ending-3.mp4` | なし | エンディングの3本目 | キービジュアル、みみこ |
@@ -60,7 +60,7 @@ Inside the top floor of an ancient owl tower, a huge ornate double door of an ol
 ### jinrai-gift.mp4
 
 ```text
-A moonlit Japanese garden at night with cherry blossoms falling, soft lantern light. A beautiful, mature woman with long black hair streaked with gold, gold hairpins and flowers, and a black-and-gold off-shoulder kimono, the same character as the first reference image, kneels down gracefully toward a small round grey-green owl plush with a yellow beak, the same character as the second reference image. She smiles knowingly, gently cups the plush's face and gives it a soft kiss on the cheek. The owl plush freezes, its cheeks flush bright pink, and it flaps its little wings in flustered embarrassment while petals swirl around them. She straightens up, still smiling, and gives a small encouraging nod. Warm, affectionate, slightly teasing. Anime illustration style matching the reference images, soft painterly lighting, slow smooth camera movement, 16:9. No text, no letters, no captions, no subtitles, no logos, no watermark.
+The final clash of a high-speed duel in a moonlit Japanese garden at night, cherry petals torn through the air. Character A, from the first reference image: a beautiful, mature kunoichi with long black hair streaked with gold, gold hairpins and flowers, a black-and-gold off-shoulder kimono, crackling with golden lightning. Character B, from the second reference image: a small, perfectly round, chubby owl PLUSH TOY, grey-green felt body, two large flat white disc eyes with black pupils, a tiny yellow beak, stubby wings, a spotted grey belly. It must stay exactly this toy-like round shape in every frame: never a realistic owl, never a bird with feathers or a long body, never a stylized mascot with different proportions. The two blur past each other in rapid lightning-fast exchanges, A dashing with lightning trails, B darting and dodging as a round ball. Then time slows: B dives straight in and lands the decisive blow, a bright flash of light at the impact. A is struck and falls back gracefully, her hair fanning out; the final shot is a slow close-up of A lying defeated among the petals, one hand at her chest, with a sultry, amused half-smile and half-lidded eyes, as if saying she has been beaten and rather enjoyed it. B hovers above her, round and small. Stylish, intense, then sensual and calm. Anime illustration style matching the reference images, dramatic lighting with lightning flashes, dynamic then slow camera movement, 16:9. No text, no letters, no captions, no subtitles, no logos, no watermark.
 ```
 
 ### ending-1.mp4
