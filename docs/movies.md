@@ -32,6 +32,7 @@ Geminiアプリの動画生成で5本を作り、MP4で保存する。1本は最
 |---|---|---|---|---|
 | 1 | `opening.mp4` | あり | 難易度を選んだ直後、ステージ1の前 | みみこ(キービジュアルは渡さない。塔の全容と他のメンバーが映り込むため) |
 | 2 | `lastboss.mp4` | なし | 5面の道中が終わり、ミネルヴァの会話の前 | みみこ、ミネルヴァの立ち絵(キービジュアルは渡さない) |
+| 6 | `jinrai-gift.mp4` | なし | 4面で迅雷を倒した直後、撃破後の会話の前 | 迅雷の立ち絵、みみこの立ち絵 |
 | 3 | `ending-1.mp4` | なし | 5面クリア後、エンディングの1本目 | みみこ |
 | 4 | `ending-2.mp4` | なし | エンディングの2本目 | キービジュアル |
 | 5 | `ending-3.mp4` | なし | エンディングの3本目 | キービジュアル、みみこ |
@@ -54,6 +55,12 @@ Night scene in front of a huge, ancient stone gate with carved owl ornaments and
 
 ```text
 Inside the top floor of an ancient owl tower, a huge ornate double door of an old observatory slowly swings open toward the camera. Beyond the door: a great brass telescope, star charts, bookshelves, and a tall window where the night sky is just beginning to pale into crimson and platinum before dawn. Floating dust and faint golden sparkles in the air. A small round grey-green owl plush with a yellow beak, the same character as the reference image, flies slowly through the opening door toward the window, seen from behind. In front of the tall window stands a single tall woman with long wavy hair and a long flowing dress, the same character as the second reference image, seen only as a dark backlit silhouette against the dawn sky, her back to the camera, a small owl perched on her raised hand. Her face and details are never visible. No other characters. The camera slowly pushes forward through the opening door after the plush. Anime illustration style matching the reference image, soft painterly lighting, slow smooth camera movement, 16:9. No text, no letters, no captions, no subtitles, no logos, no watermark.
+```
+
+### jinrai-gift.mp4
+
+```text
+A moonlit Japanese garden at night with cherry blossoms falling, soft lantern light. A beautiful, mature woman with long black hair streaked with gold, gold hairpins and flowers, and a black-and-gold off-shoulder kimono, the same character as the first reference image, kneels down gracefully toward a small round grey-green owl plush with a yellow beak, the same character as the second reference image. She smiles knowingly, gently cups the plush's face and gives it a soft kiss on the cheek. The owl plush freezes, its cheeks flush bright pink, and it flaps its little wings in flustered embarrassment while petals swirl around them. She straightens up, still smiling, and gives a small encouraging nod. Warm, affectionate, slightly teasing. Anime illustration style matching the reference images, soft painterly lighting, slow smooth camera movement, 16:9. No text, no letters, no captions, no subtitles, no logos, no watermark.
 ```
 
 ### ending-1.mp4
