@@ -82,7 +82,7 @@ it('openingを音なし設定に変えると動画をミュートし、道中BGM
   } finally { MOVIE_SETTINGS.opening.audio = original; }
 });
 
-it('lastbossを音あり設定に変えるとBGMを止め、会話で再開する', () => {
+it('lastbossを音あり設定に変えてもBGMは登場開始まで止める', () => {
   const original = MOVIE_SETTINGS.lastboss.audio;
   MOVIE_SETTINGS.lastboss.audio = true;
   try {
@@ -109,12 +109,42 @@ it('5面開始で残り4本を先読みし、道中終了後にlastbossを挟ん
   expect(videos).toHaveLength(5);
   game.stageIntroFrame = 180; game.stageFrame = 2899; game.midbossElapsedFrames = 6000;
   game.update();
-  expect(game.scene).toBe('transition'); run(game, 45);
-  expect(game.debugState).toMatchObject({ scene: 'movie', movie: 'lastboss', bgm: 'boss-minerva' });
+  expect(game.debugState).toMatchObject({ scene: 'transition', transition: 'lastboss-in', transitionFrame: 0, bgm: null });
+  run(game, 44); expect(game.bgm.cue).toBeNull(); game.update();
+  expect(game.debugState).toMatchObject({ scene: 'movie', movie: 'lastboss', bgm: null });
+  expect(video('lastboss').muted).toBe(true);
   expect(game.phase).toBeUndefined();
+  run(game, 60); expect(game.bgm.cue).toBeNull();
   video('lastboss').emit('ended');
-  expect(game.scene).toBe('arrival'); run(game, 80);
+  expect(game.debugState).toMatchObject({ scene: 'arrival', arrivalFrame: 0, bgm: 'boss-minerva' }); run(game, 80);
   expect(game.scene).toBe('dialogue'); expect(game.afterDialogue).toBe('boss'); expect(game.boss).toBe('minerva');
+  expect(game.bgm.cue).toBe('boss-minerva');
+  for (let i = 0; i < game.lines.length; i++) press(game);
+  expect(game.debugState).toMatchObject({ scene: 'stage', boss: 'ミネルヴァ', phase: 0, bgm: 'boss-minerva' });
+});
+
+it.each(['KeyZ', 'KeyX'])('lastbossを%sでスキップしても白フェード中は無音で、登場開始からボス曲を流す', (key) => {
+  vi.stubGlobal('location', { search: '?movie=lastboss' }); const game = new Game();
+  expect(game.debugState).toMatchObject({ scene: 'movie', bgm: null });
+  press(game, key);
+  expect(game.debugState).toMatchObject({ scene: 'transition', transition: 'lastboss-out', transitionFrame: 0, bgm: null });
+  run(game, 29); expect(game.bgm.cue).toBeNull(); game.update();
+  expect(game.debugState).toMatchObject({ scene: 'arrival', arrivalFrame: 0, bgm: 'boss-minerva' });
+});
+
+it.each(['ended', 'error', 'missing', 'rejected'] as const)('5面ボス直前のlastbossが%sでも無音から登場開始でボス曲へ切り替える', async (ending) => {
+  vi.stubGlobal('location', { search: '?stage=5&from=boss' }); const game = new Game();
+  expect(game.bgm.cue).toBe('stage-dawn');
+  const entry = video('lastboss');
+  if (ending === 'missing') { entry.error = {}; entry.emit('error'); }
+  if (ending === 'rejected') entry.play.mockRejectedValue(new Error('decode failed'));
+  run(game, 120);
+  expect(game.debugState).toMatchObject({ scene: 'transition', transition: 'lastboss-in', transitionFrame: 0, bgm: null });
+  run(game, 44); expect(game.bgm.cue).toBeNull(); game.update();
+  if (ending !== 'missing') expect(game.debugState).toMatchObject({ scene: 'movie', movie: 'lastboss', bgm: null });
+  if (ending === 'ended' || ending === 'error') entry.emit(ending);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(game.debugState).toMatchObject({ scene: 'arrival', arrivalFrame: 0, bgm: 'boss-minerva' });
 });
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの5面クリア後、3本を順再生してエンディングへ進む', (difficulty) => {

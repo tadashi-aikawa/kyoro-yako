@@ -63,9 +63,11 @@ it.each([1, 2, 3, 4, 5])('%s面の中ボスは60フレーム降下し、20フレ
 });
 
 it.each([1, 2, 3, 4])('%s面の本ボスは登場後に会話し、次に戦闘へ入る', (stage) => {
-  const game = fromBoss(stage); run(game, 120 + 60);
+  const game = fromBoss(stage); expect(game.bgm.cue).toBe(STAGES[stage - 1].bgm); run(game, 120 + 60);
+  expect(game.bgm.cue).toBe(`boss-${STAGES[stage - 1].boss}`);
   expect(game.boss).toBe(STAGES[stage - 1].boss); expect(game.bossXY).toEqual([192, 77]);
   run(game, 20); expect(game.scene).toBe('dialogue');
+  expect(game.bgm.cue).toBe(`boss-${STAGES[stage - 1].boss}`);
   for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
   expect(game.scene).toBe('stage'); expect(game.phaseFrame).toBe(0);
   game.update(); expect(game.phaseFrame).toBe(1);
@@ -110,7 +112,7 @@ it('5面は45フレームで白へ進み、動画の前後30フレームを白�
   expect(game.transition).toBe('lastboss-in'); expect(game.whiteAlpha).toBe(0);
   run(game, 22); expect(game.whiteAlpha).toBeCloseTo(22 / 45);
   run(game, 23); expect(game.scene).toBe('movie'); expect(game.whiteAlpha).toBe(1);
-  const video = lastbossVideo(); expect(video.muted).toBe(true); expect(game.bgm.cue).toBe('boss-minerva');
+  const video = lastbossVideo(); expect(video.muted).toBe(true); expect(game.bgm.cue).toBeNull();
   video.currentTime = 0.25; expect(game.whiteAlpha).toBe(0.5);
   video.currentTime = 0.5; expect(game.whiteAlpha).toBe(0);
   video.currentTime = 9.75; expect(game.whiteAlpha).toBe(0.5);

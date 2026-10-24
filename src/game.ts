@@ -308,8 +308,9 @@ export class Game {
       return;
     }
     let cue: BgmCue | null;
-    if (this.scene === 'movie') cue = this.movieName && this.movies.usesAudio(this.movieName) ? null : this.movieName === 'opening' ? 'stage-gate' : this.movieName === 'lastboss' ? 'boss-minerva' : this.movieName === 'jinrai-gift' ? 'boss-jinrai' : 'ending';
-    else if (this.scene === 'transition') cue = this.transition?.startsWith('jinrai-gift') ? 'boss-jinrai' : 'boss-minerva';
+    // ラスボス前は白フェードと動画を無音にし、arrivalでミネルヴァの曲を始める。
+    if (this.scene === 'movie') cue = this.movieName === 'lastboss' || (this.movieName && this.movies.usesAudio(this.movieName)) ? null : this.movieName === 'opening' ? 'stage-gate' : this.movieName === 'jinrai-gift' ? 'boss-jinrai' : 'ending';
+    else if (this.scene === 'transition') cue = this.transition?.startsWith('jinrai-gift') ? 'boss-jinrai' : null;
     else if (this.scene === 'gift') cue = 'boss-jinrai';
     else if (this.scene === 'arrival') cue = this.midboss ? STAGES[this.stage - 1].bgm : `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else if (this.scene === 'clear') cue = null;
