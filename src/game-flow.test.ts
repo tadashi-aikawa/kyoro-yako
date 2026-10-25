@@ -170,7 +170,7 @@ it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ�
   for (let i = 0; i < 8 + 90 + 150 + 60 + 120; i++) game.update();
   for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
   while (game.scene === 'gift') game.update();
-  for (let i = 0; i < 60; i++) game.update();
+  for (let i = 0; i < 300 && game.scene === 'departure'; i++) game.update();
   expect(game.scene).toBe('clear');
   expect(game.unlockedStages).toBe(5);
   press(game, 'KeyZ');
@@ -185,7 +185,7 @@ it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ�
   expect(game.scene).toBe('dialogue');
   for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
   expect(game.scene).toBe('departure');
-  for (let i = 0; i < 60; i++) game.update();
+  for (let i = 0; i < 300 && game.scene === 'departure'; i++) game.update();
   expect(game.scene).toBe('clear');
   press(game, 'KeyZ');
   expect(game.scene).toBe('ending');

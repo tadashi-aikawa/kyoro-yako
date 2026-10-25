@@ -35,7 +35,8 @@ function gift(): Game {
 function finishGift(game: Game): void {
   // テストの無限待ちだけを防ぐ。ゲーム内の餞別には時間制限を設けない。
   for (let i = 0; i < 600 && game.scene === 'gift'; i++) game.update();
-  expect(game.scene).toBe('departure'); run(game, 60);
+  expect(game.scene).toBe('departure');
+  for (let i = 0; i < 300 && game.scene === 'departure'; i++) game.update();
   expect(game.scene).toBe('clear');
 }
 beforeEach(() => {
@@ -134,12 +135,15 @@ it.each([0, 1, 4.99, 5])('餞別の羽根はPower%sから最高形態にし、�
   expect(game.items.objects.filter((item) => item.active && item.gift)).toHaveLength(0);
 });
 
-it('全品回収した場合は直ちに退場を始め、60フレーム後にクリアへ進む', () => {
+it('全品回収した場合は直ちに退場を始め、光の消失後に90フレーム待ってクリアへ進む', () => {
   const game = gift(); game.items.forEach((item) => {
     if (item.gift) { item.launchFrames = 0; item.x = game.px; item.y = game.py; }
   });
   game.update(); expect(game.scene).toBe('departure'); expect(game.giftFrame).toBe(1);
   run(game, 59); expect(game.scene).toBe('departure');
+  game.update(); expect(game.scene).toBe('departure');
+  while (game.particles.count > 0) game.update();
+  run(game, 89); expect(game.scene).toBe('departure');
   game.update(); expect(game.scene).toBe('clear');
 });
 
@@ -169,6 +173,27 @@ it('50フレームの投擲後は遠距離でも毎フレーム4px以下で吸�
   expect(item.y).toBeGreaterThan(y); expect(item.active).toBe(true);
 });
 
+it.each([1, 2, 3])('%s面の退場報酬は4面の餞別と同じ軌道・速度で投げて吸引する', (stage) => {
+  const reference = gift();
+  const referenceItems = reference.items.objects.filter((item) => item.active && item.gift);
+  const game = defeat(stage); run(game, 60 + 120);
+  for (let i = 0; i < game.lines.length; i++) press(game);
+  const items = game.items.objects.filter((item) => item.active);
+  expect(items).toHaveLength(3);
+  for (let frame = 1; frame <= 121; frame++) {
+    const previous = items.map(({ x, y }) => ({ x, y }));
+    reference.update(); game.update();
+    items.forEach((item, index) => {
+      const other = referenceItems[index * 3];
+      expect(item.active).toBe(other.active); expect(item.launchFrames).toBe(other.launchFrames);
+      expect(item.x).toBeCloseTo(other.x); expect(item.y).toBeCloseTo(other.y);
+      expect(item.vx).toBeCloseTo(other.vx); expect(item.vy).toBeCloseTo(other.vy);
+      if (frame > 50) expect(Math.hypot(item.x - previous[index].x, item.y - previous[index].y)).toBeLessThanOrEqual(4.000001);
+    });
+  }
+  expect(game.scene).toBe('departure'); expect(game.items.count).toBeGreaterThan(0);
+});
+
 it('120フレームを過ぎても残りを強制回収せず、取得が終わるまで待つ', () => {
   const game = gift(); game.items.forEach((item) => { if (!item.gift) item.active = false; });
   game.px = FIELD.w - 9; game.py = FIELD.h - 9; game.lives = 2;
@@ -188,7 +213,8 @@ it.each([[-100, 200], [FIELD.w + 100, 200], [192, -100], [192, FIELD.h + 100]])(
   });
   game.update();
   expect(game.scene).toBe('departure'); expect(game.items.objects.some((item) => item.active && item.gift)).toBe(false);
-  run(game, 60); expect(game.scene).toBe('clear');
+  for (let i = 0; i < 300 && game.scene === 'departure'; i++) game.update();
+  expect(game.scene).toBe('clear');
   expect(game.lives).toBe(2); expect(game.bombs).toBe(3); expect(game.power).toBe(0); expect(game.awakened).toBe(false);
   expect(game.score).toBe(game.clearBonus);
 });

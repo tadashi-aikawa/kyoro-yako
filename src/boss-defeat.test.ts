@@ -125,13 +125,14 @@ it.each([1, 2, 3])('%s面は会話後の退場開始時にlife・bomb・largeだ
   const items = game.items.objects.filter((item) => item.active);
   expect(items.map((item) => item.kind)).toEqual(['life', 'bomb', 'large']);
   expect(items.every((item) => item.auto && !item.gift && item.x === 192 && item.y === 77)).toBe(true);
-  // 退場後も回収待ちする条件を作り、時間だけでクリアしないことを確かめる。
-  for (const item of items) item.launchFrames = 90;
   expect(game.bossXY).toEqual([192, 77]); expect(game.particles.count).toBeGreaterThan(0);
   run(game, 30); expect(game.bossXY).toEqual([192, 61.375]);
   run(game, 30); expect(game.scene).toBe('departure'); expect(game.bossXY).toEqual([192, -48]);
   expect(game.items.count).toBeGreaterThan(0);
-  for (let i = 0; i < 600 && game.scene === 'departure'; i++) game.update();
+  for (let i = 0; i < 600 && game.scene === 'departure'; i++) {
+    game.update();
+    if (game.items.count > 0) expect(game.scene).toBe('departure');
+  }
   expect(game.scene).toBe('clear'); expect(game.items.count).toBe(0); expect(game.boss).toBeUndefined();
   expect(game.lives).toBe(3); expect(game.bombs).toBe(2); expect(game.power).toBe(2.5);
   expect(game.clearBonus).toBe(bonus); expect(game.score).toBe(bonus);
@@ -146,6 +147,76 @@ it.each([1, 2, 3])('%s面で報酬がすべて回収・消失しても退場60f�
   });
   game.update(); expect(game.items.count).toBe(0); expect(game.scene).toBe('departure');
   run(game, 58); expect(game.scene).toBe('departure');
+  game.update(); expect(game.scene).toBe('departure');
+  while (game.particles.count > 0) game.update();
+  run(game, 89); expect(game.scene).toBe('departure');
+  game.update(); expect(game.scene).toBe('clear');
+});
+
+it.each([1, 2, 3])('%s面の報酬は自機の位置に関係なく50fの放物線で動き、その間は取得しない', (stage) => {
+  const game = start(stage); conversation(game); depart(game);
+  game.px = 192; game.py = 77;
+  const items = game.items.objects.filter((item) => item.active);
+  const initial = items.map(({ x, y, vx, vy }) => ({ x, y, vx, vy }));
+  expect(new Set(items.map((item) => item.vx)).size).toBe(3);
+  for (let frame = 1; frame <= 50; frame++) {
+    game.update();
+    items.forEach((item, index) => {
+      const origin = initial[index];
+      expect(item.active).toBe(true); expect(item.launchFrames).toBe(50 - frame);
+      expect(item.x).toBeCloseTo(origin.x + origin.vx * frame);
+      expect(item.y).toBeCloseTo(origin.y + origin.vy * frame + 0.09 * frame * (frame + 1) / 2);
+    });
+  }
+});
+
+it.each([[-100, 200], [1000, 200], [192, -100], [192, 1000]])('画面外へ消えた退場報酬は取得扱いにせず、光の消失と90fの余韻後にクリアする x=%s y=%s', (x, y) => {
+  const game = start(1); conversation(game); depart(game);
+  const lives = game.lives, bombs = game.bombs, power = game.power;
+  game.items.forEach((item) => { item.x = x; item.y = y; });
+  game.update(); expect(game.items.count).toBe(0);
+  expect([game.lives, game.bombs, game.power]).toEqual([lives, bombs, power]);
+  run(game, 59);
+  while (game.particles.count > 0) game.update();
+  run(game, 89); expect(game.scene).toBe('departure');
+  game.update(); expect(game.scene).toBe('clear');
+});
+
+it.each([1, 2, 3])('%s面の退場報酬は700f経っても強制回収せず、最後の取得後に90f待つ', (stage) => {
+  const game = start(stage); conversation(game); depart(game);
+  const item = game.items.objects.find((item) => item.active)!;
+  game.items.forEach((other) => { if (other !== item) other.active = false; });
+  const lives = game.lives;
+  for (let frame = 0; frame < 700; frame++) {
+    Object.assign(item, { x: 100, y: 100, vx: 0, vy: 0, launchFrames: 0 });
+    game.update(); expect(game.scene).toBe('departure'); expect(item.active).toBe(true);
+  }
+  expect(game.lives).toBe(lives);
+  Object.assign(item, { x: game.px, y: game.py });
+  game.update(); expect(game.items.count).toBe(0); expect(game.lives).toBe(lives + 1);
+  run(game, 89); expect(game.scene).toBe('departure');
+  game.update(); expect(game.scene).toBe('clear');
+});
+
+it.each([1, 2, 3, 4, 5])('%s面は光が消えてから90fの余韻を取り、移動だけ許可してポーズで時計を止める', (stage) => {
+  const game = start(stage); conversation(game);
+  for (let i = 0; i < game.lines.length; i++) press(game);
+  if (game.scene === 'gift') {
+    game.items.clear(); game.update();
+  }
+  expect(game.scene).toBe('departure');
+  game.items.clear(); run(game, 60);
+  expect(game.particles.count).toBeGreaterThan(0);
+  while (game.particles.count > 0) game.update();
+  const startFrame = game.departureFrame;
+  const distance = game.sceneryDistance, x = game.px, bombs = game.bombs;
+  game.autoshot = true; game.keys.add('ArrowRight'); press(game, 'KeyX'); game.keys.clear();
+  expect(game.px).toBeGreaterThan(x); expect(game.bombs).toBe(bombs); expect(game.shots.count).toBe(0);
+  press(game, 'Escape'); run(game, 120);
+  expect(game.scene).toBe('pause'); expect(game.departureFrame).toBe(startFrame + 1);
+  press(game, 'Escape'); run(game, 88);
+  expect(game.scene).toBe('departure'); expect(game.particles.count).toBe(0);
+  expect(game.sceneryDistance).toBeCloseTo(distance + 89 * 1.8);
   game.update(); expect(game.scene).toBe('clear');
 });
 

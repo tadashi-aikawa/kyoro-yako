@@ -37,7 +37,7 @@ export interface JinraiLaser { x: number; y: number; angle: number; age: number;
 export interface Shot { active: boolean; x: number; y: number; vx: number; vy: number; damage: number; radius: number; homing: boolean; }
 export type WaveKind = 'arc' | 'ring' | 'cross' | 'threeWay' | 'return' | 'sweep' | 'pincer' | 'serpent' | 'orbit' | 'chevron';
 export interface Enemy { active: boolean; x: number; y: number; vx: number; vy: number; hp: number; age: number; hitFrames: number; color: number; kind: WaveKind; originX: number; originY: number; side: number; slot: number; }
-export interface Item { active: boolean; x: number; y: number; vx: number; vy: number; kind: ItemKind; auto: boolean; manual: boolean; gift: boolean; launchFrames: number; }
+export interface Item { active: boolean; x: number; y: number; vx: number; vy: number; kind: ItemKind; auto: boolean; manual: boolean; gift: boolean; tossed: boolean; launchFrames: number; }
 export interface Particle { active: boolean; x: number; y: number; vx: number; vy: number; age: number; life: number; color: string; size: number; }
 export interface Clone { active: boolean; x: number; y: number; vx: number; vy: number; age: number; }
 
@@ -48,7 +48,7 @@ export const SAKURA_GUST = 90;
 export const SAKURA_SWIRL = 24;
 const makeShot = (): Shot => ({ active: false, x: 0, y: 0, vx: 0, vy: -9, damage: 1, radius: 2, homing: false });
 const makeEnemy = (): Enemy => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, hp: 5, age: 0, hitFrames: 0, color: 0, kind: 'return', originX: 0, originY: 0, side: 1, slot: 0 });
-const makeItem = (): Item => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, kind: 'point', auto: false, manual: false, gift: false, launchFrames: 0 });
+const makeItem = (): Item => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, kind: 'point', auto: false, manual: false, gift: false, tossed: false, launchFrames: 0 });
 const makeParticle = (): Particle => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, age: 0, life: 30, color: '#fff', size: 2 });
 const makeClone = (): Clone => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, age: 0 });
 export const PLAYERS: PlayerId[] = ['mimiko'];
@@ -70,6 +70,7 @@ export class Game {
   private transitionFadeStart = 0;
   postBoss = false;
   departureFrame = 0;
+  private clearReadyFrame = -1;
   private bossDefeatOrigin: [number, number] = [192, 77];
   giftFrame = 0;
   endingFrame = 0;
@@ -812,11 +813,17 @@ export class Game {
     this.clearBonus = this.calculateClearBonus();
     this.giftFrame = 0;
     this.scene = 'gift';
-    const kinds: ItemKind[] = ['life', 'bomb', 'life', 'radiant', 'bomb', 'life', 'bomb'];
+    this.tossItems(['life', 'bomb', 'life', 'radiant', 'bomb', 'life', 'bomb'], true);
+  }
+
+  private tossItems(kinds: ItemKind[], gift = false): void {
     const [x, y] = this.bossPosition();
+    const center = (kinds.length - 1) / 2;
     kinds.forEach((kind, index) => {
+      const offset = (index - center) * 3 / Math.max(1, center);
       const item = this.spawnItem(x, y, kind, true);
-      if (item) Object.assign(item, { gift: true, launchFrames: 50, vx: (index - 3) * 0.8, vy: -1.8 - (3 - Math.abs(index - 3)) * 0.2 });
+      // 動きは退場報酬と餞別で共有し、羽根の最高形態化だけをgiftで区別する。
+      if (item) Object.assign(item, { gift, tossed: true, launchFrames: 50, vx: offset * 0.8, vy: -1.8 - (3 - Math.abs(offset)) * 0.2 });
     });
   }
 
@@ -833,13 +840,10 @@ export class Game {
   private startDeparture(): void {
     if (this.stage !== 4) this.clearBonus = this.calculateClearBonus();
     this.departureFrame = 0; this.scene = 'departure';
+    this.clearReadyFrame = -1;
     if (this.stage <= 3) {
       const powerItem = this.power >= MAX_POWER && !this.awakened && Math.random() < 0.05 ? 'radiant' : 'large';
-      const kinds: ItemKind[] = ['life', 'bomb', powerItem];
-      kinds.forEach((kind, index) => {
-        const item = this.spawnItem(192, 77, kind, true);
-        if (item) Object.assign(item, { vx: (index - 1) * 1.2, vy: -1.8, launchFrames: 30 });
-      });
+      this.tossItems(['life', 'bomb', powerItem]);
     }
     this.spark(192, 77, '#fff0bc', 45);
   }
@@ -853,7 +857,10 @@ export class Game {
       const [x, y] = this.bossPosition();
       this.spark(x, y, '#fff0bc', 4);
     }
-    if (this.departureFrame >= 60 && this.items.count === 0) {
+    // 光と回収が終わってから背景だけが流れる余韻を取り、入力は退場中のままにする。
+    if (this.departureFrame >= 60 && this.items.count === 0 && this.particles.count === 0) {
+      if (this.clearReadyFrame < 0) this.clearReadyFrame = this.departureFrame;
+      if (this.departureFrame - this.clearReadyFrame < 90) return;
       this.boss = undefined;
       this.finishStage(this.clearBonus);
     }
@@ -1443,7 +1450,7 @@ export class Game {
 
   spawnItem(x: number, y: number, kind: ItemKind, auto: boolean): Item | undefined {
     const item = this.items.acquire(); if (!item) return;
-    Object.assign(item, { x, y, vx: (Math.random() - 0.5) * 1.2, vy: -1.2, kind, auto, manual: false, gift: false, launchFrames: 0 });
+    Object.assign(item, { x, y, vx: (Math.random() - 0.5) * 1.2, vy: -1.2, kind, auto, manual: false, gift: false, tossed: false, launchFrames: 0 });
     return item;
   }
 
@@ -1459,8 +1466,8 @@ export class Game {
         item.vx += (this.px - item.x) * rate / 10;
         item.vy += (this.py - item.y) * rate / 10;
         item.vx *= 0.92; item.vy *= 0.92;
-        // 餞別は遠距離でも加速しすぎず、通常の回収に近い速さでゆっくり寄せる。
-        if (item.gift) {
+        // 投げた報酬は遠距離でも加速しすぎず、通常の回収に近い速さで寄せる。
+        if (item.tossed) {
           const speed = Math.hypot(item.vx, item.vy);
           if (speed > 4) { item.vx *= 4 / speed; item.vy *= 4 / speed; }
         }
@@ -1470,7 +1477,7 @@ export class Game {
         item.x = Math.max(12, Math.min(FIELD.w - 12, item.x));
         item.vx *= -1;
       }
-      if (item.y > FIELD.h + 20 || (item.gift && (item.x < -20 || item.x > FIELD.w + 20 || item.y < -20))) { item.active = false; return; }
+      if (item.y > FIELD.h + 20 || (item.tossed && (item.x < -20 || item.x > FIELD.w + 20 || item.y < -20))) { item.active = false; return; }
       if (!launching && dist < 11) { this.collectItem(item); item.active = false; }
     });
   }

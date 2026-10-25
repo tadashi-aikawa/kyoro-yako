@@ -30,6 +30,9 @@ function finishDialogue(game: Game): void {
   for (let i = 0; i < game.lines.length; i++) press(game);
   expect(game.scene).toBe('departure'); expect(game.items.count).toBe(0);
   run(game, 59); expect(game.scene).toBe('departure');
+  game.update(); expect(game.scene).toBe('departure');
+  while (game.particles.count > 0) game.update();
+  run(game, 89); expect(game.scene).toBe('departure');
   game.update();
   expect(game.scene).toBe('clear'); expect(game.giftFrame).toBe(0);
   expect(game.items.objects.some((item) => item.active && item.gift)).toBe(false);
