@@ -9,6 +9,17 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+it('手を差し出す姿は離陸中だけ使い、頭上に着いた後の待機は専用の呼吸2コマへ切り替える', () => {
+  const game = new Game();
+  expect(game.images['minerva-solo-release-sprite'].src).toContain('minerva-solo-release.webp');
+  for (const phaseFrame of [0, 104, 105, 224]) expect(minervaSoloSprite('idle', 0, phaseFrame)).toBe('minerva-solo-release');
+  expect(minervaSoloSprite('idle', 0, 225)).toBe('minerva-solo-base');
+  expect(minervaSoloSprite('idle', 22, 247)).toBe('minerva-solo-idle');
+  expect(minervaSoloSprite('left', 0, 300)).toBe('minerva-solo-left');
+  expect(minervaSoloSprite('cast', 0, 300)).toBe('minerva-solo-cast');
+  expect(minervaSoloSprite('prayer', 0, 300)).toBe('minerva-solo-prayer');
+});
+
 it('最終技は離陸の2秒間と召喚の1秒間を待ってから初弾を撃ち、次回は召喚だけを待つ', () => {
   vi.spyOn(Math, 'random').mockReturnValue(0.999);
   const game = new Game(); game.audio.volume = 0; game.invincible = true;

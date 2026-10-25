@@ -301,7 +301,7 @@ export class Renderer {
       const departing = game.scene === 'departure' || (game.scene === 'pause' && game.resumeScene === 'departure');
       const alpha = departing ? Math.max(0, 1 - game.departureFrame / 60) : 1;
       if (departing) { c.shadowColor = '#fff0bc'; c.shadowBlur = 24; }
-      const sprite = this.minervaDefeatFade(game) ? 'minerva-solo-base' : game.boss;
+      const sprite = this.minervaDefeatFade(game) ? minervaSoloSprite('idle', 0, game.phaseFrame) : game.boss;
       this.fieldCharacter(game, this.readySprite(game, sprite), x, y, 64, 0, alpha);
       c.shadowBlur = 0;
     }
@@ -404,7 +404,7 @@ export class Renderer {
         c.save();
         if (seal) { c.shadowColor = '#ffe591'; c.shadowBlur = 8 + Math.min(20, (burst - BURST_MOVE) * 0.6); }
         const roseSize = rose < 0 ? 64 : 74 + (rose >= FINALE_CHARGE ? rosePulse(rose, ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty)) * 3 : 0);
-        const soloSprite = minervaSoloSprite(channeling ? 'prayer' : casting ? 'cast' : pose, game.frame);
+        const soloSprite = minervaSoloSprite(channeling ? 'prayer' : casting ? 'cast' : pose, game.frame, game.phaseFrame);
         this.fieldCharacter(game, solo ? this.readySprite(game, soloSprite) : channeling ? 'minerva-prayer' : seal || thunder?.charging ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || thunder?.charging || sweepCharging || kissing || rose >= 0 ? 0 : Math.sin(game.frame * 0.045) * 2), roseSize, tilt, burstVisibility(burst));
         c.restore();
       }
@@ -1080,8 +1080,9 @@ export class Renderer {
 
   private minervaSummon(game: Game): void {
     if (game.boss !== 'minerva' || (game.phase?.pattern !== 'owlDawn' && !this.minervaDefeatFade(game))) return;
-    // 本体の読み込み前は手元のフクロウ付きの元絵を使うため、別体を重ねない。
-    const base = game.images['minerva-solo-base-sprite'];
+    // 離陸中はrelease、以後はbaseが未読込なら、別体を重ねない。
+    const baseId = minervaSoloSprite('idle', 0, game.phaseFrame);
+    const base = game.images[`${baseId}-sprite`];
     if (!base?.complete || !base.naturalWidth) return;
     const reprise = game.minervaReprise;
     const [x, y] = game.bossXY, c = this.ctx;
@@ -1256,6 +1257,8 @@ export class Renderer {
   private readySprite(game: Game, id: string): string {
     const sprite = game.images[`${id}-sprite`];
     if (sprite?.complete && sprite.naturalWidth > 0) return id;
+    // 離陸用が読めないときは、フクロウを伴う元絵と対にして戻す。
+    if (id === 'minerva-solo-release') return game.boss ?? id;
     if (id.startsWith('minerva-solo-')) {
       const base = game.images['minerva-solo-base-sprite'];
       if (base?.complete && base.naturalWidth > 0) return 'minerva-solo-base';

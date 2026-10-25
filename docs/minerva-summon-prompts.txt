@@ -21,3 +21,14 @@ Output: public/assets/sprites/minerva-solo-left.webp, minerva-solo-right.webp
 Create TWO matching transparent full-body chibi sprites side by side. Preserve the exact existing character identity, costume, proportions and illustration style. Replace the old outstretched palm poses: BOTH hands now hold an OPEN book close to the chest, elbows tucked near the body. She glides sideways serenely while reading or channeling from the book. Left frame: lean slightly left, gaze left, hair and dress trailing right, one knee softly bent. Right frame: lean slightly right, gaze right, hair and dress trailing left, opposite knee softly bent. Same character size and foot baseline, full body and trailing hair, generous transparent padding. No outstretched perch-like palm, owl, bird, bag, particles, magic circle, background, text, grid or watermark. Real alpha transparency.
 
 Right-frame cleanup: edit the generated right-gliding sprite to remove a stray thin red line at the outer edge and any isolated marks outside the character silhouette. Make those pixels fully transparent. Preserve the pose, face, costume, colors, full hair and feet, BOTH hands on the open book and square framing. Built-in imagegen, transparent background. Normalize to the same 384px canvas and foot baseline as the other poses, WebP q90 with lossless alpha.
+
+Stationary pose revision
+Tool: built-in imagegen
+Edit targets: public/assets/sprites/minerva-solo-base.webp, minerva-solo-idle.webp
+Supporting original identity reference: public/assets/sprites/minerva.webp
+Output: public/assets/sprites/minerva-solo-base.webp, minerva-solo-idle.webp
+The previous outstretched base pose is preserved as minerva-solo-release.webp for the opening flight only.
+
+Create TWO closely matching transparent full-body chibi sprites for a stationary breathing animation. Preserve the exact existing identity, costume, proportions and clean illustration style. Both frames show Minerva calm and upright, looking at the player with a quiet closed-mouth smile, BOTH hands supporting an OPEN book at the lower chest, elbows relaxed near the torso. No sideways lean, running pose or outstretched perch-like palm. Feet together with one slightly forward, long hair falling downward. Base and idle must share facial geometry, hand placement, book, body size and foot baseline; only a tiny breathing lift and subtle hair-tip and hem motion differ. They alternate every 22 frames. Full body and hair, generous transparent margins. No owl, bird, feathers, bag, magic, particles, pedestal, text, grid or watermark. Real alpha transparency.
+
+Stationary processing: align the crops to the visible alpha bounds with 2px padding before resizing, to keep transparent stray pixels from shifting the character between frames. Base crop 622x852+211+21; idle crop 632x852+135+21 in their respective half-sheet cells. Resize into the same 384px square and shared foot baseline, WebP q90 with lossless alpha.

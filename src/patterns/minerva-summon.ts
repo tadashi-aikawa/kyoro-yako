@@ -3,10 +3,12 @@ import type { Reprise } from './minerva-reprise';
 
 export const OWL_RELEASE_START = 105;
 export const OWL_RELEASE_FRAMES = 120;
-export const MINERVA_SOLO_SPRITES = ['base', 'idle', 'left', 'right', 'cast', 'prayer'].map(pose => `minerva-solo-${pose}`);
+export const MINERVA_SOLO_SPRITES = ['base', 'idle', 'left', 'right', 'cast', 'prayer', 'release'].map(pose => `minerva-solo-${pose}`);
 export const MINERVA_OWL_SPRITES = [0, 1, 2].map(frame => `minerva-owl-${frame}`);
 
-export function minervaSoloSprite(pose: BossPose | 'prayer', frame: number): string {
+export function minervaSoloSprite(pose: BossPose | 'prayer', frame: number, phaseFrame = Infinity): string {
+  // 手を差し出す姿は離陸中に限る。以後の待機は両手で本を抱える。
+  if (phaseFrame < OWL_RELEASE_START + OWL_RELEASE_FRAMES) return 'minerva-solo-release';
   return `minerva-solo-${pose === 'idle' && Math.floor(frame / IDLE_STEP) % 2 === 0 ? 'base' : pose}`;
 }
 
