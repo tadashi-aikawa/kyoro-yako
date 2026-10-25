@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
-import { emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
+import { DASH_ATTACK, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
 import { PRAYER_PERIOD } from './patterns/minerva-dawn';
 import { STAGES } from './stages';
 
@@ -102,6 +102,7 @@ it('格子は行数によらず一斉移動のSEを1回だけ鳴らす', () => {
 it('一閃と夜桜の突風が発動に同期する', () => {
   const game = new Game(); game.startStage(4); game.startBoss(false, 10);
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
+  game.phaseFrame = DASH_ATTACK;
   game.jinraiDashTick = 61;
   emitJinraiPattern(game, 'jinraiDash', 0);
   expect(play).toHaveBeenCalledWith('slash');

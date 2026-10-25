@@ -11,6 +11,9 @@ export const BURST_SHOTS = [48, 66, 84] as const;
 export const BURST_RETURN = 96;
 export const BURST_SPEED = 5.6;
 export const BURST_PETAL_RATIO = 0.92;
+export const DASH_CHARGE = 180;
+export const DASH_CUTIN = DASH_CHARGE + 30;
+export const DASH_ATTACK = DASH_CUTIN + 105;
 const BURST_DURATION = 120;
 // 前回の発散開始から8秒以上経ち、横断・往復を終えた区切りで三連発散する。
 export function dashBurstStep(game: Game): number {
@@ -23,7 +26,17 @@ export function burstVisibility(step: number): number {
   if (step < BURST_MOVE) return 0;
   return (step - BURST_MOVE) / 10;
 }
-export function dashPosition(game: Game): [number, number] {
+export function dashPosition(game: Game, entry: [number, number] = [192, 132]): [number, number] {
+  if (game.phaseFrame < DASH_ATTACK) {
+    if (game.phaseFrame < DASH_CUTIN) {
+      const progress = Math.min(1, game.phaseFrame / 45);
+      const ease = 1 - (1 - progress) ** 3;
+      return [entry[0] + (192 - entry[0]) * ease, entry[1] + (132 - entry[1]) * ease];
+    }
+    const progress = (game.phaseFrame - DASH_CUTIN) / (DASH_ATTACK - DASH_CUTIN);
+    const ease = progress * progress * (3 - 2 * progress);
+    return [192 - 168 * ease, 132 - 17 * ease];
+  }
   const tick = Math.max(0, game.jinraiDashTick);
   const local = tick - (game.jinraiDashDouble && tick >= 85 ? 85 : 0);
   const warning = [30, 24, 20, 16][['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty)];
@@ -135,6 +148,7 @@ export function emitJinraiPattern(game: Game, pattern: string, t: number): void 
   }
 
   function emitJinraiDash(game: Game, level: number): void {
+    if (game.phaseFrame < DASH_ATTACK) return;
     const lowHp = game.phaseHp <= game.phaseMaxHp * 0.5;
     const crossingEnd = game.jinraiDashTick === (game.jinraiDashDouble ? 169 : 89);
     const burstReady = game.jinraiBurstStartFrame < 0 || game.phaseFrame - game.jinraiBurstStartFrame >= 480;

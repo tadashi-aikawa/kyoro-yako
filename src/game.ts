@@ -12,7 +12,7 @@ import { claudineScene, complementBoundary, emitClaudine, whiteSpaceCircle } fro
 import { reflectEnterShot } from './patterns/enter-reflect';
 import { emitEtokichi, emitGalaxyFlash, type GalaxyFlash, updateGalaxyFlash } from './patterns/etokichi';
 import { emitEtokichiDawn } from './patterns/etokichi-dawn';
-import { burstPosition, burstVisibility, dashBurstStep, dashPosition, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
+import { burstPosition, burstVisibility, DASH_ATTACK, DASH_CHARGE, DASH_CUTIN, dashBurstStep, dashPosition, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
 import { jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_FADE, updateJinraiHeart } from './patterns/jinrai-kiss';
 import { type Thunderbolt, type Thunderstorm, thunderPosition } from './patterns/jinrai-thunder';
@@ -925,9 +925,14 @@ export class Game {
     this.clearBullets(); this.shots.clear(); this.clones.clear();
     if (phase.spell) {
       this.spellBonus = 1_000_000 + this.stage * 500_000;
-      this.cutin = 100;
-      this.flash = 12;
-      this.audio.play('declare');
+      if (phase.pattern === 'jinraiDash') {
+        this.cutin = 0; this.flash = 0;
+        this.audio.play('prayerCharge');
+      } else {
+        this.cutin = 100;
+        this.flash = 12;
+        this.audio.play('declare');
+      }
     }
   }
 
@@ -1023,6 +1028,10 @@ export class Game {
   private updateBoss(): void {
     const phase = this.phase!;
     this.phaseFrame++;
+    if (phase.pattern === 'jinraiDash') {
+      if (this.phaseFrame === DASH_CHARGE) { this.audio.play('thunderBurst'); this.spark(...this.bossXY, '#d8eaff', 24); }
+      if (this.phaseFrame === DASH_CUTIN) { this.cutin = 100; this.flash = 12; this.audio.play('declare'); }
+    }
     if (this.midboss) this.midbossElapsedFrames++;
     if (phase.spell) this.spellBonus = Math.max(0, this.spellBonus - 22);
     if (this.phaseFrame >= 105) this.emitPattern(phase.pattern);
@@ -1069,7 +1078,7 @@ export class Game {
     }
     if (this.phase?.pattern === 'jinraiDash') {
       const step = dashBurstStep(this);
-      return step >= 0 ? burstPosition(this, step) : dashPosition(this);
+      return step >= 0 ? burstPosition(this, step) : dashPosition(this, this.bossEntry);
     }
     if (this.phase?.pattern === 'flash') return [192 + Math.sin(this.phaseFrame * 0.052) * 120, 132];
     if (this.phase) {
@@ -1317,6 +1326,8 @@ export class Game {
   }
 
   private damageBoss(damage: number): void {
+    // 印とカットインを撃ち込みで飛ばせないよう、導入中はダメージを受けない。
+    if (this.phase?.pattern === 'jinraiDash' && this.phaseFrame < DASH_ATTACK) return;
     if (this.phase?.pattern === 'owlDawn' && this.minervaReprise && !this.minervaReprise.prayer && repriseLocal(this.phaseFrame, this.minervaReprise) < reprisePrepare(this.minervaReprise)) return;
     this.phaseHp -= damage * (this.phase?.pattern === 'owlDawn' ? 2 / 3 : this.phase?.pattern === 'jinraiDash' ? 2 : 1);
   }

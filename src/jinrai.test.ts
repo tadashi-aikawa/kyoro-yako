@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { emitBossNormal, normalPeriod } from './patterns/boss-normal';
-import { dashBurstStep, emitJinraiPattern } from './patterns/jinrai';
+import { DASH_ATTACK, DASH_CHARGE, DASH_CUTIN, dashBurstStep, emitJinraiPattern } from './patterns/jinrai';
 import { CLONE_HOP, CLONE_SHOOT, CLONE_STAGGER, HOP_OUT, jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_CHARGE, KISS_FADE, KISS_LIFE, KISS_PERIOD, kissEdgeWarning, updateJinraiHeart } from './patterns/jinrai-kiss';
 import { bulletSpeed } from './rules';
@@ -18,13 +18,13 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 function phase(index: number): Game {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   game.startStage(4); game.startBoss(false, index);
-  game.phaseFrame = 104; game.update();
+  game.phaseFrame = index === 10 ? DASH_ATTACK - 1 : 104; game.update();
   return game;
 }
 
 function startDashBurst(game: Game): number {
   game.phaseHp = game.phaseMaxHp / 2;
-  for (let frame = 0; frame < 300 && game.jinraiBurstStartFrame < 0; frame++) game.update();
+  for (let frame = 0; frame < DASH_ATTACK + 300 && game.jinraiBurstStartFrame < 0; frame++) game.update();
   expect(game.jinraiBurstStartFrame).toBeGreaterThanOrEqual(0);
   return game.jinraiBurstStartFrame;
 }
@@ -263,6 +263,33 @@ it('花吹雪は難易度が上がるほど螺旋の腕を増やす', () => {
   }
 });
 
+it('一閃は3秒の印から放電し、カットイン終了後に攻撃を始める', () => {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true;
+  const play = vi.spyOn(game.audio, 'play');
+  game.startStage(4); game.startBoss(false, 10);
+  expect(play).toHaveBeenCalledWith('prayerCharge');
+  expect(play).not.toHaveBeenCalledWith('declare');
+  const hp = game.phaseHp;
+  game.autoshot = true; game.power = 5;
+  for (let frame = 1; frame < DASH_ATTACK; frame++) {
+    game.px = game.bossXY[0]; game.update();
+    expect(game.bullets.count).toBe(0);
+    expect(game.jinraiDashTick).toBe(-1);
+    expect(game.phaseHp).toBe(hp);
+    if (frame < DASH_CHARGE) expect(play).not.toHaveBeenCalledWith('thunderBurst');
+    if (frame === DASH_CHARGE) {
+      expect(play).toHaveBeenCalledWith('thunderBurst');
+      expect(game.bossXY).toEqual([192, 132]);
+    }
+    if (frame < DASH_CUTIN) expect(game.cutin).toBe(0);
+    if (frame === DASH_CUTIN) { expect(game.cutin).toBe(100); expect(play).toHaveBeenCalledWith('declare'); }
+  }
+  game.update();
+  expect(game.jinraiDashTick).toBe(0);
+  expect(game.bossXY).toEqual([24, 115]);
+  expect(game.cutin).toBe(0);
+});
+
 it('一閃は時間制限∞・体力1620のスペルで、時間切れにならず撃破すると終了する', () => {
   const game = phase(10);
   expect(game.phase).toMatchObject({ kind: 'spell', duration: Infinity, hp: 1620 });
@@ -290,7 +317,7 @@ it('一閃のボーナスはミネルヴァ最終技と同じ速度で減衰し�
   }
 });
 
-it.each([130, 1300, 4000])('一閃は体力50%%超では発散せず、50%%到達後の横断終了から発散する: frame %s', (frame) => {
+it.each([DASH_ATTACK + 25, 1300, 4000])('一閃は体力50%%超では発散せず、50%%到達後の横断終了から発散する: frame %s', (frame) => {
   const game = phase(10);
   const play = vi.spyOn(game.audio, 'play');
   game.phaseHp = game.phaseMaxHp / 2 + 1;
@@ -359,7 +386,7 @@ it('一閃は開幕から体力半分以下なら最初の往復が終わって�
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   game.startStage(4); game.startBoss(false, 10);
   game.phaseHp = game.phaseMaxHp / 2;
-  while (game.phaseFrame < 189) game.update();
+  while (game.phaseFrame < DASH_ATTACK + 84) game.update();
   expect(game.jinraiDashDouble).toBe(true);
   expect(game.jinraiDashTick).toBe(84);
   expect(game.jinraiDashCrossing).toBe(0);
@@ -367,7 +394,7 @@ it('一閃は開幕から体力半分以下なら最初の往復が終わって�
   game.update();
   expect(dashBurstStep(game)).toBe(-1);
   expect(game.jinraiDashCrossing).toBe(1);
-  while (game.phaseFrame < 274) game.update();
+  while (game.phaseFrame < DASH_ATTACK + 169) game.update();
   expect(game.jinraiDashTick).toBe(169);
   expect(dashBurstStep(game)).toBe(-1);
   game.update();
@@ -495,6 +522,7 @@ it('一閃の高さは3段を巡回し、体力半分以下では次の巡回か
 it('一閃はNormalの進行中に画面内へ40〜90発を維持する', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   game.startStage(4); game.startBoss(false, 10);
+  while (game.phaseFrame < DASH_ATTACK - 105) game.update();
   for (let frame = 1; frame <= 720; frame++) {
     game.update();
     if (frame < 240 || frame % 60 !== 0) continue;
