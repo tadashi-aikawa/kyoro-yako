@@ -82,7 +82,7 @@ it.each(['KeyZ', 'KeyX'])('動画を%sでスキップすると静止映像を20�
   expect(game.movies.current).toBeUndefined(); expect(video().pause).toHaveBeenCalled();
 });
 
-it.each([1, 2, 3, 5])('%s面の本ボス後に餞別を出さない', (stage) => {
+it.each([1, 2, 3])('%s面の本ボス後に餞別を出さない', (stage) => {
   const game = defeat(stage);
   expect(game.scene).toBe('dialogue'); expect(game.afterDialogue).toBe('clear');
   for (let i = 0; i < game.lines.length; i++) press(game);

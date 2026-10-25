@@ -147,7 +147,7 @@ it('全ステージの戦闘最後に回収時間を設け、拾わなければ�
       expect(game.collectionFrames).toBe(0);
       expect(game.power).toBe(3);
       expect(game.bombs).toBe(0);
-      expect(game.scene).toBe(!mid && stage === 4 ? 'transition' : mid && stage !== 3 && stage !== 5 ? 'stage' : 'dialogue');
+      expect(game.scene).toBe(!mid && stage >= 4 ? 'transition' : mid && stage !== 3 && stage !== 5 ? 'stage' : 'dialogue');
     }
   }
 });

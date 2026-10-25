@@ -181,6 +181,8 @@ it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ�
   game.update();
   expect(game.phase).toBeUndefined();
   while (game.collectionFrames > 0) game.update();
+  expect(game.transition).toBe('minerva-finale-in');
+  for (let i = 0; i < 40; i++) game.update();
   expect(game.scene).toBe('dialogue');
   for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
   expect(game.scene).toBe('clear');

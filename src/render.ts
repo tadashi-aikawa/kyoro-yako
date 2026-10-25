@@ -76,7 +76,7 @@ export class Renderer {
   draw(game: Game): void {
     const c = this.ctx;
     c.fillStyle = '#080817'; c.fillRect(0, 0, 640, 480);
-    if (game.scene === 'movie' || (game.scene === 'transition' && (game.transition === 'lastboss-out' || game.transition === 'jinrai-gift-out'))) {
+    if (game.scene === 'movie' || (game.scene === 'transition' && (game.transition === 'lastboss-out' || game.transition === 'jinrai-gift-out' || game.transition === 'minerva-finale-out'))) {
       c.fillStyle = '#000'; c.fillRect(0, 0, 640, 480);
       const video = game.movies.current;
       if (video && video.readyState >= 2) c.drawImage(video, 0, 60, 640, 360);

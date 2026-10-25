@@ -29,7 +29,7 @@ function game(): Game {
 function clear(g: Game, stage: number): void {
   g.startStage(stage); g.startBoss(false, STAGES[stage - 1].phases.length - 1); g.skipPhase();
   while (g.collectionFrames > 0) g.update();
-  if (stage === 4) for (let i = 0; i < 40; i++) g.update();
+  if (stage >= 4) for (let i = 0; i < 40; i++) g.update();
   expect(g.scene).toBe('dialogue');
   for (let i = 0; i < g.lines.length; i++) press(g, 'KeyZ');
   while (g.scene === 'gift') g.update();

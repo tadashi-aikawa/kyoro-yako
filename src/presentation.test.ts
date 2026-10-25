@@ -103,9 +103,9 @@ it('練習ではopeningを再生しない', () => {
   expect(video('opening').play).not.toHaveBeenCalled();
 });
 
-it('5面開始で残り4本を先読みし、道中終了後にlastbossを挟んで会話へ進む', () => {
+it('5面開始で5本を先読みし、道中終了後にlastbossを挟んで会話へ進む', () => {
   const game = new Game(); game.startStage(5);
-  expect(videos).toHaveLength(5);
+  expect(videos).toHaveLength(6);
   game.stageIntroFrame = 180; game.stageFrame = 2899; game.midbossElapsedFrames = 6000;
   game.update();
   expect(game.debugState).toMatchObject({ scene: 'transition', transition: 'lastboss-in', transitionFrame: 0, bgm: 'stage-dawn', bgmVolume: 0.21 });
@@ -186,7 +186,7 @@ it.each(MOVIES)('?movie=%sは指定した1本だけを再生する', (name) => {
   vi.stubGlobal('location', { search: `?movie=${name}` }); const game = new Game();
   expect(game.movieName).toBe(name); video(name).emit('ended');
   if (name === 'lastboss') run(game, 210);
-  expect(game.scene).toBe(name === 'opening' ? 'stage' : name === 'lastboss' ? 'arrival' : name === 'jinrai-gift' ? 'dialogue' : 'ending');
+  expect(game.scene).toBe(name === 'opening' ? 'stage' : name === 'lastboss' ? 'arrival' : name === 'jinrai-gift' || name === 'minerva-finale' ? 'dialogue' : 'ending');
   expect(game.movieName).toBeUndefined();
   expect(videos.filter((entry) => entry.play.mock.calls.length > 0)).toHaveLength(1);
 });
