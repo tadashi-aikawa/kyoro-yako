@@ -115,6 +115,7 @@ export class Game {
   private bossEntry: [number, number] = [192, 77];
   phaseHp = 0;
   phaseMaxHp = 0;
+  private initialPhaseHpRatio?: number;
   encoreCount = 0;
   spellBonus = 0;
   cutin = 0;
@@ -250,11 +251,13 @@ export class Game {
     const stage = Number(this.params.get('stage'));
     if (Number.isInteger(boss) && boss >= 1 && boss <= STAGES.length) {
       this.startStage(boss);
+      this.initialPhaseHpRatio = this.queryNumber('hp', 0.01, 1, 1);
       this.startBoss(this.params.get('mid') === '1', Math.max(0, Math.floor(Number(this.params.get('phase')) || 0)));
       this.messageFrames = 0;
     } else if (Number.isInteger(stage) && stage >= 1 && stage <= STAGES.length) {
       this.startStage(stage);
       if (this.params.get('from') === 'boss') {
+        this.initialPhaseHpRatio = this.queryNumber('hp', 0.01, 1, 1);
         this.stageIntroFrame = 180;
         this.midbossElapsedFrames = midPhases(STAGES[stage - 1].mid, stage).reduce((total, phase) => total + phase.duration * 60, 0);
         this.stageFrame = this.bossAt - 120;
@@ -548,6 +551,7 @@ export class Game {
     this.midboss = false;
     this.phase = undefined;
     this.phaseIndex = -1;
+    this.initialPhaseHpRatio = undefined;
     this.minervaReprise = undefined;
     this.px = FIELD.w / 2;
     this.py = FIELD.h - 50;
@@ -832,8 +836,9 @@ export class Game {
     this.lastBossShotFrame = -1;
     this.bossCastFrame = -Infinity;
     this.encoreCount = 0;
-    this.phaseHp = phase.hp;
+    this.phaseHp = phase.hp * (this.initialPhaseHpRatio ?? 1);
     this.phaseMaxHp = phase.hp;
+    this.initialPhaseHpRatio = undefined;
     this.jinraiLasers.length = 0;
     this.jinraiBolts.length = 0; this.jinraiThunderstorm = undefined;
     this.minervaReprise = undefined;
