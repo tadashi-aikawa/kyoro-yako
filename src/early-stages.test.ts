@@ -211,9 +211,10 @@ it('残り10秒で旧弾を消し、1秒の構えから薔薇と自機狙いを�
     expect(game.phase?.pattern).toBe('final');
     game.update();
     expect(game.phase).toBeUndefined();
-    expect(game.collectionFrames).toBe(180);
+    expect(game.collectionFrames).toBe(0);
+    expect(game.transition).toBe('boss-defeat-flash');
     expect(game.bullets.count).toBe(0);
-    for (let i = 0; i < 180; i++) game.update();
+    for (let i = 0; i < 8 + 90 + 60 + 120; i++) game.update();
     expect(game.scene).toBe('dialogue');
   }
 });

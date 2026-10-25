@@ -80,7 +80,7 @@ export class Renderer {
       c.fillStyle = '#000'; c.fillRect(0, 0, 640, 480);
       const video = game.movies.current;
       if (video && video.readyState >= 2) c.drawImage(video, 0, 60, 640, 360);
-      this.fade(game.whiteAlpha, '#fff'); this.fade(game.blackAlpha, '#000');
+      this.fade(game.whiteAlpha, '#fff');
       return;
     }
     if (game.scene === 'title' || game.scene === 'difficulty' || game.scene === 'player' || game.scene === 'practice' || game.scene === 'option' || game.scene === 'help' || game.scene === 'notebook') {
@@ -91,10 +91,10 @@ export class Renderer {
     this.drawField(game);
     this.drawPanel(game);
     if (game.scene === 'dialogue') this.drawDialogue(game);
-    if (game.scene === 'pause') { this.fade(game.whiteAlpha, '#fff'); this.fade(game.blackAlpha, '#000'); }
+    if (game.scene === 'pause') this.fade(game.whiteAlpha, '#fff');
     if (game.scene === 'clear' || game.scene === 'pause' || game.scene === 'gameover') this.drawOverlay(game);
     if (import.meta.env.DEV) { this.text(`FPS ${game.fps.toFixed(0)}`, 37, 456, 9, '#ccd4ee'); }
-    if (game.scene !== 'pause') { this.fade(game.whiteAlpha, '#fff'); this.fade(game.blackAlpha, '#000'); }
+    if (game.scene !== 'pause') this.fade(game.whiteAlpha, '#fff');
   }
 
   private fade(alpha: number, color: string): void {
@@ -295,9 +295,13 @@ export class Renderer {
     c.beginPath(); c.rect(0, 0, FIELD.w, FIELD.h); c.clip();
     drawScenery(c, game);
     const beforeTalk = game.scene === 'dialogue' && (game.afterDialogue === 'boss' || game.afterDialogue === 'mid');
-    if (game.boss && !game.phase && (game.scene === 'arrival' || beforeTalk || game.scene === 'gift' || (game.scene === 'pause' && (game.resumeScene === 'arrival' || game.resumeScene === 'gift')))) {
+    if (game.boss && !game.phase && (game.postBoss || game.scene === 'arrival' || beforeTalk || game.scene === 'gift' || (game.scene === 'pause' && (game.resumeScene === 'arrival' || game.resumeScene === 'gift')))) {
       const [x, y] = game.bossXY;
-      this.fieldCharacter(game, this.readySprite(game, game.boss), x, y, 64, 0);
+      const departing = game.scene === 'departure' || (game.scene === 'pause' && game.resumeScene === 'departure');
+      const alpha = departing ? Math.max(0, 1 - game.departureFrame / 60) : 1;
+      if (departing) { c.shadowColor = '#fff0bc'; c.shadowBlur = 24; }
+      this.fieldCharacter(game, this.readySprite(game, game.boss), x, y, 64, 0, alpha);
+      c.shadowBlur = 0;
     }
     if (game.phase?.spell) {
       c.fillStyle = '#06031977'; c.fillRect(0, 0, FIELD.w, FIELD.h);

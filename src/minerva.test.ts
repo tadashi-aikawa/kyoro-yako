@@ -226,7 +226,9 @@ it('終符は時間が経っても終わらず、HPを削るとクリアにな�
   expect(game.phaseHp).toBeGreaterThan(1);
   game.phaseHp = 0; game.update();
   expect(game.phase).toBeUndefined();
-  expect(game.collectionFrames).toBe(180);
+  expect(game.collectionFrames).toBe(0);
+  expect(game.transition).toBe('boss-defeat-flash');
+  expect(game.items.count).toBe(0);
 });
 
 it('終符の祈りは元の溜めと発散を保ち、再演3回の後に挟む', () => {

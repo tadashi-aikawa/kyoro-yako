@@ -167,10 +167,10 @@ it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ�
   game.startStage(4);
   game.startBoss(false, 10);
   game.skipPhase();
-  while (game.collectionFrames > 0) game.update();
-  for (let i = 0; i < 40; i++) game.update(); // 未配置動画と黒フェードを終える。
+  for (let i = 0; i < 8 + 90 + 150 + 60 + 120; i++) game.update();
   for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
   while (game.scene === 'gift') game.update();
+  for (let i = 0; i < 60; i++) game.update();
   expect(game.scene).toBe('clear');
   expect(game.unlockedStages).toBe(5);
   press(game, 'KeyZ');
@@ -180,14 +180,16 @@ it('4面クリア後は5面へ進み、ラスボス後はみみこの結末へ�
   game.phaseHp = 0;
   game.update();
   expect(game.phase).toBeUndefined();
-  while (game.collectionFrames > 0) game.update();
-  expect(game.transition).toBe('minerva-finale-in');
-  for (let i = 0; i < 40; i++) game.update();
+  expect(game.transition).toBe('boss-defeat-flash');
+  for (let i = 0; i < 8 + 90 + 150 + 60 + 120; i++) game.update();
   expect(game.scene).toBe('dialogue');
   for (let i = 0; i < game.lines.length; i++) press(game, 'KeyZ');
+  expect(game.scene).toBe('departure');
+  for (let i = 0; i < 60; i++) game.update();
   expect(game.scene).toBe('clear');
   press(game, 'KeyZ');
   expect(game.scene).toBe('ending');
+  expect(game.bgm.sceneVolumeMultiplier).toBe(1);
   expect(game.endingLines).toHaveLength(6);
 });
 

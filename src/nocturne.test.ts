@@ -28,23 +28,25 @@ function game(): Game {
 
 function clear(g: Game, stage: number): void {
   g.startStage(stage); g.startBoss(false, STAGES[stage - 1].phases.length - 1); g.skipPhase();
-  while (g.collectionFrames > 0) g.update();
-  if (stage >= 4) for (let i = 0; i < 40; i++) g.update();
+  for (let i = 0; i < 8 + 90 + (stage >= 4 ? 150 : 0) + 60 + 120; i++) g.update();
   expect(g.scene).toBe('dialogue');
   for (let i = 0; i < g.lines.length; i++) press(g, 'KeyZ');
   while (g.scene === 'gift') g.update();
+  while (g.scene === 'departure') g.update();
   expect(g.scene).toBe('clear');
 }
 
-it('中ボスでは記録を獲得せず、ボス後の会話を終えたときに獲得する', () => {
+it('中ボスでは記録を獲得せず、ボス後の会話・退場と回収を終えたときに獲得する', () => {
   const g = game(); g.startStage(1); g.startBoss(true, 0); g.skipPhase(); g.skipPhase();
   while (g.collectionFrames > 0) g.update();
   for (let i = 0; i < g.lines.length; i++) press(g, 'KeyZ');
   expect(g.collectedRecords).toEqual([]);
   g.startBoss(false, 6); g.skipPhase();
-  while (g.collectionFrames > 0) g.update();
+  for (let i = 0; i < 8 + 90 + 60 + 120; i++) g.update();
   expect(g.collectedRecords).toEqual([]);
   for (let i = 0; i < g.lines.length; i++) press(g, 'KeyZ');
+  expect(g.collectedRecords).toEqual([]);
+  while (g.scene === 'departure') g.update();
   expect(g.collectedRecords).toEqual([1]);
   expect(storage.get('owlery-records')).toBe('1');
 });

@@ -128,27 +128,25 @@ it('弾消しで点アイテムがプールを埋めても補充品を優先す�
   expect(supplies(game).some((item) => item.kind === 'bomb')).toBe(true);
 });
 
-it('全ステージの戦闘最後に回収時間を設け、拾わなければ補充しない', () => {
+it('全中ボスの戦闘最後に回収時間を設け、拾わなければ補充しない', () => {
   for (let stage = 1; stage <= STAGES.length; stage++) {
-    for (const mid of [true, false]) {
-      const game = start(stage, mid ? midPhases(STAGES[stage - 1].mid, stage).length - 1 : STAGES[stage - 1].phases.length - 1, mid);
-      game.bombs = 0;
-      game.power = 3;
-      game.px = 12; game.py = 439;
-      game.skipPhase();
-      expect(game.phase).toBeUndefined();
-      expect(game.scene).toBe('stage');
-      expect(game.collectionFrames).toBe(180);
-      const stageFrame = game.stageFrame;
-      run(game, 179);
-      expect(game.scene).toBe('stage');
-      expect(game.stageFrame).toBe(stageFrame);
-      game.update();
-      expect(game.collectionFrames).toBe(0);
-      expect(game.power).toBe(3);
-      expect(game.bombs).toBe(0);
-      expect(game.scene).toBe(!mid && stage >= 4 ? 'transition' : mid && stage !== 3 && stage !== 5 ? 'stage' : 'dialogue');
-    }
+    const game = start(stage, midPhases(STAGES[stage - 1].mid, stage).length - 1, true);
+    game.bombs = 0;
+    game.power = 3;
+    game.px = 12; game.py = 439;
+    game.skipPhase();
+    expect(game.phase).toBeUndefined();
+    expect(game.scene).toBe('stage');
+    expect(game.collectionFrames).toBe(180);
+    const stageFrame = game.stageFrame;
+    run(game, 179);
+    expect(game.scene).toBe('stage');
+    expect(game.stageFrame).toBe(stageFrame);
+    game.update();
+    expect(game.collectionFrames).toBe(0);
+    expect(game.power).toBe(3);
+    expect(game.bombs).toBe(0);
+    expect(game.scene).toBe(stage !== 3 && stage !== 5 ? 'stage' : 'dialogue');
   }
 });
 
@@ -177,18 +175,20 @@ it('回収時間中は移動でき、ポーズで時計が止まり、再開後�
   expect(game.collectionFrames).toBe(0);
 });
 
-it('本ボスの回収時間中もボスBGMを維持する', () => {
+it('本ボスの白演出中もボスBGMを35%で維持し、対峙から通常音量へ戻す', () => {
   const game = start(4, STAGES[3].phases.length - 1);
   game.update();
   expect(game.bgm.cue).toBe('boss-jinrai');
   game.skipPhase();
   game.update();
   expect(game.bgm.cue).toBe('boss-jinrai');
-  run(game, 179);
+  run(game, 8 + 90 + 149);
   expect(game.scene).toBe('transition');
   expect(game.bgm.cue).toBe('boss-jinrai');
-  run(game, 40);
+  expect(game.bgm.sceneVolumeMultiplier).toBe(0.35);
+  run(game, 60 + 120);
   expect(game.scene).toBe('dialogue');
+  expect(game.bgm.sceneVolumeMultiplier).toBe(1);
   expect(game.bgm.cue).toBe('boss-jinrai');
 });
 

@@ -34,6 +34,38 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
+it.each(['arrival', 'dialogue', 'gift', 'departure'] as const)('撃破後の%sからポーズでタイトルへ戻ると演出状態を消し、次のopeningは通常倍率で再生する', (scene) => {
+  const game = new Game(); game.audio.volume = 0;
+  game.startStage(4); game.startBoss(false, 999); game.skipPhase(); run(game, 98);
+  video('jinrai-gift').emit('ended'); run(game, 150 + 60);
+  if (scene !== 'arrival') run(game, 120);
+  if (scene === 'gift' || scene === 'departure') for (let i = 0; i < game.lines.length; i++) press(game);
+  if (scene === 'departure') {
+    game.items.forEach((item) => { item.x = game.px; item.y = game.py; item.launchFrames = 0; });
+    game.update(); run(game, 12); expect(game.departureFrame).toBe(12);
+  }
+  expect(game.scene).toBe(scene); expect(game.postBoss).toBe(true); expect(game.boss).toBe('jinrai');
+  press(game, 'Escape'); expect(game.scene).toBe('pause');
+  game.menu = 1; press(game);
+  expect(game.scene).toBe('title'); expect(game.postBoss).toBe(false); expect(game.boss).toBeUndefined();
+  expect(game.departureFrame).toBe(0); expect(game.transition).toBeUndefined(); expect(game.arrivalFrame).toBe(0);
+  expect(game.bgm.sceneVolumeMultiplier).toBe(1);
+  press(game); press(game);
+  expect(game.scene).toBe('movie'); expect(game.movieName).toBe('opening');
+  expect(game.bgm.sceneVolumeMultiplier).toBe(1); expect(game.postBoss).toBe(false); expect(game.boss).toBeUndefined();
+});
+
+it('startRunでも撃破後の状態とBGM倍率をリセットしてからopeningを始める', () => {
+  const game = new Game(); game.audio.volume = 0;
+  game.scene = 'difficulty'; game.postBoss = true; game.boss = 'jinrai'; game.departureFrame = 12;
+  game.transition = 'boss-defeat-hold'; game.transitionFrame = 30;
+  game.bgm.sync('boss-jinrai', false, 0.35);
+  press(game);
+  expect(game.scene).toBe('movie'); expect(game.movieName).toBe('opening');
+  expect(game.postBoss).toBe(false); expect(game.boss).toBeUndefined(); expect(game.departureFrame).toBe(0);
+  expect(game.transition).toBeUndefined(); expect(game.transitionFrame).toBe(0); expect(game.bgm.sceneVolumeMultiplier).toBe(1);
+});
+
 it('タイトルでopeningを先読みし、難易度決定後に動画の音を使って再生する', () => {
   const game = new Game();
   expect(videos).toHaveLength(1);
@@ -185,8 +217,8 @@ it.each(['KeyZ', 'KeyX'])('%sでエンディング動画の残り全部をスキ
 it.each(MOVIES)('?movie=%sは指定した1本だけを再生する', (name) => {
   vi.stubGlobal('location', { search: `?movie=${name}` }); const game = new Game();
   expect(game.movieName).toBe(name); video(name).emit('ended');
-  if (name === 'lastboss') run(game, 210);
-  expect(game.scene).toBe(name === 'opening' ? 'stage' : name === 'lastboss' ? 'arrival' : name === 'jinrai-gift' || name === 'minerva-finale' ? 'dialogue' : 'ending');
+  if (name === 'lastboss' || name === 'jinrai-gift' || name === 'minerva-finale') run(game, 210);
+  expect(game.scene).toBe(name === 'opening' ? 'stage' : name === 'lastboss' || name === 'jinrai-gift' || name === 'minerva-finale' ? 'arrival' : 'ending');
   expect(game.movieName).toBeUndefined();
   expect(videos.filter((entry) => entry.play.mock.calls.length > 0)).toHaveLength(1);
 });

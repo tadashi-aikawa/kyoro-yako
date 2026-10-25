@@ -169,8 +169,11 @@ it.each([{ time: 0, alpha: 1 }, { time: 0.75, alpha: 0.5 }, { time: 1.5, alpha: 
   run(game, 60); expect(game.scene).toBe('arrival'); expect(game.arrivalFrame).toBe(0);
 });
 
-it('撃破後の会話では登場演出を繰り返さない', () => {
-  const game = new Game(); game.startStage(1); game.startBoss(false, 6); game.skipPhase(); run(game, 180);
+it('撃破後はボスが定位置に立った対峙へ120フレームで白明けし、登場の降下は繰り返さない', () => {
+  const game = new Game(); game.startStage(1); game.startBoss(false, 6); game.skipPhase(); run(game, 8 + 90 + 60);
+  expect(game.scene).toBe('arrival'); expect(game.bossXY).toEqual([192, 77]);
+  run(game, 119); expect(game.scene).toBe('arrival'); expect(game.bossXY).toEqual([192, 77]);
+  game.update();
   expect(game.scene).toBe('dialogue'); expect(game.afterDialogue).toBe('clear');
 });
 
