@@ -1058,18 +1058,24 @@ export class Renderer {
     const local = repriseLocal(game.phaseFrame, game.minervaReprise);
     if (dawnPrayerStep(game.phaseFrame, game.minervaReprise) >= 0) return;
     const release = game.minervaReprise.cycle === 0 ? OWL_RELEASE_FRAMES : 0;
-    const emergence = Math.max(0, Math.min(1, (local - release - 12) / 42));
-    const opacity = emergence * (0.58 + Math.sin(game.frame * 0.035) * 0.04);
+    const emergence = Math.max(0, Math.min(1, (local - release - 6) / 48));
+    const opacity = Math.min(1, emergence * 3.5) * (0.58 + Math.sin(game.frame * 0.035) * 0.04);
     if (!opacity) return;
     const source = REPRISES[game.minervaReprise.index];
     const sprite = this.readySprite(game, bossSpriteId(source.boss, 'cast', game.frame));
     const [x, y] = game.bossXY;
     const side = game.minervaReprise.index % 2 ? -1 : 1;
     const ghostX = Math.max(60, Math.min(324, x + side * 34));
-    // 顔を技名の帯より下に置き、本体の肩へ重ねて背面に浮かべる。
-    const owl = summonOwl(game.phaseFrame, x, y);
+    // 霊は最初から大きな姿で上方に現れ、ふっと降りて肩の背後へ定着する。
+    // 小さな姿を拡大すると、降臨よりもフクロウから飛び出す印象になる。
+    // 定着後の顔が技名帯に重ならない、従来の配置を保つ。
     const ghostY = Math.max(154, y + 12) + Math.sin(game.frame * 0.04) * 4;
-    this.fieldCharacter(game, sprite, owl.x + (ghostX - owl.x) * emergence, owl.y + (ghostY - owl.y) * emergence, 24 + 88 * emergence, side * 0.045 * emergence, opacity);
+    const descent = 1 - (1 - emergence) ** 3;
+    const c = this.ctx;
+    // 降り始めの頭もHPと名前の帯へは入れず、帯の下から姿を見せる。
+    c.save(); c.beginPath(); c.rect(0, 36, FIELD.w, FIELD.h - 36); c.clip();
+    this.fieldCharacter(game, sprite, ghostX, ghostY - 74 * (1 - descent), 112, side * 0.045, opacity);
+    c.restore();
   }
 
   private minervaSummon(game: Game): void {

@@ -11,3 +11,13 @@ Output: public/assets/sprites/minerva-owl-{0,1,2}.webp
 Isolate only Minerva's small tan and ivory owl companion. Create three equal square cells in a horizontal row: wings raised, wings spread horizontally, wings lowered. Preserve same owl identity, body size, face position, existing illustration style. Complete wings and feet, transparent padding. No human, hand, book, magic, bag, text, grid or watermark. True alpha transparency.
 
 Processing: split equal cells; normalize Minerva into 384px square canvases with shared foot baseline; owl cells resize to 256px. The middle owl frame uses a wider crop to keep the entire spread wings, centered into a square. Lossy WebP q90 with lossless alpha.
+
+Movement pose revision
+Tool: built-in imagegen
+Edit targets: public/assets/sprites/minerva-solo-left.webp, minerva-solo-right.webp
+Supporting original identity reference: public/assets/sprites/minerva.webp
+Output: public/assets/sprites/minerva-solo-left.webp, minerva-solo-right.webp
+
+Create TWO matching transparent full-body chibi sprites side by side. Preserve the exact existing character identity, costume, proportions and illustration style. Replace the old outstretched palm poses: BOTH hands now hold an OPEN book close to the chest, elbows tucked near the body. She glides sideways serenely while reading or channeling from the book. Left frame: lean slightly left, gaze left, hair and dress trailing right, one knee softly bent. Right frame: lean slightly right, gaze right, hair and dress trailing left, opposite knee softly bent. Same character size and foot baseline, full body and trailing hair, generous transparent padding. No outstretched perch-like palm, owl, bird, bag, particles, magic circle, background, text, grid or watermark. Real alpha transparency.
+
+Right-frame cleanup: edit the generated right-gliding sprite to remove a stray thin red line at the outer edge and any isolated marks outside the character silhouette. Make those pixels fully transparent. Preserve the pose, face, costume, colors, full hair and feet, BOTH hands on the open book and square framing. Built-in imagegen, transparent background. Normalize to the same 384px canvas and foot baseline as the other poses, WebP q90 with lossless alpha.
