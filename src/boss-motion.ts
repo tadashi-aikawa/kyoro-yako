@@ -14,7 +14,7 @@ export const MOTION_SPRITES = MOTION_BOSSES.flatMap((id) => [...MOTION_POSES, ..
 export const IDLE_STEP = 22;
 const MOVE_ENTER = 0.3;
 const MOVE_EXIT = 0.18;
-// 迅雷の駆け抜けは16px/フレーム。これを超える飛びは瞬間移動として扱う
+// 大きな座標の飛びは瞬間移動扱い。加速する迅雷一閃は描画側で専用のポーズを決める。
 const MAX_STEP = 24;
 
 export interface BossMotion { key: string; frame: number; x: number; vx: number; pose: BossPose; }

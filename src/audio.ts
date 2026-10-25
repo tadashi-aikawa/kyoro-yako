@@ -9,7 +9,7 @@ const tones: Record<Sound, [number, number, OscillatorType, number, number, numb
   capture: [880, 0.6, 'triangle', 1188, 0.12, 0.025], item: [950, 0.06, 'sine', 1283, 0.12, 0.025],
   extend: [660, 0.5, 'triangle', 891, 0.12, 0.025], enemyShot: [520, 0.08, 'triangle', 190, 0.2, 0.11],
   jinraiShot: [1700, 0.055, 'sawtooth', 130, 0.28, 0.055],
-  jinraiCharge: [65, 3, 'sine', 145, 0.38, 2.8],
+  jinraiCharge: [65, 4, 'sine', 145, 0.38, 3.8],
   jinraiCrackle: [120, 1.8, 'sawtooth', 120, 0.48, 1.5],
   laser: [180, 0.45, 'sawtooth', 960, 0.18, 0.3], thunder: [90, 0.5, 'sawtooth', 40, 0.24, 0.25],
   slash: [1500, 0.2, 'triangle', 120, 0.22, 0.18], wind: [280, 0.65, 'sine', 700, 0.2, 0.5],
@@ -91,7 +91,7 @@ export class AudioBank {
       const noise = Math.random() * 2 - 1;
       const fade = Math.min(1, t / 0.04, (duration - t) / 0.12);
       if (sound === 'jinraiCharge') {
-        // 3秒かけて太くなる「ブオー」。低い唸りに空気の揺れを重ねる。
+        // 充填が進むほど太くなる「ブオー」。低い唸りに空気の揺れを重ねる。
         rumble += (noise - rumble) * 0.055;
         const phase = Math.PI * 2 * (65 * t + 40 / duration * t * t);
         const tone = Math.sin(phase) * 0.4 + Math.sin(phase * 1.018) * 0.2 + Math.sin(phase * 3) * 0.28 + Math.sin(phase * 4) * 0.12;
