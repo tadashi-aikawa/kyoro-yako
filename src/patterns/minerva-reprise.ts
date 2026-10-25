@@ -6,6 +6,7 @@ import { STAGES } from '../stages';
 import { emitClaudine } from './claudine';
 import { emitJinraiPattern } from './jinrai';
 import { CLONE_FIRST_CHARGE, jinraiCloneScene } from './jinrai-clone';
+import { reprisePrepare } from './minerva-summon';
 import { emitNeo } from './neo';
 import { emitObsidia, sweepPosition } from './obsidia';
 
@@ -25,7 +26,7 @@ export function repriseIndex(seen: readonly number[], roll = Math.random()): num
 }
 export const repriseLocal = (frame: number, reprise: Reprise): number => Math.max(0, frame - reprise.startFrame);
 function repriseFrame(frame: number, reprise: Reprise): number {
-  const elapsed = repriseLocal(frame, reprise) - REPRISE_PREPARE;
+  const elapsed = repriseLocal(frame, reprise) - reprisePrepare(reprise);
   // 花影は単身射撃の前置きを省き、召喚後すぐに分身を始める。召喚中の時計は進めない。
   return 105 + elapsed + (elapsed >= 0 && REPRISES[reprise.index].phase.pattern === 'jinraiClone' ? CLONE_FIRST_CHARGE - 105 : 0);
 }
@@ -41,7 +42,7 @@ export function reprisePosition(frame: number, reprise: Reprise, difficulty: Dif
   const target = clone ? [clone.x, clone.y] : phase.pattern === 'sweep' ? sweepPosition(virtualFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty))
     : boss === 'obsidia' ? obsidiaPosition(phase.pattern, virtualFrame, reprise.entry)
     : patternPosition(phase, virtualFrame, reprise.entry)!;
-  const progress = Math.max(0, Math.min(1, local / REPRISE_PREPARE));
+  const progress = Math.max(0, Math.min(1, local / reprisePrepare(reprise)));
   const ease = progress * progress * (3 - 2 * progress);
   return [reprise.entry[0] + (target[0] - reprise.entry[0]) * ease, reprise.entry[1] + (target[1] - reprise.entry[1]) * ease];
 }

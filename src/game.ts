@@ -19,8 +19,9 @@ import { type Thunderbolt, type Thunderstorm, thunderPosition } from './patterns
 import { dawnPosition, emitMinerva, eyeX, interviewPosition } from './patterns/minerva';
 import { updateStarFlightSource } from './patterns/minerva-flight';
 import { gravityScene } from './patterns/minerva-inquiry';
-import { REPRISE_PREPARE, REPRISES, type Reprise, repriseLocal, repriseView } from './patterns/minerva-reprise';
+import { REPRISES, type Reprise, repriseLocal, repriseView } from './patterns/minerva-reprise';
 import { type InterviewRing, interviewRingBlocksShot, updateInterviewRings } from './patterns/minerva-ring';
+import { MINERVA_OWL_SPRITES, MINERVA_SOLO_SPRITES, reprisePrepare } from './patterns/minerva-summon';
 import { emitNeo, inBog, updateVimBullet, type VimAttack } from './patterns/neo';
 import { emitNeoEncore, encoreBogTime } from './patterns/neo-encore';
 import { emitObsidia, sweepPosition, tags } from './patterns/obsidia';
@@ -189,7 +190,7 @@ export class Game {
       sprite.src = `${import.meta.env.BASE_URL}assets/sprites/${id}.webp`;
       this.images[`${id}-sprite`] = sprite;
     }
-    for (const id of [...MOTION_SPRITES, 'claudine-finale']) {
+    for (const id of [...MOTION_SPRITES, ...MINERVA_SOLO_SPRITES, ...MINERVA_OWL_SPRITES, 'claudine-finale']) {
       const sprite = new Image();
       sprite.src = `${import.meta.env.BASE_URL}assets/sprites/${id}.webp`;
       this.images[`${id}-sprite`] = sprite;
@@ -1316,7 +1317,7 @@ export class Game {
   }
 
   private damageBoss(damage: number): void {
-    if (this.phase?.pattern === 'owlDawn' && this.minervaReprise && !this.minervaReprise.prayer && repriseLocal(this.phaseFrame, this.minervaReprise) < REPRISE_PREPARE) return;
+    if (this.phase?.pattern === 'owlDawn' && this.minervaReprise && !this.minervaReprise.prayer && repriseLocal(this.phaseFrame, this.minervaReprise) < reprisePrepare(this.minervaReprise)) return;
     this.phaseHp -= damage * (this.phase?.pattern === 'owlDawn' ? 2 / 3 : this.phase?.pattern === 'jinraiDash' ? 2 : 1);
   }
 

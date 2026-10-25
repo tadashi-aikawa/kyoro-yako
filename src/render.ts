@@ -14,8 +14,9 @@ import { THUNDER_FADE, THUNDER_HOLD, thunderGround, thunderPath, thunderScene } 
 import { dawnPrayerStep, eyeX, PRAYER_CHARGE, PRAYER_FIRE, recallReturnWarning } from './patterns/minerva';
 import { STAR_FLIGHT_TIME, STAR_TRAIL_WARNING } from './patterns/minerva-flight';
 import { gravityScene } from './patterns/minerva-inquiry';
-import { REPRISE_PREPARE, REPRISES, repriseLocal } from './patterns/minerva-reprise';
+import { REPRISES, repriseLocal } from './patterns/minerva-reprise';
 import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-ring';
+import { minervaSoloSprite, OWL_RELEASE_FRAMES, reprisePrepare, summonOwl } from './patterns/minerva-summon';
 import { bogs, enterScene, KEY_ROWS, keyPosition, vimScene } from './patterns/neo';
 import { encoreBogTime } from './patterns/neo-encore';
 import { SWEEP_CHARGE, SWEEP_MOVE, SWEEP_PERIOD, SWEEP_SHOTS, sweepStep, sweepTarget, tags } from './patterns/obsidia';
@@ -300,7 +301,8 @@ export class Renderer {
       const departing = game.scene === 'departure' || (game.scene === 'pause' && game.resumeScene === 'departure');
       const alpha = departing ? Math.max(0, 1 - game.departureFrame / 60) : 1;
       if (departing) { c.shadowColor = '#fff0bc'; c.shadowBlur = 24; }
-      this.fieldCharacter(game, this.readySprite(game, game.boss), x, y, 64, 0, alpha);
+      const sprite = this.minervaDefeatFade(game) ? 'minerva-solo-base' : game.boss;
+      this.fieldCharacter(game, this.readySprite(game, sprite), x, y, 64, 0, alpha);
       c.shadowBlur = 0;
     }
     if (game.phase?.spell) {
@@ -363,7 +365,8 @@ export class Renderer {
         // 跳ぶ分身は元の場所に煙を残し、跳び先へ向けて残像を並べる。
         for (const trail of scene.trails) {
           if (trail.age < 24) this.ninjaSmoke(trail.fromX, trail.fromY, trail.age);
-          const sprite = this.readySprite(game, bossSpriteId(game.boss, trail.toX < trail.fromX ? 'left' : 'right', game.frame));
+          const trailPose = trail.toX < trail.fromX ? 'left' : 'right';
+          const sprite = this.readySprite(game, game.boss === 'minerva' ? minervaSoloSprite(trailPose, game.frame) : bossSpriteId(game.boss, trailPose, game.frame));
           for (let i = 1; i <= 3; i++) {
             if (trail.age < i * 2) continue;
             const p = i / 4;
@@ -381,7 +384,9 @@ export class Renderer {
             this.magic(body.x, body.y, game.frame, '#fff4bd', 30 + scene.chargeProgress * 10, 0.6);
           }
           const breathing = scene.charging ? 1 + Math.sin(game.frame * 0.09) * 0.025 : 1;
-          this.fieldCharacter(game, performingNinpo ? game.boss === 'minerva' ? 'minerva-prayer' : 'jinrai-seal' : this.readySprite(game, bossSpriteId(game.boss, casting && scene.firing[index] ? 'cast' : 'idle', game.frame + index * 7)), body.x, body.y + (performingNinpo ? 0 : Math.sin(game.frame * 0.045) * 2), 64 * breathing, 0, body.opacity);
+          const clonePose = casting && scene.firing[index] ? 'cast' : 'idle';
+          const cloneSprite = game.boss === 'minerva' ? minervaSoloSprite(performingNinpo ? 'prayer' : clonePose, game.frame + index * 7) : performingNinpo ? 'jinrai-seal' : this.readySprite(game, bossSpriteId(game.boss, clonePose, game.frame + index * 7));
+          this.fieldCharacter(game, this.readySprite(game, cloneSprite), body.x, body.y + (performingNinpo ? 0 : Math.sin(game.frame * 0.045) * 2), 64 * breathing, 0, body.opacity);
           this.magic(body.x, body.y, game.frame, '#ffdc84', 25, 0.4 * body.opacity);
           c.restore();
         }
@@ -391,14 +396,16 @@ export class Renderer {
         const kissing = kiss >= 0 && kiss < KISS_POSE_END;
         const tilt = channeling || seal || thunder?.charging || sweepCharging || kissing || rose >= 0 ? 0 : Math.cos(game.phaseFrame * 0.012) * 0.045;
         const pose = updateBossMotion(this.bossMotion, `${game.boss}:${game.phase.name}`, game.frame, x);
-        const summoning = game.phase.pattern === 'owlDawn' && game.minervaReprise && !game.minervaReprise.prayer && repriseLocal(game.phaseFrame, game.minervaReprise) < REPRISE_PREPARE;
+        const solo = game.boss === 'minerva' && game.phase.pattern === 'owlDawn';
+        const summoning = solo && game.minervaReprise && !game.minervaReprise.prayer && repriseLocal(game.phaseFrame, game.minervaReprise) < reprisePrepare(game.minervaReprise);
         const casting = !!summoning || !!game.galaxyFlash || isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
         const spriteId = rose >= FINALE_CHARGE ? 'claudine-finale' : kissing ? 'jinrai-kiss' : bossSpriteId(game.boss, rose >= 0 || casting ? 'cast' : pose, game.frame);
         const bossSprite = this.readySprite(game, spriteId);
         c.save();
         if (seal) { c.shadowColor = '#ffe591'; c.shadowBlur = 8 + Math.min(20, (burst - BURST_MOVE) * 0.6); }
         const roseSize = rose < 0 ? 64 : 74 + (rose >= FINALE_CHARGE ? rosePulse(rose, ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty)) * 3 : 0);
-        this.fieldCharacter(game, channeling ? 'minerva-prayer' : seal || thunder?.charging ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || thunder?.charging || sweepCharging || kissing || rose >= 0 ? 0 : Math.sin(game.frame * 0.045) * 2), roseSize, tilt, burstVisibility(burst));
+        const soloSprite = minervaSoloSprite(channeling ? 'prayer' : casting ? 'cast' : pose, game.frame);
+        this.fieldCharacter(game, solo ? this.readySprite(game, soloSprite) : channeling ? 'minerva-prayer' : seal || thunder?.charging ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || thunder?.charging || sweepCharging || kissing || rose >= 0 ? 0 : Math.sin(game.frame * 0.045) * 2), roseSize, tilt, burstVisibility(burst));
         c.restore();
       }
       c.fillStyle = '#140c27aa'; c.fillRect(15, 6, 350, 13);
@@ -439,6 +446,9 @@ export class Renderer {
     if (game.bombFrames > 0) this.bombEffect(game);
     if (game.cutin > 0 && game.boss) this.cutin(game);
     if (game.phase?.spell && game.cutin <= 20) {
+      c.save();
+      // 頭上を召喚の舞台に使う終符では、技名を読ませた後に帯を退ける。
+      if (game.phase.pattern === 'owlDawn') c.globalAlpha = Math.max(0, Math.min(1, (150 - game.phaseFrame) / 45));
       const progress = Math.min(1, game.phaseFrame / 60);
       const eased = 1 - (1 - progress) ** 3;
       const y = 43 + (260 - 43) * (1 - eased);
@@ -447,6 +457,7 @@ export class Renderer {
       c.strokeStyle = '#d5ace680'; c.strokeRect(84.5, y + 0.5, 299, 43);
       this.text(game.phase.name, 373, y + 15, 13, '#fff2dd', 'right');
       this.text(failed ? 'Failed' : `BONUS  ${game.spellBonus.toLocaleString()}`, 373, y + 34, 11, failed ? '#ff9da8' : '#ffe0aa', 'right');
+      c.restore();
     }
     if (game.messageFrames > 0) {
       c.globalAlpha = Math.min(1, game.messageFrames / 30);
@@ -1046,7 +1057,9 @@ export class Renderer {
     if (game.phase?.pattern !== 'owlDawn' || !game.minervaReprise) return;
     const local = repriseLocal(game.phaseFrame, game.minervaReprise);
     if (dawnPrayerStep(game.phaseFrame, game.minervaReprise) >= 0) return;
-    const opacity = Math.max(0, Math.min(1, (local - REPRISE_PREPARE * 0.5) / (REPRISE_PREPARE * 0.4))) * (0.58 + Math.sin(game.frame * 0.035) * 0.04);
+    const release = game.minervaReprise.cycle === 0 ? OWL_RELEASE_FRAMES : 0;
+    const emergence = Math.max(0, Math.min(1, (local - release - 12) / 42));
+    const opacity = emergence * (0.58 + Math.sin(game.frame * 0.035) * 0.04);
     if (!opacity) return;
     const source = REPRISES[game.minervaReprise.index];
     const sprite = this.readySprite(game, bossSpriteId(source.boss, 'cast', game.frame));
@@ -1054,29 +1067,45 @@ export class Renderer {
     const side = game.minervaReprise.index % 2 ? -1 : 1;
     const ghostX = Math.max(60, Math.min(324, x + side * 34));
     // 顔を技名の帯より下に置き、本体の肩へ重ねて背面に浮かべる。
-    this.fieldCharacter(game, sprite, ghostX, Math.max(154, y + 12) + Math.sin(game.frame * 0.04) * 4, 112, side * 0.045, opacity);
+    const owl = summonOwl(game.phaseFrame, x, y);
+    const ghostY = Math.max(154, y + 12) + Math.sin(game.frame * 0.04) * 4;
+    this.fieldCharacter(game, sprite, owl.x + (ghostX - owl.x) * emergence, owl.y + (ghostY - owl.y) * emergence, 24 + 88 * emergence, side * 0.045 * emergence, opacity);
   }
 
   private minervaSummon(game: Game): void {
+    if (game.boss !== 'minerva' || (game.phase?.pattern !== 'owlDawn' && !this.minervaDefeatFade(game))) return;
+    // 本体の読み込み前は手元のフクロウ付きの元絵を使うため、別体を重ねない。
+    const base = game.images['minerva-solo-base-sprite'];
+    if (!base?.complete || !base.naturalWidth) return;
     const reprise = game.minervaReprise;
-    if (game.phase?.pattern !== 'owlDawn' || !reprise || reprise.prayer) return;
-    const local = repriseLocal(game.phaseFrame, reprise);
-    if (local >= REPRISE_PREPARE) return;
     const [x, y] = game.bossXY, c = this.ctx;
-    const progress = local / REPRISE_PREPARE;
-    c.save(); c.globalAlpha = Math.min(1, local / 18, (REPRISE_PREPARE - local) / 18);
-    this.magic(x, y + 18, local * 2, '#ffe4ad', 30 + Math.sin(progress * Math.PI) * 22, 0.7);
-    // 口を開いた小袋から光が立ち上がり、背後の霊へ集まる。
-    c.fillStyle = '#70505c'; c.strokeStyle = '#e6c58f'; c.lineWidth = 1.3;
-    c.beginPath(); c.moveTo(x + 12, y + 9); c.bezierCurveTo(x + 6, y + 29, x + 32, y + 29, x + 27, y + 9); c.closePath(); c.fill(); c.stroke();
-    c.fillStyle = '#fff4c6'; c.beginPath(); c.ellipse(x + 19.5, y + 9, 8, 3, 0, 0, Math.PI * 2); c.fill();
-    for (let i = 0; i < 18; i++) {
-      const rise = (progress * 1.7 + i / 18) % 1;
-      const angle = local * 0.055 + i * 2.4;
-      const width = 5 + rise * 30;
-      notebookStar(c, x + 19 + Math.cos(angle) * width, y + 8 - rise * 74, 1.5 + (1 - rise) * 2, '#fff0ce');
+    const owl = summonOwl(game.phaseFrame, x, y);
+    const local = reprise ? repriseLocal(game.phaseFrame, reprise) : 0;
+    const release = reprise?.cycle === 0 ? OWL_RELEASE_FRAMES : 0;
+    const summoning = reprise && !reprise.prayer && local >= release && local < reprisePrepare(reprise);
+    c.save();
+    if (summoning) {
+      const progress = (local - release) / 60;
+      const strength = Math.sin(progress * Math.PI);
+      this.magic(owl.x, owl.y, game.phaseFrame * 1.4, '#ffe4ad', 17 + progress * 18, strength * 0.65);
+      // 羽ばたくフクロウから霊の肩へ、光が降りる。
+      c.strokeStyle = '#ffe7b5'; c.lineWidth = 1;
+      for (let i = 0; i < 9; i++) {
+        const drop = (progress * 1.6 + i / 9) % 1;
+        c.globalAlpha = strength * (1 - drop) * 0.65;
+        const px = owl.x + Math.sin(i * 2.4 + progress * 3) * drop * 35;
+        const py = owl.y + drop * 100;
+        c.beginPath(); c.moveTo(px, py); c.lineTo(px, py + 7); c.stroke();
+      }
     }
+    c.globalAlpha = 1;
+    this.image(game, `${owl.sprite}-sprite`, owl.x - 18, owl.y - 18, 36, 36);
     c.restore();
+  }
+
+  private minervaDefeatFade(game: Game): boolean {
+    // 白で場面が切り替わるまでは召喚を保ち、ムービー後の対峙は通常の姿へ戻す。
+    return game.boss === 'minerva' && game.postBoss && game.scene === 'transition' && !!game.transition?.startsWith('boss-defeat-');
   }
 
   private minervaTelegraphs(game: Game): void {
@@ -1220,7 +1249,12 @@ export class Renderer {
   // 動きの絵が読み込めていなければ、ボスの元絵へ戻す
   private readySprite(game: Game, id: string): string {
     const sprite = game.images[`${id}-sprite`];
-    return sprite?.complete && sprite.naturalWidth > 0 ? id : (game.boss ?? id);
+    if (sprite?.complete && sprite.naturalWidth > 0) return id;
+    if (id.startsWith('minerva-solo-')) {
+      const base = game.images['minerva-solo-base-sprite'];
+      if (base?.complete && base.naturalWidth > 0) return 'minerva-solo-base';
+    }
+    return game.boss ?? id;
   }
 
   private fieldCharacter(game: Game, id: string, x: number, y: number, height: number, tilt: number, alpha = 1): void {
@@ -1360,7 +1394,12 @@ export class Renderer {
       notebookStar(c, x, 87, current ? 8 : 5, current ? '#f1dda9' : i < game.stage - 1 ? '#a1bda8' : '#536579');
     }
     const room = STAGES[game.stage - 1].title.split(' 〜 ')[0];
-    this.uiText(room, 528, 111, 10, '#a1b6ad', 'center');
+    const finaleBonus = game.phase?.pattern === 'owlDawn' && game.phaseFrame >= 150;
+    this.uiText(room, 528, finaleBonus ? 104 : 111, 10, '#a1b6ad', 'center');
+    if (finaleBonus) {
+      const failed = game.hitDuringSpell || game.bombUsed || game.pendingHit >= 0;
+      this.uiText(failed ? 'Failed' : `BONUS  ${game.spellBonus.toLocaleString()}`, 528, 119, 9, failed ? '#ff9da8' : '#ffe0aa', 'center');
+    }
     rule(126, 0.3);
     this.uiText('今回のスコア', 448, 143, 9, '#a1b6ad');
     this.uiText(game.score.toLocaleString(), 608, 166, 22, '#f0e1bf', 'right', 160);

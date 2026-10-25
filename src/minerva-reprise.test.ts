@@ -3,6 +3,7 @@ import { Game } from './game';
 import { CLONE_CHARGE, CLONE_FIRST_CHARGE, CLONE_SPLIT, jinraiCloneScene } from './patterns/jinrai-clone';
 import { dawnPrayerStep, PRAYER_CHARGE, PRAYER_PERIOD } from './patterns/minerva-dawn';
 import { REPRISE_PREPARE, REPRISES, repriseDifficulty, repriseIndex, repriseView } from './patterns/minerva-reprise';
+import { OWL_RELEASE_FRAMES, reprisePrepare } from './patterns/minerva-summon';
 
 const difficulties = ['easy', 'normal', 'hard', 'lunatic'] as const;
 let keydown: (event: { code: string; repeat: boolean; preventDefault: () => void }) => void;
@@ -37,7 +38,7 @@ it.each(difficulties)('再演10種類は%sで元の仕掛けを動かし、8%減
     const actualPhase = game.phase;
     let bullets = 0, lasers = 0, nodes = 0, maxMove = 0;
     let previous = game.bossXY;
-    for (let local = 0; local < REPRISE_PREPARE + 1200; local++) {
+    for (let local = 0; local < OWL_RELEASE_FRAMES + REPRISE_PREPARE + 1200; local++) {
       game.update();
       expect(game.phase).toBe(actualPhase); expect(game.boss).toBe('minerva');
       expect(game.phase?.duration).toBe(Infinity); expect(game.minervaReprise?.cycle).toBe(0);
@@ -47,7 +48,7 @@ it.each(difficulties)('再演10種類は%sで元の仕掛けを動かし、8%減
       bullets = Math.max(bullets, game.bullets.count); lasers = Math.max(lasers, game.jinraiLasers.length); nodes = Math.max(nodes, game.graphNodes.length);
       expect(game.bullets.count, source.phase.name).toBeLessThan(1000);
       game.bullets.forEach(b => { expect(Number.isFinite(b.x) && Number.isFinite(b.y), source.phase.name).toBe(true); });
-      if (local < REPRISE_PREPARE) expect(game.bullets.count).toBe(0);
+      if (local < reprisePrepare(game.minervaReprise!)) expect(game.bullets.count).toBe(0);
     }
     if (source.phase.pattern !== 'jinraiClone') expect(maxMove, source.phase.name).toBeLessThan(8);
     expect(bullets + lasers + nodes, source.phase.name).toBeGreaterThan(0);
@@ -110,7 +111,7 @@ it('花影は召喚後に二身・三身へ分かれ、どの分身も共有HP�
   vi.spyOn(Math, 'random').mockReturnValue((index + 0.5) / REPRISES.length);
   const game = fight(); game.phaseFrame = 104; game.update();
   expect(game.bossTargets()).toEqual([game.bossXY]);
-  const start = game.minervaReprise!.startFrame + REPRISE_PREPARE - CLONE_FIRST_CHARGE;
+  const start = game.minervaReprise!.startFrame + reprisePrepare(game.minervaReprise!) - CLONE_FIRST_CHARGE;
   for (const [frame, count] of [[CLONE_FIRST_CHARGE + 30, 1], [CLONE_FIRST_CHARGE + CLONE_CHARGE + CLONE_SPLIT + 60, 2], [2400 + CLONE_CHARGE + CLONE_SPLIT + 60, 3]]) {
     game.phaseFrame = start + frame;
     const scene = jinraiCloneScene(frame, 60);
@@ -170,7 +171,7 @@ it.each(difficulties)('再演の%sは途中でHP半分を跨いでも予告と�
   const index = REPRISES.findIndex(source => source.phase.pattern === 'sweep');
   vi.spyOn(Math, 'random').mockReturnValue((index + 0.5) / REPRISES.length);
   const game = fight('owlDawn', difficulty); game.phaseFrame = 104; game.phaseHp = game.phaseMaxHp * 0.51; game.update();
-  game.phaseFrame = game.minervaReprise!.startFrame + REPRISE_PREPARE + 280;
+  game.phaseFrame = game.minervaReprise!.startFrame + reprisePrepare(game.minervaReprise!) + 280;
   const position = game.bossXY, reprise = game.minervaReprise;
   game.phaseHp = game.phaseMaxHp * 0.49; game.update();
   expect(game.minervaReprise).toBe(reprise); expect(repriseView(game).difficulty).toBe(difficulty);
@@ -187,7 +188,7 @@ it('召喚中はダメージを受けず、最終技のショットとボムの�
   expect(hit(entering)).toBeCloseTo(20);
   const game = fight(); game.phaseFrame = 104; game.update();
   expect(hit(game)).toBe(0);
-  game.phaseFrame = game.minervaReprise!.startFrame + REPRISE_PREPARE;
+  game.phaseFrame = game.minervaReprise!.startFrame + reprisePrepare(game.minervaReprise!);
   expect(hit(game)).toBeCloseTo(20);
   const hp = game.phaseHp;
   keydown({ code: 'KeyX', repeat: false, preventDefault() {} }); game.update();
@@ -215,7 +216,7 @@ it('再演中も本体のHPと時計を保ち、リターンのショット反�
   const game = fight(); game.phaseFrame = 104; game.update();
   const view = repriseView(game);
   expect(view.phase?.pattern).toBe('enter'); expect(game.phase?.pattern).toBe('owlDawn');
-  expect(view.phaseFrame).toBe(105 - REPRISE_PREPARE); expect(game.phaseFrame).toBe(105);
+  expect(view.phaseFrame).toBe(105 - reprisePrepare(game.minervaReprise!)); expect(game.phaseFrame).toBe(105);
   game.phaseFrame = 400; game.bullets.clear();
   const letter = game.spawnBullet(192, 280, 0, 0, 1, 'glyph')!;
   letter.motion = 'enterLine'; letter.delay = 0; letter.radius = 4;

@@ -1,0 +1,13 @@
+Tool: built-in imagegen
+Use case: precise-object-edit
+References: public/assets/sprites/minerva.webp, minerva-cast.webp, minerva-prayer.webp
+Output: public/assets/sprites/minerva-solo-{base,idle,left,right,cast,prayer}.webp
+
+Create a 3-column by 2-row transparent sprite sheet of the existing Minerva character without her owl. Preserve character identity, chibi proportions, clothing, face and illustration style. Each cell contains one complete character with transparent padding. Order: base with empty extended palm and book; idle; moving left with hair trailing right; moving right with hair trailing left; casting with empty extended palm and open book; praying with closed eyes and palms pressed together. No owl, bag, aura, ghost, text, grid or watermark. True alpha transparency.
+
+References for owl: public/assets/sprites/minerva.webp, minerva-cast.webp
+Output: public/assets/sprites/minerva-owl-{0,1,2}.webp
+
+Isolate only Minerva's small tan and ivory owl companion. Create three equal square cells in a horizontal row: wings raised, wings spread horizontally, wings lowered. Preserve same owl identity, body size, face position, existing illustration style. Complete wings and feet, transparent padding. No human, hand, book, magic, bag, text, grid or watermark. True alpha transparency.
+
+Processing: split equal cells; normalize Minerva into 384px square canvases with shared foot baseline; owl cells resize to 256px. The middle owl frame uses a wider crop to keep the entire spread wings, centered into a square. Lossy WebP q90 with lossless alpha.
