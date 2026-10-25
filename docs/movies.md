@@ -11,6 +11,8 @@ Geminiアプリの動画生成で5本を作り、MP4で保存する。1本は最
     - みみこは立ち絵の絵柄に忠実な版だけ採る。本物のぬいぐるみの写真風・3D風・別の造形は捨てる
     - 教訓: 「PLUSH TOY」「felt」のような素材の言葉を書くと、ぬいぐるみの実写風に寄る。「参照画像とまったく同じ2Dアニメ絵・同じセル塗り」と書き、素材の言葉は使わない
     - 教訓: みみこを正面向きで描かせると案内役のように見える。後ろ姿か横向きで、カメラの方を向かない指定にする
+        - 例外: ending-2はキービジュアルの正面寄りの向きを保つ。途中でカメラへ振り向かせない
+    - 教訓: ending-2は冒頭から構図が組み直され、後ろ姿で始まったあと、背中に顔だけが現れる版が出た。最初のフレームから両目・くちばし・腹が見える正面寄りの向きと明記し、丸い全身を一体のまま移動させる
     - 教訓: 「calm」「composed」「floats」のような静かな言葉を戦闘場面に書くとキャラが棒立ちになる。戦闘は「darts」「teleports」「whipping」「motion blur」のような動きの言葉と、表情の変化(fierce→surprise→smile)を書く
     - 教訓: みみこの顔は「顔のほぼ全部が2つの大きな丸い白い目、その間に小さな黄色いくちばし」まで書く。「big white eyes」だけでは本物の梟の顔になる
     - 教訓: ミネルヴァの立ち絵の梟とみみこを同じ場面に出すと混ざる。みみこが出る場面ではミネルヴァの梟を「この場面にはいない。無視する」と明記し、梟は1体だけと書く
@@ -47,7 +49,7 @@ Geminiアプリの動画生成で5本を作り、MP4で保存する。1本は最
 | 6 | `jinrai-gift.mp4` | なし。白演出・動画中はボス曲を35%で継続 | 4面の最終撃破から白へ90f → 動画の白明け90f → 終了後の白フェード150f・保持60f → 対峙の白明け120f → 会話 → 餞別 → 退場60f。迅雷一閃の最後の攻防でみみこがとどめを刺す | 迅雷の立ち絵、みみこの立ち絵(みみこの形が崩れた版は捨てる) |
 | 7 | `minerva-finale.mp4` | なし。白演出・動画中はボス曲を35%で継続 | 5面の最終撃破から白へ90f → 動画の白明け90f → 終了後の白フェード150f・保持60f → 対峙の白明け120f → 会話 → 退場60f。最終技の最後の攻防でみみこがとどめを刺す | ミネルヴァの立ち絵、みみこの立ち絵(造形が崩れた版は捨てる) |
 | 3 | `ending-1.mp4` | なし | 5面クリア後、エンディングの1本目 | みみこ |
-| 4 | `ending-2.mp4` | なし | エンディングの2本目。キービジュアルをそのまま朝にして動かす | キービジュアルだけ(5人の顔が変わった版・寄った版は捨てる) |
+| 4 | `ending-2.mp4` | なし | エンディングの2本目。キービジュアルをそのまま朝にして動かす | キービジュアルだけ(5人の顔が変わった版・寄った版、みみこが後ろ姿で始まる版・背を向ける版・顔だけが回る版は捨てる) |
 | 5 | `ending-3.mp4` | なし | エンディングの3本目 | キービジュアル、みみこ |
 
 ## 共通の指定
@@ -91,7 +93,7 @@ Morning sunlight slowly fills a vast, cathedral-sized observatory at the top of 
 ### ending-2.mp4
 
 ```text
-Animate the reference image as it is: a wide exterior shot of the tall stone owl tower with its lit balconies, now at sunrise instead of night, the sky glowing orange and gold, cherry petals and loose pages drifting in the morning breeze. Keep the composition, the tower, the balconies and the five characters exactly where and how they are in the reference image: same faces, same hairstyles and hair colors, same outfits, same poses as the starting point. Each of the five simply looks up toward the brightening sky and smiles, with small natural movements: hair and clothes swaying in the breeze, one of them raising a hand slightly. They stay on their balconies at the same distance from the camera; their faces stay small, no close-ups, no one turns into a different character, no new characters appear. The round grey-green owl flying in front of the tower in the reference image rises slowly upward past the balconies, keeping its exact round design. The camera slowly drifts upward and back, revealing the whole tower in the morning light. Joyful, warm, nostalgic, very gentle motion. 2D anime illustration style identical to the reference image, soft painterly lighting, slow smooth camera movement, 16:9. No text, no letters, no captions, no subtitles, no logos, no watermark.
+Animate the reference image as it is: a wide exterior shot of the tall stone owl tower with its lit balconies, already at sunrise from the very first frame, the sky glowing orange and gold, cherry petals and loose pages drifting in the morning breeze. From the very first frame, Mimiko, the round grey-green owl in front of the tower, faces the viewer almost straight on, turned only slightly to the viewer's right, with both eyes, its beak and its spotted belly fully visible. It keeps this same orientation throughout the entire shot. Mimiko is a single perfectly round ball with no neck and no separate body below the head, a smooth round head with NO ear tufts or pointed ears, a face almost entirely made up of two huge round flat white eyes with small black pupils, a tiny yellow beak between them, short stubby wings and a spotted light-grey belly. Keep the reference design, colors, proportions and 2D illustration style. Its eyes, beak and belly stay fixed on the same front surface as it slowly floats straight upward past the balconies as one intact round shape, with only gentle flaps of its short wings. Mimiko does not turn or rotate. Keep the composition, the tower, the balconies and the five characters exactly where and how they are in the reference image: same faces, same hairstyles and hair colors, same outfits, same poses as the starting point. Each of the five simply looks up toward the brightening sky and smiles, with small natural movements: hair and clothes swaying in the breeze, one of them raising a hand slightly. They stay on their balconies at the same distance from the camera; their faces stay small, no close-ups, no one turns into a different character, no new characters appear. In one continuous shot, the camera slowly pulls straight back without orbiting, revealing the whole tower in the morning light. Joyful, warm, nostalgic, very gentle motion. 2D anime illustration style identical to the reference image, soft painterly lighting, slow smooth camera movement, 16:9. No text, no letters, no captions, no subtitles, no logos, no watermark.
 ```
 
 ### ending-3.mp4
