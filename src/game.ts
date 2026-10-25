@@ -12,7 +12,7 @@ import { claudineScene, complementBoundary, emitClaudine, whiteSpaceCircle } fro
 import { reflectEnterShot } from './patterns/enter-reflect';
 import { emitEtokichi, emitGalaxyFlash, type GalaxyFlash, updateGalaxyFlash } from './patterns/etokichi';
 import { emitEtokichiDawn } from './patterns/etokichi-dawn';
-import { burstPosition, burstVisibility, DASH_ATTACK, DASH_CHARGE, DASH_CUTIN, dashBurstStep, dashPosition, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
+import { burstPosition, burstVisibility, DASH_ATTACK, DASH_CHARGE_START, DASH_CHARGED, dashBurstStep, dashPosition, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
 import { jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_FADE, updateJinraiHeart } from './patterns/jinrai-kiss';
 import { type Thunderbolt, type Thunderstorm, thunderPosition } from './patterns/jinrai-thunder';
@@ -291,6 +291,7 @@ export class Game {
   private accept(): boolean { return this.just('KeyZ') || this.just('Enter'); }
 
   update(): void {
+    if (this.scene !== 'stage') this.audio.stopEnergy();
     this.frame++;
     if (this.flash > 0) this.flash--;
     if (this.messageFrames > 0) this.messageFrames--;
@@ -890,6 +891,7 @@ export class Game {
   }
 
   private beginPhase(phase: Phase): void {
+    this.audio.stopEnergy();
     this.bossEntry = this.phase ? this.bossPosition() : [192, phase.spell ? 132 : 77];
     this.phase = phase;
     this.keyboardWord = '';
@@ -925,14 +927,9 @@ export class Game {
     this.clearBullets(); this.shots.clear(); this.clones.clear();
     if (phase.spell) {
       this.spellBonus = 1_000_000 + this.stage * 500_000;
-      if (phase.pattern === 'jinraiDash') {
-        this.cutin = 0; this.flash = 0;
-        this.audio.play('prayerCharge');
-      } else {
-        this.cutin = 100;
-        this.flash = 12;
-        this.audio.play('declare');
-      }
+      this.cutin = 100;
+      this.flash = 12;
+      this.audio.play('declare');
     }
   }
 
@@ -1029,8 +1026,8 @@ export class Game {
     const phase = this.phase!;
     this.phaseFrame++;
     if (phase.pattern === 'jinraiDash') {
-      if (this.phaseFrame === DASH_CHARGE) { this.audio.play('thunderBurst'); this.spark(...this.bossXY, '#d8eaff', 24); }
-      if (this.phaseFrame === DASH_CUTIN) { this.cutin = 100; this.flash = 12; this.audio.play('declare'); }
+      if (this.phaseFrame === DASH_CHARGE_START) this.audio.play('jinraiCharge');
+      if (this.phaseFrame === DASH_CHARGED) { this.audio.play('jinraiCrackle'); this.spark(...this.bossXY, '#ffe45c', 32); }
     }
     if (this.midboss) this.midbossElapsedFrames++;
     if (phase.spell) this.spellBonus = Math.max(0, this.spellBonus - 22);

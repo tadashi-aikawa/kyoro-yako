@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { emitBossNormal, normalPeriod } from './patterns/boss-normal';
-import { DASH_ATTACK, DASH_CHARGE, DASH_CUTIN, dashBurstStep, emitJinraiPattern } from './patterns/jinrai';
+import { DASH_ATTACK, DASH_CHARGE_START, DASH_CHARGED, dashBurstStep, emitJinraiPattern } from './patterns/jinrai';
 import { CLONE_HOP, CLONE_SHOOT, CLONE_STAGGER, HOP_OUT, jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_CHARGE, KISS_FADE, KISS_LIFE, KISS_PERIOD, kissEdgeWarning, updateJinraiHeart } from './patterns/jinrai-kiss';
 import { bulletSpeed } from './rules';
@@ -263,12 +263,13 @@ it('花吹雪は難易度が上がるほど螺旋の腕を増やす', () => {
   }
 });
 
-it('一閃は3秒の印から放電し、カットイン終了後に攻撃を始める', () => {
+it('一閃はカットインの後に3秒の印で充電し、長い放電音から攻撃を始める', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   const play = vi.spyOn(game.audio, 'play');
   game.startStage(4); game.startBoss(false, 10);
-  expect(play).toHaveBeenCalledWith('prayerCharge');
-  expect(play).not.toHaveBeenCalledWith('declare');
+  expect(game.cutin).toBe(100);
+  expect(play).toHaveBeenCalledWith('declare');
+  expect(play).not.toHaveBeenCalledWith('jinraiCharge');
   const hp = game.phaseHp;
   game.autoshot = true; game.power = 5;
   for (let frame = 1; frame < DASH_ATTACK; frame++) {
@@ -276,18 +277,22 @@ it('一閃は3秒の印から放電し、カットイン終了後に攻撃を始
     expect(game.bullets.count).toBe(0);
     expect(game.jinraiDashTick).toBe(-1);
     expect(game.phaseHp).toBe(hp);
-    if (frame < DASH_CHARGE) expect(play).not.toHaveBeenCalledWith('thunderBurst');
-    if (frame === DASH_CHARGE) {
-      expect(play).toHaveBeenCalledWith('thunderBurst');
+    if (frame < DASH_CHARGED) expect(play).not.toHaveBeenCalledWith('jinraiCrackle');
+    if (frame === DASH_CHARGED) {
+      expect(play).toHaveBeenCalledWith('jinraiCrackle');
       expect(game.bossXY).toEqual([192, 132]);
     }
-    if (frame < DASH_CUTIN) expect(game.cutin).toBe(0);
-    if (frame === DASH_CUTIN) { expect(game.cutin).toBe(100); expect(play).toHaveBeenCalledWith('declare'); }
+    expect(game.cutin).toBe(Math.max(0, 100 - frame));
+    if (frame < DASH_CHARGE_START) expect(play).not.toHaveBeenCalledWith('jinraiCharge');
+    if (frame === DASH_CHARGE_START) expect(play).toHaveBeenCalledWith('jinraiCharge');
   }
   game.update();
   expect(game.jinraiDashTick).toBe(0);
   expect(game.bossXY).toEqual([24, 115]);
   expect(game.cutin).toBe(0);
+  expect(play.mock.calls.filter(([sound]) => sound === 'declare')).toHaveLength(1);
+  expect(play.mock.calls.filter(([sound]) => sound === 'jinraiCharge')).toHaveLength(1);
+  expect(play.mock.calls.filter(([sound]) => sound === 'jinraiCrackle')).toHaveLength(1);
 });
 
 it('一閃は時間制限∞・体力1620のスペルで、時間切れにならず撃破すると終了する', () => {

@@ -1,6 +1,9 @@
-Use case: identity-preserve
-Asset type: transparent chibi boss sprite for a bullet hell game.
-Input image: edit target; existing Jinrai sprite. Preserve the same character identity, face, hair ornaments, long dark hair with golden streaks, black-and-gold kunoichi costume, boots, proportions, illustration style and full-body square framing.
-Primary request: create a sibling ninjutsu hand-seal pose. Remove the kunai and bring both hands together in front of her chest, clearly forming a ninja hand seal with two fingers held vertically and the other hand supporting them. Focused determined eyes, stable centered stance, entire head, feet and hair visible.
-Scene/backdrop: genuinely transparent background.
-Constraints: preserve character and outfit; change only pose, hands and expression. Clean readable silhouette at 64-pixel game size. No lightning, smoke or glow baked into the image; those are animated in game code. No text, watermark, frame or background.
+用途: 弾幕ゲームのボス「迅雷」が印を結ぶときに使う、透過の全身スプライト。
+画像1: 編集対象。現在ゲームで使う迅雷のスプライト。キャラクターの顔立ち、黒と金の髪、髪飾り、衣装、体型、頭身、線と塗りの基準。
+画像2: ユーザー添付のポーズ参考。非公開素材としてリポジトリには含めない。再生成するときは元の添付を渡す。ポーズと雰囲気だけの参考。こちらの絵のタッチは使わない。
+依頼: 画像1の迅雷を、画像2のように目を静かに閉じ、胸の前で両手を合わせて忍法の印を結び、片脚の膝を軽く曲げて上げ、もう片脚を下へ伸ばして集中しながら浮遊する全身ポーズへ描き直す。顔はほぼ正面でわずかにうつむく。両手と印が顔の前を隠さない。長い髪と着物の裾はエネルギーを受けて少し外へなびく。
+画風: 画像1と同じアニメゲーム用のちびキャラ。輪郭は明瞭、セル塗りと整理された陰影。写実的な厚塗りや細かな筆触にしない。幼い顔へ変えない。閉じたまぶたと静かな集中を表し、眉を吊り上げない。
+構図: 正方形の中央に一人だけ。髪飾りから足先まで切れず、全身の占有率と余白は画像1と同じ。640px級へ縮小しても手と閉じた目が読める。
+背景: 実際のアルファを持つ完全な透明背景。
+維持: キャラクターの同一性、衣装の黒と金、元の頭身と首の見える体型、金のかんざしと花飾り、細く艶のある髪。
+オーラはゲーム側でアニメーションを重ねるため、この素材には焼き込まない。人物だけを描く。文字、透かし、枠、背景、台座、他のキャラを入れない。
