@@ -135,9 +135,9 @@ it('練習ではopeningを再生しない', () => {
   expect(video('opening').play).not.toHaveBeenCalled();
 });
 
-it('5面開始で5本を先読みし、道中終了後にlastbossを挟んで会話へ進む', () => {
+it('5面開始で3本を先読みし、道中終了後にlastbossを挟んで会話へ進む', () => {
   const game = new Game(); game.startStage(5);
-  expect(videos).toHaveLength(6);
+  expect(videos).toHaveLength(4);
   game.stageIntroFrame = 180; game.stageFrame = 2899; game.midbossElapsedFrames = 6000;
   game.update();
   expect(game.debugState).toMatchObject({ scene: 'transition', transition: 'lastboss-in', transitionFrame: 0, bgm: 'stage-dawn', bgmVolume: 0.21 });
@@ -196,22 +196,21 @@ it('白保持中のZ・X・Escを無視し、60フレームの時計だけを進
   expect(game.debugState).toMatchObject({ scene: 'arrival', arrivalFrame: 0, bgm: 'boss-minerva', bgmVolume: 0.6 });
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの5面クリア後、3本を順再生してエンディングへ進む', (difficulty) => {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの5面クリア後、編集済み動画を無音で流してエンディングへ進む', (difficulty) => {
   const game = new Game(); game.difficulty = difficulty; game.startStage(5); game.scene = 'clear'; press(game);
-  for (const name of ['ending-1', 'ending-2', 'ending-3']) {
-    expect(game.debugState).toMatchObject({ scene: 'movie', movie: name, bgm: 'ending' });
-    video(name).emit('ended');
-  }
+  expect(game.debugState).toMatchObject({ scene: 'movie', movie: 'ending', bgm: 'ending' });
+  expect(video('ending').muted).toBe(true);
+  video('ending').emit('ended');
   expect(game.scene).toBe('ending'); expect(game.endingFrame).toBe(0);
 });
 
 it.each(['KeyZ', 'KeyX'])('%sでエンディング動画の残り全部をスキップし、古い終了通知も無視する', (key) => {
   const game = new Game(); game.startStage(5); game.scene = 'clear'; press(game);
-  video('ending-1').emit('ended'); press(game, key);
+  press(game, key);
   expect(game.scene).toBe('ending'); expect(game.movies.current).toBeUndefined();
-  video('ending-2').emit('ended');
-  expect(game.scene).toBe('ending'); expect(video('ending-3').play).not.toHaveBeenCalled();
-  expect(video('ending-2').pause).toHaveBeenCalled();
+  video('ending').emit('ended');
+  expect(game.scene).toBe('ending'); expect(game.endingFrame).toBe(0);
+  expect(video('ending').pause).toHaveBeenCalled();
 });
 
 it.each(MOVIES)('?movie=%sは指定した1本だけを再生する', (name) => {
@@ -334,9 +333,10 @@ it('バッファ待ちのwaitingは1秒で切り上げる', async () => {
   vi.advanceTimersByTime(1); expect(done).toHaveBeenCalledOnce();
 });
 
-it('再生途中のエラーでも次の動画へ進む', () => {
+it('編集済みエンディングの再生途中のエラーでも本文へ進む', () => {
   const game = new Game(); game.startStage(5); game.scene = 'clear'; press(game);
-  video('ending-1').emit('error'); expect(game.movieName).toBe('ending-2');
+  video('ending').emit('error'); expect(game.scene).toBe('ending');
+  expect(game.movieName).toBeUndefined();
 });
 
 it('エンディングは72フレームずつ行を送り、Zで全文、次のZでロールへ進む', () => {

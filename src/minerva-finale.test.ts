@@ -118,7 +118,7 @@ it.each(['ended', 'KeyZ', 'KeyX', 'error'])('?movie=minerva-finaleの%s後は5�
 it('5面開始時はlastboss・minerva-finale・endingを先読みする', () => {
   const game = new Game(); game.startStage(5);
   expect(videos.filter((entry) => !entry.src.endsWith('/opening.mp4')).map((entry) => entry.src.split('/').at(-1))).toEqual([
-    'lastboss.mp4', 'minerva-finale.mp4', 'ending-1.mp4', 'ending-2.mp4', 'ending-3.mp4',
+    'lastboss.mp4', 'minerva-finale.mp4', 'ending.mp4',
   ]);
   expect(video().play).not.toHaveBeenCalled();
 });
