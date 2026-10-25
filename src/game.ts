@@ -158,6 +158,7 @@ export class Game {
   jinraiDashCrossing = -1;
   jinraiDashY = 115;
   jinraiDashDirection = 1;
+  jinraiDashTrails: { x: number; y: number; frame: number; direction: number; wave: number }[] = [];
   jinraiBurstStartFrame = -1;
   jinraiBurstCount = 0;
   jinraiBurstFromX = 192;
@@ -923,6 +924,7 @@ export class Game {
     this.jinraiDashCrossing = -1;
     this.jinraiDashY = 115;
     this.jinraiDashDirection = 1;
+    this.jinraiDashTrails.length = 0;
     this.jinraiBurstStartFrame = -1;
     this.jinraiBurstCount = 0;
     this.jinraiBurstFromX = 192;

@@ -8,7 +8,7 @@ import { CHAPPY_PORTS, CHAPPY_THROW, PARALLEL_BEAT } from './patterns/chappy';
 import { claudineScene, complementBoundary, whiteSpaceCircle } from './patterns/claudine';
 import { FINALE_CHARGE, FINALE_CRESCENDO, finaleTime, rosePulse } from './patterns/claudine-finale';
 import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, GRID_REPLAY_PERIOD, gridLayoutAt, gridPoint, gridRows, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_NAMES, WEATHER_PERIOD, WEATHER_REPLAY_PERIOD, weatherAt } from './patterns/claudine-weather-grid';
-import { BURST_MOVE, BURST_RETURN, burstVisibility, DASH_ATTACK, DASH_CHARGE, DASH_CHARGE_START, DASH_CHARGED, DASH_CUTIN, DASH_MOVE, dashBurstStep, dashCrossingX, dashMotion } from './patterns/jinrai';
+import { BURST_MOVE, BURST_RETURN, burstVisibility, DASH_ATTACK, DASH_CHARGE, DASH_CHARGE_START, DASH_CHARGED, DASH_CUTIN, DASH_TRAIL_LIFE, dashBurstStep, dashMotion } from './patterns/jinrai';
 import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_CHARGE, KISS_FADE, KISS_ORIGIN, KISS_POSE_END, kissEdgeWarning, kissStep } from './patterns/jinrai-kiss';
 import { THUNDER_FADE, THUNDER_HOLD, thunderGround, thunderPath, thunderScene } from './patterns/jinrai-thunder';
@@ -413,15 +413,7 @@ export class Renderer {
         if (seal && !dashIntro) { c.shadowColor = '#ffe591'; c.shadowBlur = 8 + Math.min(20, (burst - BURST_MOVE) * 0.6); }
         const roseSize = rose < 0 ? 64 : 74 + (rose >= FINALE_CHARGE ? rosePulse(rose, ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty)) * 3 : 0);
         const soloSprite = minervaSoloSprite(channeling ? 'prayer' : casting ? 'cast' : pose, game.frame, game.phaseFrame);
-        if (dash && dash.local >= dash.warning && dash.local < dash.warning + DASH_MOVE + 8) {
-          const elapsed = dash.local - dash.warning;
-          const sprite = this.readySprite(game, bossSpriteId('jinrai', game.jinraiDashDirection > 0 ? 'right' : 'left', game.frame));
-          for (let i = 5; i >= 1; i--) {
-            const age = elapsed - i * 1.5;
-            if (age < 0 || age >= DASH_MOVE) continue;
-            this.fieldCharacter(game, sprite, dashCrossingX(game.jinraiDashDirection, age), y, 64, -game.jinraiDashDirection * 0.18, (0.32 - i * 0.045) * Math.max(0, 1 - Math.max(0, elapsed - DASH_MOVE) / 8));
-          }
-        }
+        if (game.phase.pattern === 'jinraiDash') this.jinraiDashTrail(game);
         this.fieldCharacter(game, solo ? this.readySprite(game, soloSprite) : channeling ? 'minerva-prayer' : seal || thunder?.charging ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || thunder?.charging || sweepCharging || kissing || rose >= 0 ? 0 : Math.sin(game.frame * 0.045) * 2), roseSize, tilt, burstVisibility(burst));
         if (game.boss === 'jinrai' && game.phase.pattern === 'jinraiDash' && game.phaseFrame >= DASH_CHARGED) {
           const direction = dash?.moving ? game.jinraiDashDirection : 0;
@@ -705,6 +697,34 @@ export class Renderer {
       const angle = i * 2.4 + frame * 0.007;
       c.globalAlpha = travel * (0.35 + progress * 0.65);
       c.beginPath(); c.arc(x + Math.cos(angle) * radius, y - 13 + Math.sin(angle) * radius, 0.8 + progress * 0.7, 0, Math.PI * 2); c.fill();
+    }
+    c.restore();
+  }
+
+  private jinraiDashTrail(game: Game): void {
+    const c = this.ctx;
+    const trails = game.jinraiDashTrails.filter(trail => game.phaseFrame - trail.frame < DASH_TRAIL_LIFE);
+    c.save(); c.lineJoin = 'round';
+    // 実際に通った位置を0.6秒残す。到着した後も残像で軌道を追えるようにする。
+    for (const trail of trails) {
+      const fade = 1 - (game.phaseFrame - trail.frame) / DASH_TRAIL_LIFE;
+      const sprite = this.readySprite(game, bossSpriteId('jinrai', trail.direction > 0 ? 'right' : 'left', game.frame));
+      this.fieldCharacter(game, sprite, trail.x, trail.y, 64, -trail.direction * 0.18, fade * 0.58);
+    }
+    // 電撃は残像の上へ重ね、密になった区間でもビリビリを見せる。
+    for (let i = 1; i < trails.length; i++) {
+      const from = trails[i - 1], to = trails[i];
+      if (from.wave !== to.wave) continue;
+      const fade = 1 - (game.phaseFrame - from.frame) / DASH_TRAIL_LIFE;
+      const dx = to.x - from.x, dy = to.y - from.y, distance = Math.hypot(dx, dy) || 1;
+      c.globalAlpha = fade * 0.65;
+      c.strokeStyle = '#ffdf56'; c.lineWidth = 1.8; c.shadowColor = '#ffcc24'; c.shadowBlur = 5;
+      c.beginPath(); c.moveTo(from.x, from.y - 13);
+      for (let j = 1; j <= 6; j++) {
+        const bend = j === 6 ? 0 : Math.sin(Math.floor(game.phaseFrame / 3) * 1.7 + i * 4 + j * 2.9) * Math.min(7, distance * 0.3);
+        c.lineTo(from.x + dx * j / 6 - dy / distance * bend, from.y - 13 + dy * j / 6 + dx / distance * bend);
+      }
+      c.stroke();
     }
     c.restore();
   }

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { emitBossNormal, normalPeriod } from './patterns/boss-normal';
-import { DASH_ATTACK, DASH_CHARGE_START, DASH_CHARGED, DASH_CUTIN, DASH_MOVE, dashBurstStep, dashCrossingX, dashMotion, emitJinraiPattern } from './patterns/jinrai';
+import { DASH_ATTACK, DASH_CHARGE_START, DASH_CHARGED, DASH_CUTIN, DASH_DROP, DASH_MOVE, DASH_START_Y, DASH_TRAIL_LIFE, dashBurstStep, dashCrossingPoint, dashCrossingX, dashMotion, emitJinraiPattern } from './patterns/jinrai';
 import { CLONE_HOP, CLONE_SHOOT, CLONE_STAGGER, HOP_OUT, jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_CHARGE, KISS_FADE, KISS_LIFE, KISS_PERIOD, kissEdgeWarning, updateJinraiHeart } from './patterns/jinrai-kiss';
 import { bulletSpeed } from './rules';
@@ -296,13 +296,20 @@ it('一閃はゆっくり移動し、印から1秒後にカットインを挟ん
   expect(play.mock.calls.filter(([sound]) => sound === 'jinraiCrackle')).toHaveLength(1);
 });
 
-it('一閃の横断は12フレームで加速・減速し、左右で対称に駆け抜ける', () => {
+it('一閃の横断は24フレームで加減速し、左右対称に斜め下へ駆け抜ける', () => {
   const left = Array.from({ length: DASH_MOVE + 1 }, (_, frame) => dashCrossingX(1, frame));
   const speed = left.slice(1).map((x, i) => x - left[i]);
   expect(left[0]).toBe(24); expect(left.at(-1)).toBe(360);
-  expect(Math.max(...speed)).toBeGreaterThan(60);
+  expect(Math.max(...speed)).toBeGreaterThan(35);
+  expect(Math.max(...speed)).toBeLessThan(45);
   expect(speed[0]).toBeLessThan(2); expect(speed.at(-1)).toBeLessThan(2);
   for (let i = 0; i <= DASH_MOVE; i++) expect(dashCrossingX(-1, i)).toBeCloseTo(384 - left[i]);
+  for (const direction of [1, -1]) {
+    const path = Array.from({ length: DASH_MOVE + 1 }, (_, frame) => dashCrossingPoint(direction, 115, frame));
+    expect(path[0][1]).toBe(115); expect(path.at(-1)![1]).toBe(165);
+    expect(path.slice(1).every((p, i) => p[1] > path[i][1])).toBe(true);
+    expect(path.every(([x, y]) => Math.abs(y - 115 - Math.abs(x - path[0][0]) / 336 * DASH_DROP) < 0.001)).toBe(true);
+  }
 });
 
 it('一閃は時間制限∞・体力1620のスペルで、時間切れにならず撃破すると終了する', () => {
@@ -500,10 +507,10 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('迅雷一閃だけシ�
 
 it('一閃は16px間隔の列に切れ目を作り、停止後に光って時間差で飛ぶ', () => {
   const game = phase(10);
-  while (game.jinraiDashTick < 45) game.update();
+  while (dashMotion(game).local < dashMotion(game).warning + DASH_MOVE) game.update();
   const held = game.bullets.objects.filter((b) => b.active && b.motion === 'jinraiHold');
   expect(held).toHaveLength(20);
-  expect(held.every((b) => b.y === 115)).toBe(true);
+  expect(held.every((b) => Math.abs(b.y - 115 - DASH_DROP * b.dashOrder / 21) < 0.001)).toBe(true);
   const positions = held.map((b) => b.x).sort((a, b) => a - b);
   const spacing = positions.slice(1).map((x, i) => x - positions[i]);
   expect(spacing.filter((gap) => gap > 40)).toHaveLength(1);
@@ -525,16 +532,48 @@ it('一閃の高さは3段を巡回し、体力半分以下では次の巡回か
   game.phaseHp = game.phaseMaxHp / 2;
   while (game.jinraiDashCrossing < 1) game.update();
   expect(game.jinraiDashDouble).toBe(true);
-  expect(game.bossXY[1]).toBe(170);
+  expect(game.bossXY[1]).toBe(DASH_START_Y[1]);
   const firstDirection = game.jinraiDashDirection;
   while (game.jinraiDashCrossing < 2) game.update();
   expect(game.jinraiDashTick).toBe(85);
-  expect(game.bossXY[1]).toBe(225);
+  expect(game.bossXY[1]).toBe(DASH_START_Y[2]);
   expect(game.jinraiDashDirection).toBe(-firstDirection);
   expect(game.bossXY[1]).toBeLessThanOrEqual(398 - 120);
 });
 
-it('一閃はNormalの進行中に画面内へ40〜90発を維持する', () => {
+it('一閃の残像は等間隔で残り、寿命と上限があり、移動開始だけ転移音が鳴る', () => {
+  const game = phase(10);
+  const play = vi.spyOn(game.audio, 'play');
+  while (dashMotion(game).local < dashMotion(game).warning) game.update();
+  expect(play.mock.calls.filter(([sound]) => sound === 'jinraiWarp')).toHaveLength(1);
+  expect(play.mock.calls.some(([sound]) => sound === 'wind')).toBe(false);
+  for (let frame = 0; frame < DASH_MOVE; frame++) game.update();
+  const trails = game.jinraiDashTrails;
+  expect(trails).toHaveLength(15);
+  expect(new Set(trails.map(trail => trail.wave)).size).toBe(1);
+  for (let i = 1; i < trails.length; i++) {
+    expect(trails[i].x - trails[i - 1].x).toBe(24);
+    expect(trails[i].y - trails[i - 1].y).toBeCloseTo(DASH_DROP / 14);
+  }
+  const snapshot = trails.map(trail => ({ ...trail }));
+  game.scene = 'pause';
+  for (let frame = 0; frame < 60; frame++) game.update();
+  expect(game.jinraiDashTrails).toEqual(snapshot);
+  game.scene = 'stage';
+  for (let frame = 0; frame < DASH_TRAIL_LIFE; frame++) game.update();
+  expect(game.jinraiDashTrails).toHaveLength(0);
+  for (let frame = 0; frame < 1000; frame++) {
+    game.update();
+    expect(game.jinraiDashTrails.length).toBeLessThanOrEqual(15);
+    expect(game.jinraiDashTrails.every(trail => game.phaseFrame - trail.frame < DASH_TRAIL_LIFE)).toBe(true);
+    expect(new Set(game.jinraiDashTrails.map(trail => trail.wave)).size).toBeLessThanOrEqual(1);
+  }
+  while (!game.jinraiDashTrails.length) game.update();
+  game.startBoss(false, 10);
+  expect(game.jinraiDashTrails).toHaveLength(0);
+});
+
+it('一閃はNormalの斜め移動中に画面内へ39〜90発を維持する', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   game.startStage(4); game.startBoss(false, 10);
   while (game.phaseFrame < DASH_ATTACK - 105) game.update();
@@ -542,7 +581,7 @@ it('一閃はNormalの進行中に画面内へ40〜90発を維持する', () => 
     game.update();
     if (frame < 240 || frame % 60 !== 0) continue;
     const visible = game.bullets.objects.filter((b) => b.active && b.x >= 0 && b.x <= 384 && b.y >= 0 && b.y <= 448).length;
-    expect(visible, `frame ${frame}`).toBeGreaterThanOrEqual(40);
+    expect(visible, `frame ${frame}`).toBeGreaterThanOrEqual(39);
     expect(visible, `frame ${frame}`).toBeLessThanOrEqual(90);
   }
 });
@@ -561,7 +600,7 @@ it('一閃の後半の横断もNormalは40〜90発に収まり、Lunaticの列�
   }
   const lunatic = new Game(); lunatic.audio.volume = 0; lunatic.invincible = true;
   lunatic.difficulty = 'lunatic'; lunatic.startStage(4); lunatic.startBoss(false, 10);
-  while (lunatic.jinraiDashTick < 37) lunatic.update();
+  while (dashMotion(lunatic).local < dashMotion(lunatic).warning + DASH_MOVE) lunatic.update();
   const positions = lunatic.bullets.objects.filter((b) => b.active && b.dashWave === 0).map((b) => b.x).sort((a, b) => a - b);
   expect(positions).toHaveLength(20);
   expect(positions.slice(1).filter((x, i) => x - positions[i] > 40)).toHaveLength(1);
