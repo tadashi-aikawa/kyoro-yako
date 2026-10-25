@@ -339,32 +339,47 @@ it('編集済みエンディングの再生途中のエラーでも本文へ進�
   expect(game.movieName).toBeUndefined();
 });
 
-it('エンディングは72フレームずつ行を送り、Zで全文、次のZでロールへ進む', () => {
+it('エンディングは1行3秒で表示し、最後を読んだあと入力なしでロールへ進む', () => {
   vi.stubGlobal('location', { search: '?ending=mimiko' }); const game = new Game();
   expect(game.endingLines).toHaveLength(6); expect(game.endingLineAlpha(0)).toBe(0);
-  run(game, 30); expect(game.endingLineAlpha(0)).toBe(1); expect(game.endingLineAlpha(1)).toBe(0);
-  run(game, 57); expect(game.endingLineAlpha(1)).toBe(0.5); expect(game.endingLineAlpha(2)).toBe(0);
-  press(game); expect(game.scene).toBe('ending'); expect(game.endingComplete).toBe(true);
-  expect(game.endingFrame).toBe(88);
-  expect(game.endingLineAlpha(5)).toBe(1); press(game);
+  run(game, 60); expect(game.endingLineAlpha(0)).toBe(1); expect(game.endingLineAlpha(1)).toBe(0);
+  run(game, 150); expect(game.endingLineAlpha(1)).toBe(0.5); expect(game.endingLineAlpha(2)).toBe(0);
+  run(game, 750); expect(game.endingLineAlpha(5)).toBe(1); expect(game.endingComplete).toBe(true);
+  expect(game.scene).toBe('ending'); expect(game.endingExitAlpha).toBe(0);
+  run(game, 238); expect(game.scene).toBe('ending'); expect(game.endingExitAlpha).toBeGreaterThan(0.9);
+  game.update();
   expect(game.scene).toBe('credits'); expect(game.creditsFrame).toBe(0);
 });
 
-it('ロールは25秒流れ、約2秒待ってタイトルへ戻る', () => {
-  const game = new Game(); game.scene = 'credits'; run(game, 1500);
-  expect(game.scene).toBe('credits'); run(game, 119); expect(game.scene).toBe('credits');
+it('Zで全文表示しても次のZでは飛ばさず、読む時間のあと自動でロールへ進む', () => {
+  vi.stubGlobal('location', { search: '?ending=mimiko' }); const game = new Game();
+  run(game, 87); press(game); expect(game.endingComplete).toBe(true);
+  expect(game.endingLineAlpha(5)).toBe(1); press(game); expect(game.scene).toBe('ending');
+  run(game, 237); expect(game.scene).toBe('ending'); expect(game.endingExitAlpha).toBe(0);
+  run(game, 660); expect(game.scene).toBe('ending'); game.update();
+  expect(game.scene).toBe('credits'); expect(game.creditsFrame).toBe(0);
+});
+
+it('?credits=1でスタッフロールから確認できる', () => {
+  vi.stubGlobal('location', { search: '?credits=1' });
+  expect(new Game().scene).toBe('credits');
+});
+
+it('ロールは4枚を48秒で流し、3秒の余韻でタイトルへ戻る', () => {
+  const game = new Game(); game.scene = 'credits'; run(game, 2880);
+  expect(game.scene).toBe('credits'); run(game, 179); expect(game.scene).toBe('credits');
   game.update(); expect(game.scene).toBe('title'); expect(game.menu).toBe(0);
 });
 
 it('ロールのZは2倍速、Xは終端へ飛ぶ', () => {
   const game = new Game(); game.scene = 'credits'; game.keys.add('KeyZ'); run(game, 100);
   expect(game.creditsFrame).toBe(200); game.keys.delete('KeyZ'); press(game, 'KeyX');
-  expect(game.creditsFrame).toBe(1500); run(game, 120); expect(game.scene).toBe('title');
+  expect(game.creditsFrame).toBe(2880); run(game, 180); expect(game.scene).toBe('title');
 });
 
-it('ロール終了後の2秒はZを押していても短縮しない', () => {
-  const game = new Game(); game.scene = 'credits'; game.keys.add('KeyZ'); run(game, 750);
-  expect(game.creditsFrame).toBe(1500); run(game, 119); expect(game.scene).toBe('credits');
+it('ロール終了後の3秒はZを押していても短縮しない', () => {
+  const game = new Game(); game.scene = 'credits'; game.keys.add('KeyZ'); run(game, 1440);
+  expect(game.creditsFrame).toBe(2880); run(game, 179); expect(game.scene).toBe('credits');
   game.update(); expect(game.scene).toBe('title');
 });
 

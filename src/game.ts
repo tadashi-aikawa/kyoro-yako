@@ -3,6 +3,7 @@ import { type BgmCue, BgmPlayer } from './bgm';
 import { CAST_GAP, MOTION_SPRITES } from './boss-motion';
 import { patternPosition } from './boss-movement';
 import { dialogue, ENDINGS, type Line, midDialogue } from './dialogue';
+import { CREDITS_HOLD_FRAMES, CREDITS_ROLL_FRAMES, ENDING_EXIT_FRAMES, ENDING_LINE_FADE, ENDING_LINE_GAP, ENDING_READ_FRAMES } from './ending';
 import { ENEMY_ROOMS, enemyFireFrames } from './enemy-design';
 import { ENDING_MOVIES, MOVIES, type MovieName, MoviePlayer } from './movies';
 import { obsidiaPosition } from './obsidia-movement';
@@ -75,6 +76,8 @@ export class Game {
   private bossDefeatOrigin: [number, number] = [192, 77];
   giftFrame = 0;
   endingFrame = 0;
+  private endingReadFrame = 0;
+  private endingReadDuration = ENDING_READ_FRAMES;
   private endingRevealed = false;
   creditsFrame = 0;
   movieName?: MovieName;
@@ -248,6 +251,7 @@ export class Game {
       });
       return;
     }
+    if (this.params.get('credits') === '1') { this.scene = 'credits'; return; }
     const ending = this.params.get('ending');
     if (PLAYERS.includes(ending as PlayerId)) {
       this.player = ending as PlayerId;
@@ -341,16 +345,20 @@ export class Game {
   private updateMenu(): void {
     if (this.scene === 'ending') {
       this.endingFrame++;
-      if (this.accept()) {
-        if (!this.endingComplete) this.endingRevealed = true;
-        else { this.scene = 'credits'; this.creditsFrame = 0; }
+      if (this.accept() && !this.endingComplete) {
+        // 全文表示は未読の行を消す操作ではない。残りも1行3秒の余裕を取る。
+        const unread = this.endingLines.filter((_, index) => this.endingLineAlpha(index) < 1).length;
+        this.endingReadDuration = Math.max(ENDING_READ_FRAMES, unread * ENDING_LINE_GAP);
+        this.endingRevealed = true;
       }
+      if (this.endingComplete) this.endingReadFrame++;
+      if (this.endingReadFrame >= this.endingReadDuration) { this.scene = 'credits'; this.creditsFrame = 0; }
       return;
     }
     if (this.scene === 'credits') {
-      this.creditsFrame += this.creditsFrame < 1500 && this.held('KeyZ') ? 2 : 1;
-      if (this.just('KeyX')) this.creditsFrame = Math.max(this.creditsFrame, 1500);
-      if (this.creditsFrame >= 1620) this.returnToTitle();
+      this.creditsFrame += this.creditsFrame < CREDITS_ROLL_FRAMES && this.held('KeyZ') ? 2 : 1;
+      if (this.just('KeyX')) this.creditsFrame = Math.max(this.creditsFrame, CREDITS_ROLL_FRAMES);
+      if (this.creditsFrame >= CREDITS_ROLL_FRAMES + CREDITS_HOLD_FRAMES) this.returnToTitle();
       return;
     }
     if (this.scene === 'clear' && this.accept()) {
@@ -559,9 +567,10 @@ export class Game {
     if (++this.arrivalFrame >= (this.arrivalFromWhite ? 120 : 80)) this.scene = 'dialogue';
   }
 
-  private startEnding(): void { this.scene = 'ending'; this.endingFrame = 0; this.endingRevealed = false; }
-  get endingComplete(): boolean { return this.endingRevealed || this.endingFrame >= (this.endingLines.length - 1) * 72 + 30; }
-  endingLineAlpha(index: number): number { return this.endingRevealed ? 1 : Math.max(0, Math.min(1, (this.endingFrame - index * 72) / 30)); }
+  private startEnding(): void { this.scene = 'ending'; this.endingFrame = 0; this.endingReadFrame = 0; this.endingReadDuration = ENDING_READ_FRAMES; this.endingRevealed = false; }
+  get endingComplete(): boolean { return this.endingRevealed || this.endingFrame >= (this.endingLines.length - 1) * ENDING_LINE_GAP + ENDING_LINE_FADE; }
+  get endingExitAlpha(): number { return Math.max(0, Math.min(1, (this.endingReadFrame - this.endingReadDuration + ENDING_EXIT_FRAMES) / ENDING_EXIT_FRAMES)); }
+  endingLineAlpha(index: number): number { return this.endingRevealed ? 1 : Math.max(0, Math.min(1, (this.endingFrame - index * ENDING_LINE_GAP) / ENDING_LINE_FADE)); }
 
   startStage(stage: number): void {
     this.movies.stop();

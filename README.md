@@ -108,5 +108,6 @@ pnpm exec vite preview --base=/kyoro-yako/ --host 127.0.0.1 --port 5198
 - `?autoshot=1`：ショットを常時発射。
 - `?power=5&lives=5&bombs=3`：開始時のPower(0〜5)・残機(0〜8)・ボム数(0〜8)を指定。
 - `?ending=mimiko`：エンディングから開始。
+- `?credits=1`：スタッフロールの背景イラストから開始。
 
 開発ビルドでは `window.__owlery.state()` で状態を取得し、`window.__owlery.skipPhase()` で現在のボスフェーズを進められます。

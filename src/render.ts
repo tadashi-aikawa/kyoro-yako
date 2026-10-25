@@ -1,4 +1,5 @@
 import { bossSpriteId, createBossMotion, isCasting, updateBossMotion } from './boss-motion';
+import { CREDITS_ART, CREDITS_CROSSFADE_FRAMES, CREDITS_HOLD_FRAMES, CREDITS_ROLL_FRAMES, CREDITS_SCENE_FRAMES } from './ending';
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
 import { PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
@@ -34,6 +35,7 @@ export class Renderer {
   private readonly bossMotion = createBossMotion();
   private readonly titleArt = Object.assign(new Image(), { src: `${import.meta.env.BASE_URL}assets/title/key-visual.webp` });
   private titleLayer?: HTMLCanvasElement;
+  private readonly creditsArt = new Map<string, HTMLImageElement>();
   private pixelRatio = 1;
   constructor(private readonly ctx: CanvasRenderingContext2D) {
     this.setPixelRatio(1);
@@ -76,6 +78,8 @@ export class Renderer {
 
   draw(game: Game): void {
     const c = this.ctx;
+    // 本編の初期ロードを増やさず、動画・本文を読んでいる間に背景を先読みする。
+    if (game.scene === 'ending' || game.scene === 'credits' || (game.scene === 'movie' && game.movieName === 'ending')) this.preloadCreditsArt();
     c.fillStyle = '#080817'; c.fillRect(0, 0, 640, 480);
     if (game.scene === 'movie' || (game.scene === 'transition' && (game.transition === 'lastboss-out' || game.transition === 'jinrai-gift-out' || game.transition === 'minerva-finale-out'))) {
       c.fillStyle = '#000'; c.fillRect(0, 0, 640, 480);
@@ -1630,19 +1634,64 @@ export class Renderer {
       this.text('ENDING', 415, 73, 31, ink, 'center', shadow);
       game.endingLines.forEach((line, i) => { c.globalAlpha = game.endingLineAlpha(i); this.text(line, 266, 146 + i * 44, 14, ink, 'left', shadow); });
       c.globalAlpha = 1;
-      this.text(game.endingComplete ? 'Z  スタッフロールへ' : 'Z  すべて読む', 584, 451, 12, ink, 'right', shadow);
+      if (!game.endingComplete) this.text('Z  すべて読む', 584, 451, 12, ink, 'right', shadow);
+      this.fade(game.endingExitAlpha, '#f5efe1');
     } else {
+      this.drawCreditsArt(game.creditsFrame);
       const lines = ['企画・仕様  チャッピー', '制作・調整  迅雷 / Codex', 'キャラクター  owleryのみんな', 'エトキチ  エトキチの大冒険より', '遊んでくれたあなたへ、ありがとう。'];
       const rowGap = 48;
       const distance = 520 + 132 + (lines.length - 1) * rowGap / 2 - 240;
-      const y = 520 - Math.min(1, game.creditsFrame / 1500) * distance;
+      const y = 520 - Math.min(1, game.creditsFrame / CREDITS_ROLL_FRAMES) * distance;
       const ink = '#3c283c';
-      c.save(); c.globalAlpha = Math.max(0, Math.min(1, (y - 24) / 36));
-      this.text(GAME_TITLE, 320, y, 36, ink, 'center', 0);
-      this.uiText('弾幕シューティング / owlery', 320, y + 52, 12, ink, 'center');
+      // 下端の操作案内へスクロール中の文字を重ねない。
+      c.save(); c.beginPath(); c.rect(380, 0, 260, 420); c.clip();
+      const line = (value: string, baseline: number, size: number, ui = true) => {
+        // クリップ境界へ届く前に消し、文字が上下半分だけ現れる状態を避ける。
+        c.globalAlpha = Math.max(0, Math.min(1, (baseline - 12) / 30, (414 - baseline) / 30));
+        if (ui) this.uiText(value, 505, baseline, size, ink, 'center');
+        else this.text(value, 505, baseline, size, ink, 'center', 0);
+      };
+      line(GAME_TITLE, y, 28, false);
+      line('弾幕シューティング / owlery', y + 52, 11);
+      lines.forEach((value, i) => { line(value, y + 132 + i * rowGap, 12); });
       c.restore();
-      lines.forEach((line, i) => { this.uiText(line, 320, y + 132 + i * rowGap, 16, ink, 'center'); });
-      if (game.creditsFrame < 1500) this.text('Z  早送り    X  スキップ', 584, 451, 12, ink, 'right', 0);
+      if (game.creditsFrame < CREDITS_ROLL_FRAMES) this.text('Z  早送り    X  スキップ', 608, 451, 10, ink, 'right', 0);
+      const fadeOut = Math.max(0, (game.creditsFrame - CREDITS_ROLL_FRAMES - CREDITS_HOLD_FRAMES + 60) / 60);
+      this.fade(fadeOut, '#080817');
     }
+  }
+
+  private preloadCreditsArt(): void {
+    for (const id of CREDITS_ART) {
+      if (this.creditsArt.has(id)) continue;
+      this.creditsArt.set(id, Object.assign(new Image(), { src: `${import.meta.env.BASE_URL}assets/credits/${id}.webp` }));
+    }
+  }
+
+  private drawCreditsArt(frame: number): void {
+    const c = this.ctx;
+    c.fillStyle = '#f5efe1'; c.fillRect(0, 0, 640, 480);
+    const index = Math.min(CREDITS_ART.length - 1, Math.floor(frame / CREDITS_SCENE_FRAMES));
+    const draw = (scene: number, alpha: number) => {
+      const image = this.creditsArt.get(CREDITS_ART[scene]);
+      if (!image?.complete || !image.naturalWidth) return;
+      const progress = Math.max(0, Math.min(1, (frame - scene * CREDITS_SCENE_FRAMES) / CREDITS_SCENE_FRAMES));
+      const zoom = Math.max(640 / image.naturalWidth, 480 / image.naturalHeight) * (1 + progress * 0.025);
+      const width = image.naturalWidth * zoom; const height = image.naturalHeight * zoom;
+      c.save(); c.globalAlpha = alpha;
+      c.drawImage(image, (640 - width) / 2, (480 - height) / 2, width, height);
+      c.restore();
+    };
+    const local = frame - index * CREDITS_SCENE_FRAMES;
+    if (index > 0 && local < CREDITS_CROSSFADE_FRAMES) {
+      // 同じ位置にある顔を重ねず、紙へ消えてから次の絵を出す。
+      const progress = local / CREDITS_CROSSFADE_FRAMES;
+      if (progress < 0.5) draw(index - 1, 1 - progress * 2);
+      else draw(index, (progress - 0.5) * 2);
+    } else draw(index, Math.min(1, local / CREDITS_CROSSFADE_FRAMES));
+    // 顔を暗くせず、クレジットが通る側だけ紙の色へなじませる。
+    const paper = c.createLinearGradient(340, 0, 640, 0);
+    paper.addColorStop(0, '#f5efe100'); paper.addColorStop(0.55, '#f5efe1d9'); paper.addColorStop(1, '#f5efe1f2');
+    c.fillStyle = paper; c.fillRect(0, 0, 640, 480);
   }
 }
