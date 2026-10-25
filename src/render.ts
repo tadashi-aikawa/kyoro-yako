@@ -412,11 +412,9 @@ export class Renderer {
       c.fillStyle = '#e4aeea'; c.fillRect(17, 8, 346 * Math.max(0, game.phaseHp / game.phaseMaxHp), 9);
       this.text(NAMES[game.boss], 18, 29, 12, '#f9ebff');
       this.text('★'.repeat(game.remainingSpells), 330, 29, 12, '#ffe1a7', 'right');
-      if (game.phase.pattern === 'owlDawn' && game.minervaReprise && dawnPrayerStep(game.phaseFrame, game.minervaReprise) < 0) {
-        this.text(`再演「${REPRISES[game.minervaReprise.index].phase.name}」`, 330, 29, 10, '#ffe5b7', 'right');
-      }
       this.text(Number.isFinite(game.phase.duration) ? `${Math.ceil((game.phase.duration * 60 - game.phaseFrame) / 60)}` : '∞', 367, 29, 14, '#fff', 'right');
     }
+    this.repriseCutin(game);
     game.enemies.forEach((enemy) => { this.enemy(game, enemy); });
     game.clones.forEach((clone) => { this.clone(clone, game.frame); });
     game.items.forEach((item) => { this.item(game, item); });
@@ -1324,6 +1322,28 @@ export class Renderer {
       c.globalAlpha = Math.max(0, Math.min(1, (age - index * 30) / 30)) * fade;
       this.text(line, FIELD.w / 2, [173, 213, 253][index], [12, 29, 12][index], index === 1 ? '#fff5db' : STAGES[game.stage - 1].colors[2], 'center');
     });
+    c.restore();
+  }
+
+  private repriseCutin(game: Game): void {
+    const reprise = game.minervaReprise;
+    if (game.phase?.pattern !== 'owlDawn' || !reprise || reprise.prayer) return;
+    // 初回は離陸後、以後は召喚開始と同時に表示する。弾と予告は帯より手前に描く。
+    const age = repriseLocal(game.phaseFrame, reprise) - (reprisePrepare(reprise) - 60);
+    if (age < 0 || age >= 84) return;
+    const source = REPRISES[reprise.index];
+    const accent = STAGES.find(stage => stage.boss === source.boss)!.colors[2];
+    const alpha = Math.min(1, age / 8, (84 - age) / 24);
+    const enter = 1 - (1 - Math.min(1, age / 12)) ** 3;
+    const c = this.ctx;
+    c.save(); c.globalAlpha = alpha;
+    c.translate((1 - enter) * -24, 0);
+    c.fillStyle = '#080c20e8'; c.fillRect(12, 214, 360, 68);
+    c.strokeStyle = `${accent}80`; c.lineWidth = 0.7;
+    c.beginPath(); c.moveTo(12, 214.5); c.lineTo(372, 214.5); c.moveTo(12, 281.5); c.lineTo(372, 281.5); c.stroke();
+    this.image(game, `${source.boss}-face`, 18, 220, 56, 56, alpha);
+    this.uiText(NAMES[source.boss], 86, 234, 12, accent);
+    this.uiText(source.phase.name, 86, 258, 17, '#fff5e7', 'left', 274);
     c.restore();
   }
 
