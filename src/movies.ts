@@ -1,4 +1,4 @@
-export const MOVIES = ['opening', 'lastboss', 'jinrai-gift', 'minerva-finale', 'ending', 'ending-1', 'ending-2', 'ending-3'] as const;
+export const MOVIES = ['opening', 'lastboss', 'jinrai-gift', 'minerva-finale', 'ending'] as const;
 export type MovieName = typeof MOVIES[number];
 export const MOVIE_SETTINGS: Record<MovieName, { audio: boolean }> = {
   opening: { audio: true },
@@ -6,9 +6,6 @@ export const MOVIE_SETTINGS: Record<MovieName, { audio: boolean }> = {
   'jinrai-gift': { audio: false },
   'minerva-finale': { audio: false },
   ending: { audio: false },
-  'ending-1': { audio: false },
-  'ending-2': { audio: false },
-  'ending-3': { audio: false },
 };
 // 3本の間の白フェードと余韻は編集済み動画に含め、読み込みの切れ目を作らない。
 export const ENDING_MOVIES: MovieName[] = ['ending'];

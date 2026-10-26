@@ -78,17 +78,17 @@ owleryのAIメンバーとエトキチが登場する、縦スクロールの弾
 - 曲の切り替えは約1秒のクロスフェードでつなぐ。デコード後の波形から、先頭と末尾に0.3秒以上続く-45dBFS未満の無音を曲ごとに検出して除く。0.2秒以下の短い音が無音を分断する場合は一続きの無音として扱う。ループは有音区間の末尾約2秒と頭をクロスフェードでつなぐ。ポーズ・ゲームオーバー中は音量を下げる
 - 最初のキー入力後に再生を開始する。必要になった曲だけ取得・デコードして使い回す。未配置の曲は無音で進める
 - Optionで効果音とBGMの音量を別々に設定する。BGMの既定は60%。どちらもlocalStorageへ保存し、失敗時は既定値で動く
-- 動画ごとの音の有無は `src/movies.ts` の `MOVIE_SETTINGS` に従う。openingは音あり、lastboss・jinrai-gift・minerva-finale・ending-1〜3は無音で再生する
+- 動画ごとの音の有無は `src/movies.ts` の `MOVIE_SETTINGS` に従う。openingは音あり、lastboss・jinrai-gift・minerva-finale・endingは無音で再生する
     - 音ありの動画ではBGMを約1秒かけて無音へクロスフェードする。動画の音量はOptionのBGM音量に追従する
     - 動画の終了・スキップ・再生失敗後は次の場面の曲へ切り替える
         - 例外: lastbossは白保持が終わり、登場が始まるまで下げたstage-dawnを保つ
-    - 無音動画ではBGMを流す。openingを無音設定にした場合はstage-gate、lastbossは音量を下げたstage-dawn、jinrai-giftはboss-jinrai、minerva-finaleはboss-minerva、ending-1〜3はendingを使う
+    - 無音動画ではBGMを流す。openingを無音設定にした場合はstage-gate、lastbossは音量を下げたstage-dawn、jinrai-giftはboss-jinrai、minerva-finaleはboss-minerva、endingはendingを使う
     - 音あり動画が `NotAllowedError` で再生拒否された場合は、無音にして1回だけ再試行する。openingの再試行中はstage-gateを流す
     - `?bgm=0` ではBGMと動画の音をともに無効にする
 
 ## ゲームの流れ
 
-タイトル → 難易度選択(Easy / Normal / Hard / Lunatic) → opening → ステージ1 → 2 → 3 → 4面迅雷戦 → 白 → jinrai-gift → 対峙 → 撃破後会話 → 餞別 → 退場 → 4面クリア → 5面道中 → lastboss → ミネルヴァ戦 → 白 → minerva-finale → 対峙 → 撃破後会話 → 退場 → 5面クリア → ending-1 → ending-2 → ending-3 → エンディング → スタッフロール → タイトル
+タイトル → 難易度選択(Easy / Normal / Hard / Lunatic) → opening → ステージ1 → 2 → 3 → 4面迅雷戦 → 白 → jinrai-gift → 対峙 → 撃破後会話 → 餞別 → 退場 → 4面クリア → 5面道中 → lastboss → ミネルヴァ戦 → 白 → minerva-finale → 対峙 → 撃破後会話 → 退場 → 5面クリア → ending → エンディング → スタッフロール → タイトル
 
 - タイトルのメニュー: はじめる / 練習(クリア済みのステージを選んで遊ぶ。未クリアなら1のみ)/ 音の設定(音量)/ 遊び方 / 冒険ノート(集めた記録を読む)
 - ハイスコアは難易度ごとにlocalStorageへ保存する
@@ -132,7 +132,9 @@ owleryのAIメンバーとエトキチが登場する、縦スクロールの弾
         - Z・Xでスキップした場合も、その時点の映像を止めて同じ白フェード・白保持・登場へ進む
         - 未配置・読み込み失敗時も白フェード・白保持を経て登場へ進む。映像が無ければ白を保ったまま同じ時計を進める
         - 白保持中のZ・X・Escは無視する。openingとendingの動画にはこのフェードを付けない
-    - ending-1〜3は5面クリア画面のZ後に連続再生する
+    - endingは5面クリア画面のZ後に再生する
+        - 原本3本を白フェードでつないだ29.5秒の編集済み動画を使う
+        - 原本はGit管理外の `_Unversioned/assets/movies/` に保存し、`scripts/build-ending.sh` で再編集する
     - jinrai-giftは4面本ボス撃破後の白フェード直後に流す。minerva-finaleは5面で同じ流れを使う
         - 動画の最初の1.5秒で白が明ける。60fps換算で90フレームとし、動画は白の下で最初から再生する
         - 終了・Z・Xでのスキップ後は、その時点の映像を止めて150フレームで白へ溶かす。白を60フレーム保持し、120フレームの白明けで対峙へ戻る
@@ -141,7 +143,7 @@ owleryのAIメンバーとエトキチが登場する、縦スクロールの弾
     - 動画は640×480の画面全体を使い、中央640×360に描画する。上下60pxは黒。冒険ノートは隠す
     - ZかXでスキップする。エンディング動画は残り全部を飛ばす。Escは無視する
     - 未配置・読み込み失敗・再生拒否時は次の場面へ進む。読み込みと再生開始の待機上限は1秒。再生がバッファ待ちで止まった場合も1秒で進む
-    - タイトルでopeningを先読みする。4面開始でjinrai-gift、5面開始でlastboss・minerva-finale・ending-1〜3を先読みする。失敗した素材を繰り返し取得しない
+    - タイトルでopeningを先読みする。4面開始でjinrai-gift、5面開始でlastboss・minerva-finale・endingを先読みする。失敗した素材を繰り返し取得しない
 - 4面の撃破後会話が終わると、迅雷が定位置から餞別を扇状に投げる
     - 内容: 残機3個、ボム3個、光の羽根1個
     - 投擲: 最初の50フレームは放物線で落とし、その後は自動回収する
@@ -619,7 +621,7 @@ Power 4.00の理論火力は64.8ダメージ/秒。下表の撃破秒数は全�
     - `?stage=1&power=5&maxform=1`: 最高形態で開始する検証用クエリ。Power5未満では最高形態にならない
     - `?bgm=0`: BGMと動画の音を無効にする
     - `?ending=mimiko`: エンディングから始める
-    - `?movie=<opening|lastboss|jinrai-gift|minerva-finale|ending-1|ending-2|ending-3>`: 指定の1本だけを再生する
+    - `?movie=<opening|lastboss|jinrai-gift|minerva-finale|ending>`: 指定の1本だけを再生する
         - 終了・スキップ・失敗後: openingは1面、lastbossはミネルヴァ登場と5面ボス前会話、jinrai-giftは白演出・対峙・4面撃破後会話・餞別・退場、minerva-finaleは白演出・対峙・5面撃破後会話・退場・クリア、ending系はエンディングへ進む
 - `window.__owlery`(開発ビルドのみ)
     - BGMの `bgmVolume` はOption音量・ポーズ倍率・演出倍率を掛けた目標音量。クロスフェード途中の実ゲインは含まない

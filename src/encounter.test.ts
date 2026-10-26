@@ -178,7 +178,7 @@ it('撃破後はボスが定位置に立った対峙へ120フレームで白明�
 });
 
 it('openingとendingには白フェードを付けない', () => {
-  for (const name of ['opening', 'ending-1']) {
+  for (const name of ['opening', 'ending']) {
     vi.stubGlobal('location', { search: `?movie=${name}` }); const game = new Game();
     expect(game.whiteAlpha).toBe(0); press(game, 'KeyX');
     expect(game.scene).toBe(name === 'opening' ? 'stage' : 'ending'); expect(game.whiteAlpha).toBe(0);
