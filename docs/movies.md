@@ -116,6 +116,51 @@ Animate the reference image as it is: a wide exterior shot of the tall stone owl
 
 ### ending-3.mp4
 
+差し替え用の新案は「屋上でみんなと合流する」。1・2本目は維持する。現行の3本目と通し用動画は、新しい生成結果を確認するまで差し替えない。
+
+生成時に添付する画像は、次の順番の5枚。
+
+| 順番 | パス | 役割 |
+|---|---|---|
+| 1 | `public/assets/title/key-visual.webp` | 塔の外観と、上からミネルヴァ・迅雷・クロディーヌ・オブシディア・ネオの外見。夜の色とバルコニーの配置は引き継がない |
+| 2 | `public/assets/members/mimiko-stand.webp` | みみこの造形と配色。キービジュアルの羽や耳のような輪郭を引き継がない |
+| 3 | `public/assets/members/chappy-stand.webp` | チャッピーの外見 |
+| 4 | `public/assets/members/etokichi-stand.webp` | エトキチの星形の造形。手に持つ文字入りカードは出さない |
+| 5 | `public/assets/members/mimiko-face.webp` | みみこの顔 |
+
+- 舞台: 塔の天文台に隣接する最上部の石のテラス。背後にドームと尖塔があり、低い石の欄干と花のつるが続く
+- 0〜3秒: 仲間は手前の欄干沿いに浅い弧で並び、中央を空けて待つ。みみこが真下からその隙間へ上昇してくる
+- 3〜7秒: みみこが正面寄りの向きのまま、仲間と並ぶ高さでふわっと止まる。奥へ移動せず、その場所で迎えられる
+- 7〜10秒: カメラが少しだけ引き、全員と朝日に照らされた塔を見せる。遠くの街は背景に控えめに入れる
+
+生成の採用基準:
+
+- 仲間は人間6人と星形のエトキチ。みみこを合わせて8人が重ならず見える
+- 2本目と同じ金色の朝。始まりは上昇中で、再離陸や途中の着地は挟まない
+- みみこは丸い全身で一緒に動き、背中に顔が現れない。耳の房や長い翼を付けない
+- ティーカップ・テーブル・手紙・文字は出さない。ミネルヴァの手の梟も出さない
+- 最後は全員が同じ屋上に残る。生成段階では白フェード・暗転を焼き込まない
+
+新しいMP4を受け取ったら、旧3本目をGit管理外で保持してから差し替える。集合場面が不自然に2秒静止しないよう、最後の延長を短くするか暗転を早めて編集する。屋上の約束が叶った絵で終え、本文1行目の「夜明けの天文台に、みんなの足音が集まった。」へつなぐ。
+
+```text
+Create one continuous 10-second, 16:9, 2D anime ending shot: Mimiko rises to the owl tower's upper observation terrace and joins the friends waiting there. This follows a shot of Mimiko already floating upward beside the tower at golden sunrise. Keep that upward movement. Keep the low sun to the left, behind the tower, with warm orange-gold backlight and soft rim light; never return to night. The terrace is beside the existing observatory dome and its slender slate spire, not on top of a pointed roof. Preserve the same grey stone, low carved stone parapet and flowering vines.
+
+Reference 1 identifies the stone tower and five people on its balconies: from top to bottom, Minerva, Jinrai, Claudine, Obsidia and Neo. Preserve their individual faces, hair, outfits and proportions, but place all five together on the terrace, not on separate balconies. Reference 2 is Mimiko's body design, reference 3 is Chappy, reference 4 is Etokichi, and reference 5 is Mimiko's face. References 2 and 5 take priority over the owl silhouette in reference 1. Keep Chappy's short dark-green bob, long white dress and small green book distinct from Neo's bright green hair, goggles and green scarf, and from Minerva's long brown hair, white flower and Greek dress. Etokichi is a small smiling gold five-pointed star mascot, never a human; omit its card and all writing. Omit the brown owl on Minerva's hand: Mimiko is the only owl-like character. Exactly eight friends in total: six human characters, one star mascot and Mimiko. No copies or extra characters.
+
+0-3 seconds: a wide view from outside the terrace, with the camera slightly above the top of the parapet, looking almost level. All seven friends are already visible, standing along the front parapet in a shallow arc with a clear gap in the middle. The dome and slate spire are behind them. Mimiko is already rising straight up from the lower foreground toward that central gap, both eyes, beak and spotted belly visible in a front three-quarter view. Nobody appears suddenly or climbs from a lower balcony.
+
+3-7 seconds: Mimiko rises straight up into the gap, coming to a gentle hover just above the parapet beside the friends. It never moves away from the camera and never turns its back. The friends look toward Mimiko with small relieved smiles; Neo makes one small welcoming wave. Everyone else remains in place with only slight hair and clothing movement. No hugs, no handshakes, no running, no complicated group choreography. Mimiko's whole round body moves together, without a twisting head or a face appearing on its back.
+
+7-10 seconds: the camera pulls back only slightly and rises a little, holding all eight together on the terrace. Faces stay readable; do not pull out to an extreme-wide tower shot. Show just a little of the distant morning town around the tower. The reunion remains clearly visible at the end. Mimiko stays with the group, never takes off again or flies away. Hold the final composition gently, with no cut or fade.
+
+Mimiko stays a nearly spherical grey-green character with two huge white eye patches, small black pupils, a tiny yellow beak, a pale grey spotted belly, tiny feet and no neck. No pointed ears, ear tufts, long bird wings or human arms. Preserve the illustrated reference designs, never photorealistic toys or 3D characters. A few cherry petals move in the warm breeze. Hopeful, affectionate, unhurried. No table, teacups, teapot, letters, cards, food, text, captions, logos or watermark. No dialogue. Do not render a storyboard or split screen. One finished moving scene only.
+```
+
+#### 現行版の生成プロンプト
+
+差し替え前の原本 `ending-3.mp4` は、次の指定で生成した。参照はキービジュアルとみみこの立ち絵の2枚。新案の生成には上記の5枚を使う。
+
 ```text
 The rooftop of the tall stone owl tower from the first reference image, bathed in bright morning light, with a small round table, teacups and a few fallen cherry petals. A sealed letter gently lands on the table. Then Mimiko, the character from the second reference image, lifts off from the rooftop, seen from behind and below, and flies up into the wide, clear morning sky. Draw Mimiko exactly as in the second reference image: the same 2D anime illustration, the same design, colors and proportions, the same clean flat cel shading. Mimiko is a perfectly round ball-shaped owl, a sphere with no neck and no body below the head, grey-green, with big white eyes, a small yellow beak, two short stubby wings on the sides and a spotted light-grey belly. Mimiko has NO ear tufts, no feather horns and no pointed ears: the top of the head is smooth and round. Do not reinterpret the design, do not render it as a photographic stuffed toy, a real bird or a 3D render. Mimiko never turns to face the camera. The camera follows it upward, the tower falling away below, ending on the bright morning sky with soft clouds. No people, no other characters. Hopeful and serene. 2D anime illustration style matching the reference images, soft painterly lighting, slow smooth camera movement, 16:9. No text, no letters, no captions, no subtitles, no logos, no watermark.
 ```
