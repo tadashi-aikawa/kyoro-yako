@@ -48,6 +48,8 @@ export const SAKURA_PERIOD = 300;
 export const SAKURA_WARNING = [84, 60, 48, 36] as const;
 export const SAKURA_GUST = 90;
 export const SAKURA_SWIRL = 24;
+export const BATTLE_COMMENT_FRAMES = 100;
+export const FINAL_MOVE_FRAMES = 18;
 const makeShot = (): Shot => ({ active: false, x: 0, y: 0, vx: 0, vy: -9, damage: 1, radius: 2, homing: false });
 const makeEnemy = (): Enemy => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, hp: 5, age: 0, hitFrames: 0, color: 0, kind: 'return', originX: 0, originY: 0, side: 1, slot: 0 });
 const makeItem = (): Item => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, kind: 'point', auto: false, manual: false, gift: false, tossed: false, launchFrames: 0 });
@@ -127,6 +129,7 @@ export class Game {
   flash = 0;
   message = '';
   messageFrames = 0;
+  messageY = 205;
   battleComment?: Line;
   battleCommentFrames = 0;
   finaleIntro?: { frame: number; from: [number, number]; target: [number, number] };
@@ -300,6 +303,7 @@ export class Game {
     this.frame++;
     if (this.flash > 0) this.flash--;
     if (this.messageFrames > 0) this.messageFrames--;
+    if (this.messageFrames === 0) this.messageY = 205;
     if (this.cutin > 0) this.cutin--;
     if (this.scene === 'stage' && this.battleCommentFrames > 0) this.battleCommentFrames--;
     if (this.scene === 'stage') this.updateStage();
@@ -308,15 +312,8 @@ export class Game {
     else if (this.scene === 'dialogue') this.updateDialogue();
     else if (this.scene === 'gift') this.updateGift();
     else if (this.scene === 'departure') this.updateDeparture();
-    else if (this.scene === 'movie') {
-      if (this.just('KeyZ') || this.just('KeyX')) {
-        if (this.movieName === 'lastboss' || this.movieName === 'jinrai-gift' || this.movieName === 'minerva-finale') {
-          if (this.movieName === 'lastboss') this.startLastbossOut();
-          else this.startAfterBossOut();
-        } else this.finishMovies();
-      }
-    }
-    else this.updateMenu();
+    else if (this.scene !== 'movie') this.updateMenu();
+    if (this.messageFrames > 0 && this.battleCommentFrames > 0) this.messageY = 300;
     this.syncBgm();
     this.pressed.clear();
   }
@@ -620,9 +617,11 @@ export class Game {
       this.updatePlayer(false); this.updateItems(); this.updateParticles();
       if (this.pendingHit >= 0 && this.just('KeyX') && this.bombs > 0 && this.bombFrames <= 0) this.useBomb();
       const intro = this.finaleIntro;
-      if (++intro.frame === 60 && this.boss) this.showBattleComment(FINAL_COMMENTS[this.boss]!);
       if (this.pendingHit >= 0 && ++this.pendingHit >= 8) this.commitHit();
-      if (intro.frame >= 300) { this.finaleIntro = undefined; this.bossEntry = intro.target; this.startPhasePresentation(); }
+      if (++intro.frame >= FINAL_MOVE_FRAMES) {
+        this.finaleIntro = undefined; this.bossEntry = intro.target; this.startPhasePresentation();
+        if (this.boss) this.showBattleComment(FINAL_COMMENTS[this.boss]!);
+      }
       return;
     }
     // 中ボスで道中の時計が止まっても、世界のスクロールは続ける。
@@ -957,6 +956,7 @@ export class Game {
     this.clearBullets(); this.shots.clear(); this.clones.clear();
     if (introduceFinale && this.boss && FINAL_COMMENTS[this.boss]) {
       this.finaleIntro = { frame: 0, from: this.bossEntry, target: phase.pattern === 'sweep' ? sweepPosition(0, 0) : [192, 132] };
+      if (this.messageFrames > 0) this.messageY = 300;
       this.cutin = 0; this.flash = 0;
       if (phase.spell) this.spellBonus = 1_000_000 + this.stage * 500_000;
       return;
@@ -966,7 +966,10 @@ export class Game {
   }
 
   private showBattleComment(text: string): void {
-    if (this.boss) { this.battleComment = { who: this.boss, text }; this.battleCommentFrames = 240; }
+    if (this.boss) {
+      this.battleComment = { who: this.boss, text }; this.battleCommentFrames = BATTLE_COMMENT_FRAMES;
+      if (this.messageFrames > 0) this.messageY = 300;
+    }
   }
 
   private startPhasePresentation(): void {
@@ -1093,7 +1096,7 @@ export class Game {
 
   bossPosition(): [number, number] {
     if (this.finaleIntro) {
-      const progress = Math.min(1, this.finaleIntro.frame / 60), ease = progress * progress * (3 - 2 * progress);
+      const progress = Math.min(1, this.finaleIntro.frame / FINAL_MOVE_FRAMES), ease = progress * progress * (3 - 2 * progress);
       return [this.finaleIntro.from[0] + (this.finaleIntro.target[0] - this.finaleIntro.from[0]) * ease, this.finaleIntro.from[1] + (this.finaleIntro.target[1] - this.finaleIntro.from[1]) * ease];
     }
     if (this.postBoss) {

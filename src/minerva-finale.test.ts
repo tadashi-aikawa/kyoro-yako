@@ -79,12 +79,13 @@ it.each([false, true])('5面撃破後は白→動画→対峙→既存3行→退
   finishDialogue(game);
 });
 
-it.each(['KeyZ', 'KeyX'])('最終フェーズ直行から動画を%sでスキップできる', async (key) => {
+it.each(['KeyZ', 'KeyX'])('最終フェーズ直行からの動画も%sではスキップせず、終了後に会話へ進む', async (key) => {
   const game = defeat(); await vi.advanceTimersByTimeAsync(0);
   video().currentTime = 5; press(game, key);
+  expect(game.scene).toBe('movie'); video().emit('ended');
   expect(game.transition).toBe('minerva-finale-out'); expect(game.movies.current).toBe(video());
   expect(video().pause).toHaveBeenCalled(); expect(game.bgm.cue).toBe('boss-minerva');
-  video().emit('ended'); run(game, 75); expect(game.whiteAlpha).toBe(0.5);
+  run(game, 75); expect(game.whiteAlpha).toBe(0.5);
   run(game, 75); expect(game.transition).toBe('boss-defeat-hold'); expect(game.whiteAlpha).toBe(1);
   expect(game.movies.current).toBeUndefined(); run(game, 60 + 120); finishDialogue(game);
 });
@@ -103,13 +104,12 @@ it.each(['missing', 'decode', 'timeout', 'rejected'] as const)('動画の%sで�
   expect(game.bgm.cue).toBe('boss-minerva'); finishDialogue(game);
 });
 
-it.each(['ended', 'KeyZ', 'KeyX', 'error'])('?movie=minerva-finaleの%s後は5面撃破後会話・クリアへ進む', async (event) => {
+it.each(['ended', 'error'])('?movie=minerva-finaleの%s後は5面撃破後会話・クリアへ進む', async (event) => {
   vi.stubGlobal('location', { search: '?movie=minerva-finale' }); const game = new Game();
   expect(game.stage).toBe(5); expect(game.movieName).toBe('minerva-finale');
   expect(game.bgm.cue).toBe('boss-minerva');
   await vi.advanceTimersByTimeAsync(0);
-  if (event.startsWith('Key')) { video().currentTime = 5; press(game, event); }
-  else video().emit(event);
+  video().emit(event);
   run(game, 150 + 60 + 120);
   expect(game.debugState).toMatchObject({ scene: 'dialogue', stage: 5, boss: 'ミネルヴァ', bgm: 'boss-minerva' });
   expect(videos.filter((entry) => entry.play.mock.calls.length > 0)).toHaveLength(1);

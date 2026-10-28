@@ -81,11 +81,12 @@ it.each([false, true])('4面本ボス撃破は白→動画→対峙→会話→�
   expect(game.awakened).toBe(true); expect(game.power).toBe(5); expect(game.bgm.cue).toBeNull();
 });
 
-it.each(['KeyZ', 'KeyX'])('動画を%sでスキップすると静止映像を150フレームで白へ溶かす', async (key) => {
+it.each(['KeyZ', 'KeyX'])('動画中の%sは無視し、再生終了後に静止映像を150フレームで白へ溶かす', async (key) => {
   const game = defeat(); await vi.advanceTimersByTimeAsync(0);
   video().currentTime = 5; press(game, key);
+  expect(game.scene).toBe('movie'); video().emit('ended');
   expect(game.transition).toBe('jinrai-gift-out'); expect(game.movies.current).toBe(video());
-  video().emit('ended'); run(game, 75); expect(game.whiteAlpha).toBe(0.5);
+  run(game, 75); expect(game.whiteAlpha).toBe(0.5);
   run(game, 75); expect(game.transition).toBe('boss-defeat-hold'); expect(game.whiteAlpha).toBe(1);
   expect(game.movies.current).toBeUndefined(); expect(video().pause).toHaveBeenCalled();
   run(game, 60 + 120); expect(game.scene).toBe('dialogue');

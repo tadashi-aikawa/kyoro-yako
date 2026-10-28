@@ -56,6 +56,7 @@ export class MoviePlayer {
     this.current = video;
     let active = true;
     let starting = false;
+    let resuming = false;
     let timer: ReturnType<typeof setTimeout>;
     const cleanup = () => {
       active = false;
@@ -86,7 +87,14 @@ export class MoviePlayer {
         play();
       } catch { finish(); }
     };
-    const handlers: Record<string, () => void> = { canplay: start, playing: () => clearTimeout(timer), waiting: timeout, ended: finish, error: finish };
+    const resume = () => {
+      if (!active || video.ended || resuming) return;
+      resuming = true;
+      timeout();
+      try { void video.play().then(() => { resuming = false; if (active) clearTimeout(timer); }).catch(() => finish()); }
+      catch { finish(); }
+    };
+    const handlers: Record<string, () => void> = { canplay: start, playing: () => clearTimeout(timer), waiting: timeout, pause: resume, ended: finish, error: finish };
     for (const [event, handler] of Object.entries(handlers)) video.addEventListener(event, handler);
     this.cancel = cleanup;
     timeout();

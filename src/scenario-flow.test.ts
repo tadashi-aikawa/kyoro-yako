@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { dialogue, FINAL_COMMENTS } from './dialogue';
 import { CREDITS_ROLL_FRAMES } from './ending';
-import { Game } from './game';
+import { BATTLE_COMMENT_FRAMES, FINAL_MOVE_FRAMES, Game } from './game';
 import { STAGES } from './stages';
 import { INVITATION, RECORDS } from './story';
 
@@ -29,20 +29,23 @@ it('新規プレイは匿名の招待状とみみこの反応を読んでから�
   expect(dialogue('mimiko', 'minerva', 'before').some(line => line.text.includes('あなたが送ったの'))).toBe(true);
 });
 
-it.each([1, 2, 3, 4, 5])('%s階の最終技前は安全に移動し、4秒話してから技の時計を始める', stage => {
+it.each([1, 2, 3, 4, 5])('%s階の最終技前は短く移動し、技の予備動作と重ねたコメントから攻撃へ進む', stage => {
   const game = new Game(); game.startStage(stage); game.startBoss(false, STAGES[stage - 1].phases.length - 2);
   game.phaseHp = 0; game.update();
   expect(game.finaleIntro?.frame).toBe(0); expect(game.cutin).toBe(0); expect(game.phaseFrame).toBe(0);
-  game.keys.add('KeyZ'); run(game, 60); expect(game.shots.count).toBe(0);
+  game.keys.add('KeyZ'); run(game, FINAL_MOVE_FRAMES); expect(game.shots.count).toBe(0);
   expect(game.bossXY).toEqual(stage === 2 ? [192, 150] : [192, 132]);
   expect(game.battleComment?.text).toBe(FINAL_COMMENTS[game.boss!]);
-  expect(game.battleCommentFrames).toBe(240);
-  press(game, 'Escape'); const frame = game.finaleIntro!.frame; run(game, 60);
-  expect(game.finaleIntro!.frame).toBe(frame); expect(game.battleCommentFrames).toBe(239);
-  press(game, 'Escape'); run(game, 240);
   expect(game.finaleIntro).toBeUndefined(); expect(game.phaseFrame).toBe(0);
+  expect(game.battleCommentFrames).toBe(BATTLE_COMMENT_FRAMES);
   expect(game.phaseHp).toBe(game.phaseMaxHp);
-  game.update(); expect(game.phaseFrame).toBe(1);
+  game.keys.delete('KeyZ');
+  press(game, 'Escape'); run(game, 60);
+  expect(game.phaseFrame).toBe(0); expect(game.battleCommentFrames).toBe(BATTLE_COMMENT_FRAMES - 1);
+  press(game, 'Escape'); run(game, BATTLE_COMMENT_FRAMES - 1);
+  expect(game.battleCommentFrames).toBe(0); expect(game.phaseFrame).toBe(BATTLE_COMMENT_FRAMES - 1);
+  expect(game.bullets.count).toBe(0);
+  run(game, 6); expect(game.phaseFrame).toBe(105);
 });
 
 it('最終技前のリトライで演出とコメントを持ち越さない', () => {
@@ -51,12 +54,28 @@ it('最終技前のリトライで演出とコメントを持ち越さない', (
   expect(game.finaleIntro).toBeUndefined(); expect(game.battleComment).toBeUndefined(); expect(game.battleCommentFrames).toBe(0);
 });
 
-it('通常の掛け声は指定した7戦だけに出し、4秒後に消す', () => {
+it('技のボーナスはコメントが消えた後も同じ位置で消える', () => {
+  const game = new Game(); game.invincible = true; game.startStage(1); game.startBoss(false, 5); game.skipPhase();
+  expect(game.messageY).toBe(300);
+  run(game, FINAL_MOVE_FRAMES + BATTLE_COMMENT_FRAMES);
+  expect(game.battleCommentFrames).toBe(0); expect(game.messageFrames).toBeGreaterThan(0); expect(game.messageY).toBe(300);
+  run(game, game.messageFrames); expect(game.messageFrames).toBe(0); expect(game.messageY).toBe(205);
+});
+
+it.each(['point', 'radiant'] as const)('コメント中の%s回収で新しく出たメッセージも帯の下へ固定する', kind => {
+  const game = new Game(); game.invincible = true; game.startStage(1); game.startBoss(false, 1); run(game, 30);
+  game.score = 9_999_999; game.power = 5; game.spawnItem(game.px, game.py, kind, false); game.update();
+  expect(game.message).toBe(kind === 'point' ? 'EXTEND!' : '光の羽根'); expect(game.messageY).toBe(300);
+  run(game, game.battleCommentFrames);
+  expect(game.messageFrames).toBeGreaterThan(0); expect(game.messageY).toBe(300);
+});
+
+it('通常の掛け声は指定した7戦だけに出し、技の予備動作中に消す', () => {
   const checks = [[1, false, true], [2, false, true], [3, false, true], [4, false, true], [5, false, true], [3, true, true], [5, true, true], [1, true, false], [2, true, false], [4, true, false]] as const;
   for (const [stage, mid, expected] of checks) {
     const game = new Game(); game.invincible = true; game.startStage(stage); game.startBoss(mid, 1);
     expect(!!game.battleComment).toBe(expected);
-    if (expected) { run(game, 240); expect(game.battleCommentFrames).toBe(0); }
+    if (expected) { run(game, BATTLE_COMMENT_FRAMES); expect(game.battleCommentFrames).toBe(0); }
   }
 });
 

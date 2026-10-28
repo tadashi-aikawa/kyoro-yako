@@ -137,13 +137,13 @@ it('5面は90フレームで白へ進み、動画後は150フレームで白へ�
   expect(game.scene).toBe('dialogue'); expect(game.afterDialogue).toBe('boss');
 });
 
-it.each(['KeyZ', 'KeyX'])('lastbossの%sスキップでも映像を止めて150フレームで白へ進む', async (key) => {
+it.each(['KeyZ', 'KeyX'])('lastboss中の%sを無視し、終了後に150フレームで白へ進む', async (key) => {
   const game = fromBoss(); run(game, 120 + 90); await vi.advanceTimersByTimeAsync(0);
   const video = lastbossVideo(); video.currentTime = 4;
-  video.emit('waiting'); vi.advanceTimersByTime(990);
-  press(game, key); expect(game.scene).toBe('transition'); expect(game.transition).toBe('lastboss-out');
+  press(game, key); expect(game.scene).toBe('movie');
+  video.emit('ended'); expect(game.scene).toBe('transition'); expect(game.transition).toBe('lastboss-out');
   expect(game.movies.current).toBe(video); expect(video.pause).toHaveBeenCalled();
-  vi.advanceTimersByTime(20); video.emit('ended'); expect(game.scene).toBe('transition');
+  video.emit('ended'); expect(game.scene).toBe('transition');
   run(game, 75); expect(game.whiteAlpha).toBe(0.5);
   run(game, 75); expect(game.transition).toBe('lastboss-hold'); expect(game.whiteAlpha).toBe(1);
   expect(game.movies.current).toBeUndefined(); run(game, 60 + 120); expect(game.scene).toBe('dialogue');
@@ -158,11 +158,13 @@ it('lastboss未配置でも白フェードと白保持後にミネルヴァ登�
   run(game, 120); expect(game.scene).toBe('dialogue');
 });
 
-it.each([{ time: 0, alpha: 1 }, { time: 0.75, alpha: 0.5 }, { time: 1.5, alpha: 0 }])('動画冒頭の白明け中time=$timeのスキップでも白が跳ばず、従来の時間配分で登場へ進む', ({ time, alpha }) => {
+it.each([{ time: 0, alpha: 1 }, { time: 0.75, alpha: 0.5 }, { time: 1.5, alpha: 0 }])('動画冒頭の白明け中time=$timeの入力を無視し、再生失敗時も白が跳ばず登場へ進む', ({ time, alpha }) => {
   const game = fromBoss(); run(game, 120 + 90);
   lastbossVideo().currentTime = time;
   expect(game.whiteAlpha).toBe(alpha);
   press(game, 'KeyX');
+  expect(game.scene).toBe('movie'); expect(game.whiteAlpha).toBe(alpha);
+  lastbossVideo().emit('error');
   expect(game.transition).toBe('lastboss-out'); expect(game.whiteAlpha).toBe(alpha);
   run(game, 149); expect(game.transition).toBe('lastboss-out');
   game.update(); expect(game.transition).toBe('lastboss-hold'); expect(game.whiteAlpha).toBe(1);
@@ -180,7 +182,7 @@ it('撃破後はボスが定位置に立った対峙へ120フレームで白明�
 it('openingとendingには白フェードを付けない', () => {
   for (const name of ['opening', 'ending']) {
     vi.stubGlobal('location', { search: `?movie=${name}` }); const game = new Game();
-    expect(game.whiteAlpha).toBe(0); press(game, 'KeyX');
+    expect(game.whiteAlpha).toBe(0); game.movies.current!.dispatchEvent(new Event('ended'));
     expect(game.scene).toBe(name === 'opening' ? 'letter' : 'ending'); expect(game.whiteAlpha).toBe(0);
   }
 });
