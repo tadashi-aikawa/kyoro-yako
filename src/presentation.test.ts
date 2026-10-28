@@ -352,12 +352,12 @@ it('エンディングは1行3秒で表示し、最後を読んだあと入力�
   expect(game.scene).toBe('credits'); expect(game.creditsFrame).toBe(0);
 });
 
-it('Zで全文表示しても次のZでは飛ばさず、読む時間のあと自動でロールへ進む', () => {
+it.each(['KeyZ', 'KeyX', 'Enter', 'ControlLeft'])('%sで本文を早送りせず、全行を順番に見せてから自動でロールへ進む', key => {
   vi.stubGlobal('location', { search: '?ending=mimiko' }); const game = new Game();
-  run(game, 87); press(game); expect(game.endingComplete).toBe(true);
-  expect(game.endingLineAlpha(5)).toBe(1); press(game); expect(game.scene).toBe('ending');
-  run(game, 237); expect(game.scene).toBe('ending'); expect(game.endingExitAlpha).toBe(0);
-  run(game, 660); expect(game.scene).toBe('ending'); game.update();
+  run(game, 87); press(game, key); expect(game.endingComplete).toBe(false);
+  expect(game.endingLineAlpha(5)).toBe(0); expect(game.endingLineAlpha(0)).toBe(1);
+  game.keys.add(key); run(game, 1110); expect(game.scene).toBe('ending');
+  expect(game.endingLineAlpha(5)).toBe(1); game.update();
   expect(game.scene).toBe('credits'); expect(game.creditsFrame).toBe(0);
 });
 
@@ -366,7 +366,7 @@ it('?credits=1でスタッフロールから確認できる', () => {
   expect(new Game().scene).toBe('credits');
 });
 
-it('ロールは12枚を201秒で見せ、最後の暗転からタイトルへ戻る', () => {
+it('ロールは12枚を296秒で見せ、最後の暗転からタイトルへ戻る', () => {
   const game = new Game(); game.scene = 'credits'; run(game, CREDITS_ROLL_FRAMES - CREDITS_FADE_FRAMES);
   expect(game.scene).toBe('credits'); run(game, CREDITS_FADE_FRAMES - 1); expect(game.scene).toBe('credits');
   game.update(); expect(game.scene).toBe('title'); expect(game.menu).toBe(0);

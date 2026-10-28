@@ -99,7 +99,7 @@ it('未配置の曲は一度だけ取得を試み、無音で進める', async (
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
 
-it('曲末と曲頭を2秒重ねてループする', async () => {
+it.each(['title', 'ending'] as const)('%sは2秒重ねてループし、endingは2周目の余韻を使い切ってから次へつなぐ', async cue => {
   vi.useFakeTimers();
   try {
     const starts: Array<[number, number, number]> = [];
@@ -133,7 +133,7 @@ it('曲末と曲頭を2秒重ねてループする', async () => {
     });
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(1) })));
     const bgm = new BgmPlayer(false, 60);
-    bgm.sync('title', false);
+    bgm.sync(cue, false);
     bgm.unlock();
     for (let i = 0; i < 8; i++) await Promise.resolve();
     expect(starts).toEqual([[0.02, 1, 11]]);
@@ -141,6 +141,12 @@ it('曲末と曲頭を2秒重ねてループする', async () => {
     await vi.advanceTimersByTimeAsync(500);
     expect(starts[1][0]).toBeCloseTo(9.02);
     expect(starts[1].slice(1)).toEqual([1, 11]);
+    for (let second = 6; second <= 30; second++) {
+      context.currentTime = second;
+      await vi.advanceTimersByTimeAsync(1000);
+    }
+    expect(starts.length).toBe(4);
+    expect(starts[2][0]).toBeCloseTo(cue === 'ending' ? 20.02 : 18.02);
     bgm.sync(null, false);
     await vi.advanceTimersByTimeAsync(1100);
   } finally {

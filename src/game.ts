@@ -77,8 +77,6 @@ export class Game {
   giftFrame = 0;
   endingFrame = 0;
   private endingReadFrame = 0;
-  private endingReadDuration = ENDING_READ_FRAMES;
-  private endingRevealed = false;
   creditsFrame = 0;
   movieName?: MovieName;
   readonly movies: MoviePlayer;
@@ -355,14 +353,8 @@ export class Game {
     }
     if (this.scene === 'ending') {
       this.endingFrame++;
-      if (this.accept() && !this.endingComplete) {
-        // 全文表示は未読の行を消す操作ではない。残りも1行3秒の余裕を取る。
-        const unread = this.endingLines.filter((_, index) => this.endingLineAlpha(index) < 1).length;
-        this.endingReadDuration = Math.max(ENDING_READ_FRAMES, unread * ENDING_LINE_GAP);
-        this.endingRevealed = true;
-      }
       if (this.endingComplete) this.endingReadFrame++;
-      if (this.endingReadFrame >= this.endingReadDuration) { this.scene = 'credits'; this.creditsFrame = 0; }
+      if (this.endingReadFrame >= ENDING_READ_FRAMES) { this.scene = 'credits'; this.creditsFrame = 0; }
       return;
     }
     if (this.scene === 'credits') {
@@ -579,13 +571,13 @@ export class Game {
     if (++this.arrivalFrame >= (this.arrivalFromWhite ? 120 : 80)) this.scene = 'dialogue';
   }
 
-  private startEnding(): void { this.scene = 'ending'; this.endingFrame = 0; this.endingReadFrame = 0; this.endingReadDuration = ENDING_READ_FRAMES; this.endingRevealed = false; }
+  private startEnding(): void { this.scene = 'ending'; this.endingFrame = 0; this.endingReadFrame = 0; }
   private startIntroduction(): void {
     this.startStage(1); this.stageIntroFrame = 180; this.scene = 'letter';
   }
-  get endingComplete(): boolean { return this.endingRevealed || this.endingFrame >= (this.endingLines.length - 1) * ENDING_LINE_GAP + ENDING_LINE_FADE; }
-  get endingExitAlpha(): number { return Math.max(0, Math.min(1, (this.endingReadFrame - this.endingReadDuration + ENDING_EXIT_FRAMES) / ENDING_EXIT_FRAMES)); }
-  endingLineAlpha(index: number): number { return this.endingRevealed ? 1 : Math.max(0, Math.min(1, (this.endingFrame - index * ENDING_LINE_GAP) / ENDING_LINE_FADE)); }
+  get endingComplete(): boolean { return this.endingFrame >= (this.endingLines.length - 1) * ENDING_LINE_GAP + ENDING_LINE_FADE; }
+  get endingExitAlpha(): number { return Math.max(0, Math.min(1, (this.endingReadFrame - ENDING_READ_FRAMES + ENDING_EXIT_FRAMES) / ENDING_EXIT_FRAMES)); }
+  endingLineAlpha(index: number): number { return Math.max(0, Math.min(1, (this.endingFrame - index * ENDING_LINE_GAP) / ENDING_LINE_FADE)); }
 
   startStage(stage: number): void {
     this.finaleIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;

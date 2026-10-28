@@ -1,3 +1,5 @@
+import { ENDING_MUSIC_PLAYS } from './ending';
+
 export type BgmCue = 'title' | 'stage-gate' | 'boss-neo' | 'stage-archive' | 'boss-obsidia' | 'stage-sakura' | 'boss-jinrai' | 'stage-top' | 'boss-claudine' | 'stage-dawn' | 'boss-minerva' | 'ending';
 
 export interface LoopRange { start: number; end: number; }
@@ -67,6 +69,8 @@ interface Voice {
   sources: Set<AudioBufferSourceNode>;
   nextStart: number;
   first: boolean;
+  plays: number;
+  ending: boolean;
   timer?: ReturnType<typeof setInterval>;
 }
 
@@ -164,7 +168,7 @@ export class BgmPlayer {
     bus.gain.setValueAtTime(0, now);
     bus.gain.linearRampToValueAtTime(this.sceneGain, now + 1);
     bus.connect(this.master);
-    const voice: Voice = { bus, track, sources: new Set(), nextStart: now + 0.02, first: true };
+    const voice: Voice = { bus, track, sources: new Set(), nextStart: now + 0.02, first: true, plays: 0, ending: cue === 'ending' };
     this.voice = voice;
     this.schedule(voice);
     voice.timer = setInterval(() => this.schedule(voice), 500);
@@ -208,7 +212,9 @@ export class BgmPlayer {
       source.onended = () => { voice.sources.delete(source); source.disconnect(); envelope.disconnect(); };
       voice.sources.add(source);
       voice.first = false;
-      voice.nextStart += duration - overlap;
+      voice.plays++;
+      // 通常のFinでは2周目の余韻を使い切る。描画が止まった場合は次の2周へつなぐ。
+      voice.nextStart += duration - (voice.ending && voice.plays % ENDING_MUSIC_PLAYS === 0 ? 0 : overlap);
     }
   }
 

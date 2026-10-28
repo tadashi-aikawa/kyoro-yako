@@ -7,58 +7,58 @@ export const ENDING_EXIT_FRAMES = 60;
 export const CREDITS_SCENES = [
   {
     "art": "invitations",
-    "seconds": 20
+    "seconds": 40
   },
   {
     "art": "library",
-    "seconds": 20
+    "seconds": 40
   },
   {
     "art": "tea",
-    "seconds": 20
+    "seconds": 40
   },
   {
     "art": "minerva-solo",
-    "seconds": 20
+    "seconds": 40
   },
   {
     "art": "etokichi-mimiko",
-    "seconds": 15,
+    "seconds": 17,
     "cast": "エトキチ"
   },
   {
     "art": "neo-mimiko",
-    "seconds": 15,
+    "seconds": 17,
     "cast": "ネオ"
   },
   {
     "art": "obsidia-mimiko",
-    "seconds": 15,
+    "seconds": 17,
     "cast": "オブシディア"
   },
   {
     "art": "chappy-mimiko",
-    "seconds": 15,
+    "seconds": 17,
     "cast": "チャッピー"
   },
   {
     "art": "claudine-mimiko",
-    "seconds": 15,
+    "seconds": 17,
     "cast": "クロディーヌ"
   },
   {
     "art": "jinrai-mimiko",
-    "seconds": 15,
+    "seconds": 17,
     "cast": "迅雷"
   },
   {
     "art": "minerva-mimiko",
-    "seconds": 15,
+    "seconds": 17,
     "cast": "ミネルヴァ"
   },
   {
     "art": "mimiko-fin",
-    "seconds": 16
+    "seconds": 17
   }
 ] as const;
 export const CREDITS_ART = CREDITS_SCENES.map(scene => scene.art);
@@ -140,7 +140,10 @@ export const CREDITS_STAFF = [
     "name": "チャッピー"
   }
 ] as const;
-export const CREDITS_CROSSFADE_FRAMES = 90;
+// 動画29.5秒＋本文約20秒＋ロール296秒で、実際のBGM区間2周の約346秒に合わせる。
+export const ENDING_MUSIC_PLAYS = 2;
+export const CREDITS_CROSSFADE_FRAMES = 360;
+export const CREDITS_STAFF_FRAMES = CREDITS_SCENES.slice(0, 4).reduce((frames, scene) => frames + scene.seconds * 60, 0);
 export const CREDITS_ROLL_FRAMES = CREDITS_SCENES.reduce((frames, scene) => frames + scene.seconds * 60, 0);
 export const CREDITS_FIN_FRAME = CREDITS_ROLL_FRAMES - CREDITS_SCENES[CREDITS_SCENES.length - 1].seconds * 60;
 export const CREDITS_FADE_FRAMES = 180;
@@ -151,7 +154,8 @@ export function creditsScene(frame: number) {
     if (frame < start + frames || index === CREDITS_SCENES.length - 1) {
       const local = Math.max(0, frame - start);
       const halfFade = CREDITS_CROSSFADE_FRAMES / 2;
-      const alpha = Math.max(0, Math.min(1, local / halfFade, index === CREDITS_SCENES.length - 1 ? 1 : (frames - local) / halfFade));
+      const fade = Math.max(0, Math.min(1, local / halfFade, index === CREDITS_SCENES.length - 1 ? 1 : (frames - local) / halfFade));
+      const alpha = fade * fade * (3 - 2 * fade);
       return { scene, index, local, progress: Math.min(1, local / frames), alpha };
     }
     start += frames;

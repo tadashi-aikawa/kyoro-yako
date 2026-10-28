@@ -1,5 +1,5 @@
 import { bossSpriteId, createBossMotion, isCasting, updateBossMotion } from './boss-motion';
-import { CREDITS_ART, CREDITS_STAFF, creditsFade, creditsScene } from './ending';
+import { CREDITS_ART, CREDITS_STAFF, CREDITS_STAFF_FRAMES, creditsFade, creditsScene } from './ending';
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
 import { PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
@@ -1670,10 +1670,8 @@ export class Renderer {
       const ink = blend([255, 241, 203], [60, 40, 60], transition);
       const shadow = 4 * (1 - transition);
       this.image(game, `${game.player}-stand`, 30, 58, 230, 365, 0.85);
-      this.text('ENDING', 415, 73, 31, ink, 'center', shadow);
       game.endingLines.forEach((line, i) => { c.globalAlpha = game.endingLineAlpha(i); this.text(line, 266, 146 + i * 44, 14, ink, 'left', shadow); });
       c.globalAlpha = 1;
-      if (!game.endingComplete) this.text('Z  すべて読む', 584, 451, 12, ink, 'right', shadow);
       this.fade(game.endingExitAlpha, '#f5efe1');
     } else this.drawCredits(game.creditsFrame);
   }
@@ -1701,22 +1699,29 @@ export class Renderer {
       const paper = c.createLinearGradient(0, 378, 0, 480);
       paper.addColorStop(0, '#f5efe100'); paper.addColorStop(0.45, '#f5efe18c'); paper.addColorStop(1, '#f5efe1e6');
       c.fillStyle = paper; c.fillRect(0, 378, 640, 102);
-      text('出演', 320, index === 4 ? 428 : 430, 11, '#665344');
-      text(scene.cast, 320, index === 4 ? 451 : 460, 21);
-      if (index === 4) text('エトキチの大冒険より', 320, 472, 10);
+      text('出演', 320, 428, 11, '#665344');
+      text(scene.cast, 320, 451, 21);
+      text(index === 4 ? 'エトキチの大冒険より' : 'チーム owlery', 320, 472, 10);
     } else if (index < 4) {
+      // 絵の切り替えをまたいで、制作スタッフは1本のロールとして流す。
+      c.globalAlpha = 1;
       const paper = c.createLinearGradient(340, 0, 640, 0);
       paper.addColorStop(0, '#f5efe100'); paper.addColorStop(0.55, '#f5efe1d9'); paper.addColorStop(1, '#f5efe1f2');
       c.fillStyle = paper; c.fillRect(0, 0, 640, 480);
-      if (index === 0) { text(GAME_TITLE, 510, 46, 27); text('制作スタッフ', 510, 72, 11); }
-      const first = index === 0 ? 116 : 66, gap = index === 0 ? 65 : 66;
-      CREDITS_STAFF.slice(index * 5, index * 5 + 5).forEach((row, i) => { text(row.role, 510, first + i * gap, 11); text(row.name, 510, first + 23 + i * gap, 12); });
-      if (index === 3) {
-        text('制作支援', 510, 348, 11); text('Codex・Claude Code・Gemini', 510, 371, 11);
-        text('画像生成　Codex内蔵imagegen', 510, 393, 10); text('BGM生成　Lyria 3.5', 510, 414, 11);
-      }
+      const support = 90 + CREDITS_STAFF.length * 66;
+      const height = support + 140;
+      const top = 500 - frame / CREDITS_STAFF_FRAMES * (height + 530);
+      const rollText = (value: string, offset: number, size: number) => {
+        const y = top + offset;
+        c.globalAlpha = Math.max(0, Math.min(1, (y - 16) / 32, (472 - y) / 32));
+        text(value, 510, y, size);
+      };
+      rollText(GAME_TITLE, 0, 27); rollText('制作スタッフ', 30, 11);
+      CREDITS_STAFF.forEach((row, i) => { rollText(row.role, 90 + i * 66, 11); rollText(row.name, 113 + i * 66, 12); });
+      rollText('制作支援', support + 10, 11); rollText('Codex・Claude Code・Gemini', support + 33, 11);
+      rollText('画像生成　Codex内蔵imagegen', support + 55, 10); rollText('BGM生成　Lyria 3.5', support + 76, 11);
     } else {
-      text('主演', 504, 303, 12); text('みみこ', 504, 333, 24);
+      text('主演', 504, 303, 12); text('みみこ', 504, 333, 24); text('チーム owlery', 504, 358, 10);
       if (local >= 240) {
         c.globalAlpha = alpha * Math.min(1, (local - 240) / 90);
         const paper = c.createLinearGradient(0, 412, 0, 480); paper.addColorStop(0, '#f5efe100'); paper.addColorStop(1, '#f5efe1e6');
