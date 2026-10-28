@@ -5,87 +5,12 @@ owleryのメンバーが登場する、ブラウザ向けの弾幕シューテ�
 消えた朝の約束を、みみこの手でつなぎ直す夜の冒険。
 五つの階で記録の断片を集め、夜明けの天文台へ届けます。
 
-タイトルの読みは「きょうろうやこう」です。
+[ブラウザで遊ぶ](https://tadashi-aikawa.github.io/kyoro-yako/)
 
-## 夜の梟楼
+## 遊び方
 
-- 各階のクリアで記録の断片を獲得します。タイトルの「集めた記録を読む」から読み返せます。
-- 門の小鳥、書庫の本、回廊の折り紙、夜桜の提灯、天文台の星狐が道中に登場します。
-    - 演出: 通常・発射前・被弾の姿を切り替えます。
-- 床と建築が異なる速さで流れ、門・書架・回廊・夜桜を通り抜けて朝焼けの天文台へ進みます。
-- 道中は10種の編隊が登場します。左右からの挟み込み、蛇行、旋回、V字隊列が加わり、各階と前後半で順序が変わります。
-- 全5面の中ボス・ボスは、技ごとに移動と停止、段違いの巡回、弧、8の字を使い分けます。
-- 必殺技は各メンバーの個性に合わせた自由な名前です。
-
-| 面 | 中ボス・ボスの移動 |
-| --- | --- |
-| 1 | エトキチはゆったり移動。ネオは短い位置替え・弧・8の字 |
-| 2 | オブシディアは段違いの巡回・弧・8の字 |
-| 3 | チャッピーは停止の長い四角い巡回。クロディーヌは対称の弧・楕円・格子状の巡回 |
-| 4 | 迅雷は素早い切り返し。レーザー中は停止し、次の発射前に移動 |
-| 5 | エトキチは星の輪・五芒星の巡回・光線発射間の位置替え。ミネルヴァは観測点で停止する巡回・楕円・8の字 |
-
-分身・一閃・追跡は、それぞれの技の専用移動を使います。
-
-敵素材の生成プロンプトは [docs/enemy-sprites-prompts.txt](docs/enemy-sprites-prompts.txt) に収録しています。
-
-## 起動
-
-```sh
-pnpm install
-pnpm dev
-```
-
-`pnpm check` で型チェック、Biome、ユニットテスト、ビルドを実行します。
-
-## GitHub Pagesでの公開
-
-公開先は `https://tadashi-aikawa.github.io/kyoro-yako/` を予定しています。
-
-1. `public/assets/bgm/ending.mp3` を配置します。
-2. タイトルからエンディングまで通しで確認します。
-3. `pnpm check` を実行します。
-4. `main` をGitHubへpushします。
-5. GitHubの Settings → Pages → Build and deployment → Source で **GitHub Actions** を選びます。
-6. Actionsの **Deploy to GitHub Pages** を開き、`main` を選んで **Run workflow** を実行します。
-7. ワークフローの成功後、公開URLで画像・音楽・操作を確認します。
-
-公開ワークフローは手動で実行します。push時には公開しません。
-
-ローカルで公開用の配信パスを確認する場合は、次を実行します。
-
-```sh
-pnpm build:pages
-pnpm exec vite preview --base=/kyoro-yako/ --host 127.0.0.1 --port 5198
-```
-
-`http://127.0.0.1:5198/kyoro-yako/` で確認できます。
-
-- [ViteのGitHub Pages公開手順](https://v7.vite.dev/guide/static-deploy#github-pages)
-- [GitHub Pagesのカスタムワークフロー](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
-
-## 依存と公開処理の更新
-
-- 直接依存はexactバージョン、間接依存はコミット済みのロックファイルで固定します。
-- CIでは `pnpm install --frozen-lockfile` を使います。
-- インストール時のスクリプト実行は `esbuild@0.28.2` だけを許可します。
-    - 条件: 未確認のスクリプトが追加された場合はインストールを失敗させます。
-- pnpmとCIのNode、Actionsの参照も固定します。
-    - Actions: 公式リリースのフルコミットSHAを使い、コメントにバージョンを記載します。
-- 更新時は差分をレビューし、`pnpm audit`・`pnpm check`・`pnpm build:pages` を実行します。
-    - 限界: 固定と監査は、パッケージ自体の悪意や未公開の脆弱性を保証しません。
-
-## ステージ
-
-| Stage | 中ボス | ボス |
-| --- | --- | --- |
-| 1 | エトキチ | ネオ |
-| 2 | オブシディア | オブシディア |
-| 3 | チャッピー | クロディーヌ |
-| 4 | 迅雷 | 迅雷 |
-| 5 | エトキチ | ミネルヴァ |
-
-## 操作
+キーボードで操作します。
+タイトルの「はじめる」から難易度を選んで開始します。
 
 | キー | 操作 |
 | --- | --- |
@@ -96,18 +21,9 @@ pnpm exec vite preview --base=/kyoro-yako/ --host 127.0.0.1 --port 5198
 | Esc | ポーズ |
 | Ctrl | 会話早送り |
 
-## デバッグ用クエリ
+各階をクリアすると記録の断片が集まります。
+タイトルの「冒険ノート」から読み返せます。
 
-- `?stage=1`：指定ステージの道中から開始。値は1〜5。
-- `?boss=2&phase=1`：指定ボスのフェーズから開始。値は1〜5。フェーズは0始まり。
-- `?boss=1&mid=1&phase=1`：中ボスの指定フェーズから開始。この例はエトキチギャラクシーフラッシュ。
-- `?boss=5&mid=1&phase=0`：強化エトキチのスターリング。`phase=1`はエトキチ・ペンタグラムノヴァ、`phase=2`は強化版エトキチギャラクシーフラッシュ。
-- `?boss=3&mid=1&phase=0`：チャッピーの丸投げ。`phase=1`はサブエージェント召喚、`phase=2`は完成品の花火。
-- `?player=mimiko&difficulty=hard`：自機と難易度を指定。自機は`mimiko`のみ。難易度は`easy`、`normal`、`hard`、`lunatic`。
-- `?invincible=1`：無敵。
-- `?autoshot=1`：ショットを常時発射。
-- `?power=5&lives=5&bombs=3`：開始時のPower(0〜5)・残機(0〜8)・ボム数(0〜8)を指定。
-- `?ending=mimiko`：エンディングから開始。
-- `?credits=1`：スタッフロールの背景イラストから開始。
+## 開発者向け
 
-開発ビルドでは `window.__owlery.state()` で状態を取得し、`window.__owlery.skipPhase()` で現在のボスフェーズを進められます。
+起動・公開・検証の手順は[開発ガイド](docs/development.md)を参照してください。
