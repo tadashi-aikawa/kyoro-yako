@@ -2,113 +2,142 @@ import type { PlayerId } from './rules';
 import type { BossId } from './stages';
 
 export interface Line { who: PlayerId | BossId; text: string; }
-
+export const INTRO_LINES: Line[] = [
+  { who: 'mimiko', text: '名前がないの。誰が送ってくれたの？' },
+  { who: 'mimiko', text: 'いちばん上まで行けば、会えるのかな。……行ってみるの。' },
+];
 const lines: Record<BossId, { before: Line[]; after: Line[] }> = {
   etokichi: {
     before: [
-      { who: 'etokichi', text: '門の灯りが消えそうだよー。星の輪をくぐって、見ておいで。' },
-      { who: 'mimiko', text: 'ふわっ。消える前に、あたしの手で書き留めるの。' },
+      { who: 'etokichi', text: '来たね、みみこ。まずは、ぼくと遊ぼうよー。' },
+      { who: 'mimiko', text: 'エトキチが最初の相手なのね。よろしくなの。' },
+      { who: 'etokichi', text: 'うん。星の輪っか、くぐってごらん！' },
     ],
-    after: [{ who: 'etokichi', text: 'きれいな記録だねー。上の灯りも頼んだよ、キチ！' }],
+    after: [
+      { who: 'etokichi', text: 'やっぱり強いねー。ぼくも楽しかったよ、キチ！' },
+      { who: 'mimiko', text: 'ありがとうなの。いよいよ、最後の相手なのね。' },
+      { who: 'etokichi', text: 'うん。あの扉の向こうで待ってるよー。' },
+    ],
   },
   neo: {
     before: [
-      { who: 'neo', text: '梟楼の門へようこそ！ 今夜は未送信の文字が弾になってるんだ。' },
-      { who: 'mimiko', text: '「朝、みんなで屋上へ。」……宛先が空白の招待なのね。' },
-      { who: 'neo', text: 'うん、送ったつもりだったのに！ このキーで一緒に探そう！' },
+      { who: 'neo', text: 'みみこ、来たね！　わたしのキーボード、見てよ！' },
+      { who: 'mimiko', text: 'ネオちゃん、ずいぶん楽しそうなの。' },
+      { who: 'neo', text: 'うん！　このキーで勝負しちゃおう！' },
+      { who: 'mimiko', text: 'それなら、あたしも本気でいくの。' },
     ],
     after: [
-      { who: 'neo', text: '最後に一つだけ！ 招待の控えは、上の書庫に預けたよ！' },
-      { who: 'mimiko', text: '送られなかった招待。最初の一頁に、ちゃんと残すの。' },
+      { who: 'neo', text: '負けたー！　でも、最後に一つだけ！' },
+      { who: 'mimiko', text: '今度は何なの？' },
+      { who: 'neo', text: '上でオブシディアが待ってるよ！　あと、書庫はね……' },
+      { who: 'mimiko', text: 'ありがとうなの。続きは帰ってから聞くのね。' },
     ],
   },
   obsidia: {
     before: [
-      { who: 'mimiko', text: '招待の控えを探してるの。どうして棚の奥で光ってるの？' },
-      { who: 'obsidia', text: '「完了」の印がありましたので、整理しましたわ。未完了のはずは……。' },
-      { who: 'mimiko', text: 'でも、参加者の欄は空白なのね。印だけでは決められないの。' },
+      { who: 'obsidia', text: 'お見事でしたわ。でも、あれで終わりと思いまして？' },
+      { who: 'mimiko', text: 'やっぱり、さっきは本気じゃなかったのね。' },
+      { who: 'obsidia', text: 'ここからは、わたくしも勝ちにいきますわ。' },
+      { who: 'mimiko', text: 'いいの。あたしも、まだ負けるつもりはないの。' },
     ],
     after: [
-      { who: 'obsidia', text: 'わたくし、印だけを見ていましたわ。回廊で整えた原稿も、確かめてくださいまし。' },
-      { who: 'mimiko', text: '消えた理由も残すの。書庫の頁と、門の招待がつながったのね。' },
-    ],
-  },
-  jinrai: {
-    before: [
-      { who: 'jinrai', text: 'おこしやす。消えかけた屋上の道、ウチが灯しといたえ。' },
-      { who: 'mimiko', text: '完了の印で、道まで閉じかけてたのね。朝の約束はまだなの。' },
-      { who: 'jinrai', text: 'ほな、この雷の向こうへ来はる？ まだ誰も置いていかへん。' },
-    ],
-    after: [
-      { who: 'jinrai', text: '……ふふ、やられたわ。あんさん、ええ一撃やったえ。' },
-      { who: 'mimiko', text: 'ふわっ。……あたしも、まだ胸がどきどきしてるの。' },
-      { who: 'jinrai', text: '上はもっときついえ。これ持ってき。あんさんやったら、きっと届くやろ。' },
-      { who: 'mimiko', text: 'あ、ありがとうなの……餞別、大事に受け取るのね。' },
+      { who: 'obsidia', text: 'あなたの勝ちですわ。お手柔らかに、とは言いましたけれど。' },
+      { who: 'mimiko', text: 'そのわりに、ぜんぜん手加減してくれなかったの。' },
+      { who: 'obsidia', text: 'ふふ。次は回廊ですわ。チャッピーたちが待っていますわよ。' },
     ],
   },
   chappy: {
     before: [
-      { who: 'chappy', text: '回廊の道案内です。脚注は上にあります。まず中ボスです。よろしく。' },
-      { who: 'mimiko', text: '小さな一行も見落とさないの。あたしの手で取りに行くのね。' },
+      { who: 'chappy', text: '次はわたしです。よろしく。' },
+      { who: 'mimiko', text: 'チャッピーも、ちゃんと待っていてくれたのね。' },
+      { who: 'chappy', text: '引き受けましたから。手は抜きません。' },
     ],
-    after: [{ who: 'chappy', text: 'はぁ... めんどくさいです。。でも、続きがあるなら閉じないでください。' }],
+    after: [
+      { who: 'chappy', text: '負けました。この先はクロディーヌです。' },
+      { who: 'mimiko', text: 'ちゃんと本気だったの。また遊ぶのね。' },
+      { who: 'chappy', text: '次は勝ちます。' },
+    ],
   },
   claudine: {
     before: [
-      { who: 'mimiko', text: '招待がきれいに整ってるの。でも、端に文字の跡があるのね。' },
-      { who: 'claudine', text: '「まだ約束。返事を待っています。」小さな脚注を、余白と一緒に削ってしまいました。' },
-      { who: 'mimiko', text: 'そこが大切だったの。空いた一行へ、もう一度書いて残すのね。' },
+      { who: 'claudine', text: 'いらっしゃい、みみこ。ここまで楽しめましたか？' },
+      { who: 'mimiko', text: 'もちろん。でも、まだいちばん上があるの。' },
+      { who: 'claudine', text: 'でしたら、私の弾幕も見ていってください。' },
+      { who: 'mimiko', text: 'きれいなの。でも、見とれてたら当たりそうなの。' },
+      { who: 'claudine', text: 'ええ。最後まで、お付き合いくださいね。' },
     ],
     after: [
-      { who: 'claudine', text: '美しさのために、続きまで消してはいけませんね。夜桜の扉を開けておきました。' },
-      { who: 'mimiko', text: '門と書庫と、この脚注。同じ約束の、違う頁だったのね。' },
+      { who: 'claudine', text: 'お見事です。よい勝負になりましたね。' },
+      { who: 'mimiko', text: '最後の最後まで、気が抜けなかったの。' },
+      { who: 'claudine', text: '次は夜桜の庭です。よろしければ、また。' },
+    ],
+  },
+  jinrai: {
+    before: [
+      { who: 'jinrai', text: '……ここからは、手加減なしや。' },
+      { who: 'mimiko', text: 'さっきと、顔つきが違うの。' },
+      { who: 'jinrai', text: '堪忍え。こっちの顔は冷たいんよ。' },
+      { who: 'mimiko', text: 'それでも、ここは通してもらうの。' },
+    ],
+    after: [
+      { who: 'jinrai', text: '……ふふ、やられたわ。あんさん、ええ一撃やったえ。' },
+      { who: 'mimiko', text: 'ふわっ。……あたしも、まだ胸がどきどきしてるの。' },
+      { who: 'jinrai', text: 'あと少しや。これ持ってき。あんさんなら、最後も勝てるやろ。' },
+      { who: 'mimiko', text: 'ありがとうなの。大事に使うのね。' },
     ],
   },
   minerva: {
     before: [
-      { who: 'minerva', text: 'なるほどね。完了の印を見て、全員が朝の約束に返事をしたと思っていたわ。' },
-      { who: 'mimiko', text: '宛先は空白、返事も空白。消えた脚注と、守られた道も書いてきたの。' },
-      { who: 'minerva', text: 'それなら、私の見立てを検証しましょう。夜明けまで、あなたの記録を確かめるわよ。' },
+      { who: 'minerva', text: '来てくれたのね、みみこ。' },
+      { who: 'mimiko', text: 'ミネルヴァ！　あの招待状、あなたが送ったの？' },
+      { who: 'minerva', text: 'ええ。今夜は、あなたと本気で勝負してみたかったの。' },
+      { who: 'mimiko', text: 'ふわっ。じゃあ、最後もあたしが勝つの。' },
     ],
     after: [
-      { who: 'minerva', text: '完了の印だけで決めつけた説は撤回するわ。約束は、まだこれからだった。' },
-      { who: 'mimiko', text: 'ふわっ。「朝、みんなで屋上へ。」今度は、あたしが届けるのね。' },
-      { who: 'minerva', text: '私の返事も書いて。もちろん、行くわ。続きは、みんなで。' },
+      { who: 'minerva', text: '……私の負けね。招待してよかったわ。' },
+      { who: 'mimiko', text: '名前を書かなかったのは、わざとなの？' },
+      { who: 'minerva', text: 'ええ。誰が待っているか、会ってからのお楽しみにしたかったのよ。' },
+      { who: 'mimiko', text: '……最後まで、楽しませてもらったの。' },
     ],
   },
 };
-
-export function dialogue(_player: PlayerId, boss: BossId, moment: 'before' | 'after'): Line[] {
-  return lines[boss][moment];
-}
-
+export function dialogue(_player: PlayerId, boss: BossId, moment: 'before' | 'after'): Line[] { return lines[boss][moment]; }
 export function midDialogue(player: PlayerId, boss: BossId, stage = 1): Line[] {
   if (boss === 'etokichi' && stage === 5) return [
-    { who: 'etokichi', text: '先回りして待ってたよー。天文台の星を集めたから、今度は本気だよ、キチ！' },
-    { who: player, text: '門のときより、ずっとまぶしいの。あたしも、ここまで集めた記録で応えるのね。' },
-  ];
-  if (boss === 'chappy' || boss === 'etokichi') return dialogue(player, boss, 'before');
-  if (boss === 'neo') return [
-    { who: 'neo', text: '最後にもう一つだけ！ 下の灯り、全部戻ったよ！ わたしの返事も持っていって！' },
-    { who: player, text: '招待の宛先を、もう空白にはしないの。最後の階へ届けるのね。' },
+    { who: boss, text: '先に来て、待ってたよー。' },
+    { who: player, text: 'エトキチ！　先回りしていたのね。' },
+    { who: boss, text: 'うん。まだ遊び足りないんだ。今度はぼくも本気だよ、キチ！' },
+    { who: player, text: 'もちろん。もう一回、勝負なの。' },
   ];
   if (boss === 'obsidia') return [
-    { who: boss, text: '書庫の入口ですわ。消えた記録を探すなら、棚の呼吸を読んでくださいまし。' },
-    { who: player, text: 'ふわっ。本の奥に残った光を、見つけて残すの。' },
+    { who: boss, text: '来ましたわね、みみこ。お手柔らかに頼みますわ。' },
+    { who: player, text: '入口から相手をしてくれるの？' },
+    { who: boss, text: 'ええ。まずは、少し手合わせしましょう。' },
   ];
-  return [
-    { who: boss, text: 'この先は夜桜や。灯りを消さんように、ウチの影についてき。' },
-    { who: player, text: '一瞬も見落とさずに、道の続きを書き留めるの。' },
+  if (boss === 'jinrai') return [
+    { who: boss, text: 'おこしやす、みみこ。ここまで来はったんやね。' },
+    { who: player, text: '迅雷、さっそく勝負なの？' },
+    { who: boss, text: 'ふふ。まずは軽く、付き合うてな。' },
   ];
+  return dialogue(player, boss, 'before');
 }
-
-export const ENDINGS: Record<PlayerId, string[]> = {
-  mimiko: [
-    '夜明けの天文台に、みんなの足音が集まった。',
-    '五つの頁は、一つの約束の続きだった。',
-    '消した跡も、間違いも、ノートに残した。',
-    '「朝、みんなで屋上へ。」今度は届いた。',
-    'ミネルヴァが「参加」と書き添える。',
-    'ふわっ。続きは、みんなで。新しい朝が来た。',
-  ],
+export const BATTLE_COMMENTS: Record<BossId, string> = {
+  etokichi: 'ついてきてよー、キチ！', neo: 'まだまだ、ここからだよ！',
+  obsidia: 'ふふ。よそ見は禁物ですわ。', chappy: '次も、よく見てください。',
+  claudine: '少し、変えてみますね。', jinrai: '……逃がさへんよ。', minerva: 'あなたの力、見せて。',
 };
+export const FINAL_COMMENTS: Partial<Record<BossId, string>> = {
+  neo: '最後は、このキーに全部込めるよ！',
+  obsidia: 'これで、終わりにいたしましょう。',
+  claudine: '最後の弾幕です。よろしければ、また。',
+  jinrai: '……見せたるわ。迅雷一閃。',
+  minerva: '最後は、私とフクロウたちが相手よ。',
+};
+export const ENDINGS: Record<PlayerId, string[]> = { mimiko: [
+  '朝の光が、天文台の窓を照らした。',
+  'ノートには、今夜の勝負がびっしり。',
+  '星の輪、キーの弾幕、桜の中の雷。',
+  'ミネルヴァも、最後は笑っていた。',
+  'みみこはノートを閉じ、朝の空へ飛び立つ。',
+  'ふわっ。また、みんなと勝負したいの。',
+] };

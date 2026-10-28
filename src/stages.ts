@@ -71,7 +71,7 @@ export const STAGES: Stage[] = [
     ],
   },
   {
-    title: '暁の天文台 〜 Owl of Minerva', boss: 'minerva', mid: 'etokichi', bgm: 'stage-dawn', colors: ['#642e4d', '#b86c67', '#ffe4ab'],
+    title: '暁の天文台 〜 Observatory at Dawn', boss: 'minerva', mid: 'etokichi', bgm: 'stage-dawn', colors: ['#642e4d', '#b86c67', '#ffe4ab'],
     phases: [
       phase(5, '通常攻撃・仮説の星図', 'normal', 'minervaStarFan'),
       phase(5, 'セブンフォールド・サーベイ', 'spell', 'sevenRings'),

@@ -2,8 +2,8 @@ import { AudioBank } from './audio';
 import { type BgmCue, BgmPlayer } from './bgm';
 import { CAST_GAP, MOTION_SPRITES } from './boss-motion';
 import { patternPosition } from './boss-movement';
-import { dialogue, ENDINGS, type Line, midDialogue } from './dialogue';
-import { CREDITS_HOLD_FRAMES, CREDITS_ROLL_FRAMES, ENDING_EXIT_FRAMES, ENDING_LINE_FADE, ENDING_LINE_GAP, ENDING_READ_FRAMES } from './ending';
+import { BATTLE_COMMENTS, dialogue, ENDINGS, FINAL_COMMENTS, INTRO_LINES, type Line, midDialogue } from './dialogue';
+import { CREDITS_FADE_FRAMES, CREDITS_FIN_FRAME, CREDITS_ROLL_FRAMES, creditsFade, ENDING_EXIT_FRAMES, ENDING_LINE_FADE, ENDING_LINE_GAP, ENDING_READ_FRAMES } from './ending';
 import { ENEMY_ROOMS, enemyFireFrames } from './enemy-design';
 import { ENDING_MOVIES, MOVIES, type MovieName, MoviePlayer } from './movies';
 import { obsidiaPosition } from './obsidia-movement';
@@ -32,7 +32,7 @@ import { autoCollect, bulletContact, bulletSpeed, circlesHit, type Difficulty, d
 import { type BossId, midPhases, NAMES, type Phase, STAGES } from './stages';
 import { readRecords } from './story';
 
-export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'stage' | 'arrival' | 'transition' | 'dialogue' | 'gift' | 'departure' | 'clear' | 'pause' | 'gameover' | 'movie' | 'ending' | 'credits';
+export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'letter' | 'stage' | 'arrival' | 'transition' | 'dialogue' | 'gift' | 'departure' | 'clear' | 'pause' | 'gameover' | 'movie' | 'ending' | 'credits';
 type AfterBossMovie = 'jinrai-gift' | 'minerva-finale';
 export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'starOwl' | 'starTrail' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSpark' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'chappyBloom' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
 export interface JinraiLaser { x: number; y: number; angle: number; age: number; warning: number; life: number; speed: number; }
@@ -129,9 +129,12 @@ export class Game {
   flash = 0;
   message = '';
   messageFrames = 0;
+  battleComment?: Line;
+  battleCommentFrames = 0;
+  finaleIntro?: { frame: number; from: [number, number]; target: [number, number] };
   lines: Line[] = [];
   lineIndex = 0;
-  afterDialogue: 'boss' | 'mid' | 'stage' | 'clear' | 'gift' = 'stage';
+  afterDialogue: 'boss' | 'mid' | 'stage' | 'clear' | 'gift' | 'intro' = 'stage';
   clearBonus = 0;
   fps = 60;
   practice = false;
@@ -245,14 +248,14 @@ export class Game {
         this.boss = STAGES[this.stage - 1].boss;
       }
       this.startMovies([movie], () => {
-        if (movie === 'opening') this.startStage(1);
+        if (movie === 'opening') this.startIntroduction();
         else if (movie === 'lastboss') this.startConversation('minerva', 'before', 'boss', true);
         else if (movie === 'jinrai-gift' || movie === 'minerva-finale') this.startAfterBossConversation();
         else this.startEnding();
       });
       return;
     }
-    if (this.params.get('credits') === '1') { this.scene = 'credits'; return; }
+    if (this.params.get('credits') === '1') { this.scene = 'credits'; this.creditsFrame = Math.floor(this.queryNumber('t', 0, CREDITS_ROLL_FRAMES / 60, 0) * 60); return; }
     const ending = this.params.get('ending');
     if (PLAYERS.includes(ending as PlayerId)) {
       this.player = ending as PlayerId;
@@ -300,6 +303,7 @@ export class Game {
     if (this.flash > 0) this.flash--;
     if (this.messageFrames > 0) this.messageFrames--;
     if (this.cutin > 0) this.cutin--;
+    if (this.scene === 'stage' && this.battleCommentFrames > 0) this.battleCommentFrames--;
     if (this.scene === 'stage') this.updateStage();
     else if (this.scene === 'arrival') this.updateArrival();
     else if (this.scene === 'transition') this.updateTransition();
@@ -340,10 +344,15 @@ export class Game {
     else if (this.scene === 'dialogue' && (this.afterDialogue === 'boss' || this.afterDialogue === 'clear' || this.afterDialogue === 'gift')) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else if (this.phase && !this.midboss) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else cue = STAGES[this.stage - 1].bgm;
-    this.bgm.sync(cue, false, lastbossQuiet || postBossQuiet ? 0.35 : 1);
+    this.bgm.sync(cue, false, this.scene === 'credits' ? 1 - creditsFade(this.creditsFrame) : lastbossQuiet || postBossQuiet ? 0.35 : 1, this.scene === 'credits' ? 1 / 60 : 1);
   }
 
   private updateMenu(): void {
+    if (this.scene === 'letter') {
+      if (this.accept()) { this.scene = 'dialogue'; this.lines = INTRO_LINES; this.lineIndex = 0; this.afterDialogue = 'intro'; }
+      if (this.just('Escape')) { this.resumeScene = 'letter'; this.scene = 'pause'; this.menu = 0; }
+      return;
+    }
     if (this.scene === 'ending') {
       this.endingFrame++;
       if (this.accept() && !this.endingComplete) {
@@ -357,9 +366,9 @@ export class Game {
       return;
     }
     if (this.scene === 'credits') {
-      this.creditsFrame += this.creditsFrame < CREDITS_ROLL_FRAMES && this.held('KeyZ') ? 2 : 1;
-      if (this.just('KeyX')) this.creditsFrame = Math.max(this.creditsFrame, CREDITS_ROLL_FRAMES);
-      if (this.creditsFrame >= CREDITS_ROLL_FRAMES + CREDITS_HOLD_FRAMES) this.returnToTitle();
+      this.creditsFrame += this.creditsFrame < CREDITS_ROLL_FRAMES - CREDITS_FADE_FRAMES && this.held('KeyZ') ? 2 : 1;
+      if (this.just('KeyX')) this.creditsFrame = Math.max(this.creditsFrame, this.creditsFrame >= CREDITS_FIN_FRAME ? CREDITS_ROLL_FRAMES - CREDITS_FADE_FRAMES : CREDITS_FIN_FRAME);
+      if (this.creditsFrame >= CREDITS_ROLL_FRAMES) this.returnToTitle();
       return;
     }
     if (this.scene === 'clear' && this.accept()) {
@@ -397,10 +406,10 @@ export class Game {
       case 'title': this.scene = (['difficulty', 'practice', 'option', 'help', 'notebook'] as Scene[])[this.menu]; this.menu = 0; break;
       case 'difficulty':
         this.difficulty = DIFFICULTIES[this.menu]; this.menu = 0;
-        if (PLAYERS.length === 1) { this.player = PLAYERS[0]; this.practice = false; this.startRun(); this.startMovies(['opening'], () => this.startStage(1)); }
+        if (PLAYERS.length === 1) { this.player = PLAYERS[0]; this.practice = false; this.startRun(); this.startMovies(['opening'], () => this.startIntroduction()); }
         else this.scene = 'player';
         break;
-      case 'player': this.player = PLAYERS[this.menu]; this.practice = false; this.startRun(); this.startMovies(['opening'], () => this.startStage(1)); break;
+      case 'player': this.player = PLAYERS[this.menu]; this.practice = false; this.startRun(); this.startMovies(['opening'], () => this.startIntroduction()); break;
       case 'practice': this.practice = true; this.startRun(); this.startStage(this.menu + 1); break;
       case 'option': case 'help': case 'notebook': this.returnToTitle(); break;
       case 'pause': {
@@ -422,10 +431,11 @@ export class Game {
   }
 
   private resetBossPresentation(): void {
+    this.finaleIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
     this.postBoss = false; this.departureFrame = 0; this.boss = undefined; this.phase = undefined;
     this.transition = undefined; this.transitionFrame = 0;
     this.arrivalFrame = 0; this.arrivalFromWhite = false; this.giftFrame = 0;
-    this.bgm.sync(this.bgm.cue, false, 1);
+    this.bgm.sync(this.bgm.cue, false, this.scene === 'credits' ? 0 : 1, this.scene === 'credits' ? 0 : 1);
   }
 
   private returnToTitle(): void {
@@ -460,6 +470,7 @@ export class Game {
   }
 
   private clearEncounter(): void {
+    this.finaleIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
     this.clearBullets(); this.enemies.clear(); this.shots.clear(); this.clones.clear();
     this.pendingHit = -1; this.bombFrames = 0; this.flash = 0;
   }
@@ -569,11 +580,15 @@ export class Game {
   }
 
   private startEnding(): void { this.scene = 'ending'; this.endingFrame = 0; this.endingReadFrame = 0; this.endingReadDuration = ENDING_READ_FRAMES; this.endingRevealed = false; }
+  private startIntroduction(): void {
+    this.startStage(1); this.stageIntroFrame = 180; this.scene = 'letter';
+  }
   get endingComplete(): boolean { return this.endingRevealed || this.endingFrame >= (this.endingLines.length - 1) * ENDING_LINE_GAP + ENDING_LINE_FADE; }
   get endingExitAlpha(): number { return Math.max(0, Math.min(1, (this.endingReadFrame - this.endingReadDuration + ENDING_EXIT_FRAMES) / ENDING_EXIT_FRAMES)); }
   endingLineAlpha(index: number): number { return this.endingRevealed ? 1 : Math.max(0, Math.min(1, (this.endingFrame - index * ENDING_LINE_GAP) / ENDING_LINE_FADE)); }
 
   startStage(stage: number): void {
+    this.finaleIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
     this.movies.stop();
     this.movieName = undefined;
     this.movieDone = undefined;
@@ -606,6 +621,18 @@ export class Game {
 
   private updateStage(): void {
     if (this.just('Escape')) { this.resumeScene = 'stage'; this.scene = 'pause'; this.menu = 0; return; }
+    if (this.finaleIntro) {
+      this.sceneryDistance += 0.65;
+      if (this.invulnFrames > 0) this.invulnFrames--;
+      if (this.bombFrames > 0) this.bombFrames--;
+      this.updatePlayer(false); this.updateItems(); this.updateParticles();
+      if (this.pendingHit >= 0 && this.just('KeyX') && this.bombs > 0 && this.bombFrames <= 0) this.useBomb();
+      const intro = this.finaleIntro;
+      if (++intro.frame === 60 && this.boss) this.showBattleComment(FINAL_COMMENTS[this.boss]!);
+      if (this.pendingHit >= 0 && ++this.pendingHit >= 8) this.commitHit();
+      if (intro.frame >= 300) { this.finaleIntro = undefined; this.bossEntry = intro.target; this.startPhasePresentation(); }
+      return;
+    }
     // 中ボスで道中の時計が止まっても、世界のスクロールは続ける。
     this.sceneryDistance += this.phase ? 0.65 : 1.8;
     if (this.stageIntroFrame < 180) {
@@ -815,6 +842,7 @@ export class Game {
     if (this.afterDialogue === 'boss') this.startBoss(false, 0);
     if (this.afterDialogue === 'mid') this.startBoss(true, 0);
     if (this.afterDialogue === 'stage') { this.scene = 'stage'; this.boss = undefined; }
+    if (this.afterDialogue === 'intro') { this.scene = 'stage'; this.boss = undefined; this.stageIntroFrame = this.presentation ? 0 : 180; }
     if (this.afterDialogue === 'clear') this.startDeparture();
     if (this.afterDialogue === 'gift') this.startGift();
   }
@@ -899,9 +927,10 @@ export class Game {
     this.beginPhase(phases[this.phaseIndex]);
   }
 
-  private beginPhase(phase: Phase): void {
+  private beginPhase(phase: Phase, introduceFinale = false): void {
     this.audio.stopEnergy();
     this.bossEntry = this.phase ? this.bossPosition() : [192, phase.spell ? 132 : 77];
+    this.finaleIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
     this.phase = phase;
     this.keyboardWord = '';
     this.phaseFrame = 0;
@@ -934,6 +963,22 @@ export class Game {
     this.bombUsed = false;
     this.hitDuringSpell = false;
     this.clearBullets(); this.shots.clear(); this.clones.clear();
+    if (introduceFinale && this.boss && FINAL_COMMENTS[this.boss]) {
+      this.finaleIntro = { frame: 0, from: this.bossEntry, target: phase.pattern === 'sweep' ? sweepPosition(0, 0) : [192, 132] };
+      this.cutin = 0; this.flash = 0;
+      if (phase.spell) this.spellBonus = 1_000_000 + this.stage * 500_000;
+      return;
+    }
+    this.startPhasePresentation();
+    if (this.boss && this.phaseIndex === 1 && (!this.midboss || this.boss === 'chappy' || (this.boss === 'etokichi' && this.stage === 5))) this.showBattleComment(BATTLE_COMMENTS[this.boss]);
+  }
+
+  private showBattleComment(text: string): void {
+    if (this.boss) { this.battleComment = { who: this.boss, text }; this.battleCommentFrames = 240; }
+  }
+
+  private startPhasePresentation(): void {
+    const phase = this.phase!;
     if (phase.spell) {
       this.spellBonus = 1_000_000 + this.stage * 500_000;
       this.cutin = phase.pattern === 'jinraiDash' ? 0 : 100;
@@ -978,7 +1023,7 @@ export class Game {
     for (const node of this.graphNodes) this.spawnItem(node.x, node.y, 'point', true);
     this.clearBullets(); this.clones.clear();
     this.flash = 8;
-    if (next) { this.phaseIndex++; this.beginPhase(next); }
+    if (next) { this.phaseIndex++; this.beginPhase(next, this.presentation && !this.midboss && this.phaseIndex === STAGES[this.stage - 1].phases.length - 1); }
     else {
       // 会話へ進む前に手で拾う時間を残す。近づいて拾うまで補充を直接加算しない。
       this.phase = undefined;
@@ -994,10 +1039,7 @@ export class Game {
   private leaveBossFight(): void {
     if (this.boss === 'chappy') this.startConversation('chappy', 'after', 'stage');
     else if (this.boss === 'etokichi' && this.stage === 5) {
-      this.lines = [
-        { who: 'etokichi', text: 'ここまで来たら、もう大丈夫だねー。ぼくの返事も「行く」だよ、キチ！' },
-        { who: 'mimiko', text: 'ふわっ。門からここまで、星がつないでくれたのね。約束の続きを届けるの。' },
-      ];
+      this.lines = dialogue(this.player, 'etokichi', 'after');
       this.lineIndex = 0;
       this.afterDialogue = 'stage';
       this.scene = 'dialogue';
@@ -1058,6 +1100,10 @@ export class Game {
   }
 
   bossPosition(): [number, number] {
+    if (this.finaleIntro) {
+      const progress = Math.min(1, this.finaleIntro.frame / 60), ease = progress * progress * (3 - 2 * progress);
+      return [this.finaleIntro.from[0] + (this.finaleIntro.target[0] - this.finaleIntro.from[0]) * ease, this.finaleIntro.from[1] + (this.finaleIntro.target[1] - this.finaleIntro.from[1]) * ease];
+    }
     if (this.postBoss) {
       if (this.scene === 'transition' && (this.transition === 'boss-defeat-flash' || this.transition === 'boss-defeat-in')) {
         const elapsed = this.transitionFrame + (this.transition === 'boss-defeat-in' ? 8 : 0);
@@ -1333,6 +1379,7 @@ export class Game {
   }
 
   private damageBoss(damage: number): void {
+    if (this.finaleIntro) return;
     // 印とカットインを撃ち込みで飛ばせないよう、導入中はダメージを受けない。
     if (this.phase?.pattern === 'jinraiDash' && this.phaseFrame < DASH_ATTACK) return;
     if (this.phase?.pattern === 'owlDawn' && this.minervaReprise && !this.minervaReprise.prayer && repriseLocal(this.phaseFrame, this.minervaReprise) < reprisePrepare(this.minervaReprise)) return;

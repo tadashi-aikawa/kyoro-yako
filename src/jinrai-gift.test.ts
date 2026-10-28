@@ -72,8 +72,8 @@ it.each([false, true])('4面本ボス撃破は白→動画→対峙→会話→�
   expect(game.lines).toEqual([
     { who: 'jinrai', text: '……ふふ、やられたわ。あんさん、ええ一撃やったえ。' },
     { who: 'mimiko', text: 'ふわっ。……あたしも、まだ胸がどきどきしてるの。' },
-    { who: 'jinrai', text: '上はもっときついえ。これ持ってき。あんさんやったら、きっと届くやろ。' },
-    { who: 'mimiko', text: 'あ、ありがとうなの……餞別、大事に受け取るのね。' },
+    { who: 'jinrai', text: 'あと少しや。これ持ってき。あんさんなら、最後も勝てるやろ。' },
+    { who: 'mimiko', text: 'ありがとうなの。大事に使うのね。' },
   ]);
   for (let i = 0; i < game.lines.length; i++) press(game);
   expect(game.scene).toBe('gift'); expect(game.bossXY).toEqual([192, 77]); expect(game.bgm.cue).toBe('boss-jinrai');

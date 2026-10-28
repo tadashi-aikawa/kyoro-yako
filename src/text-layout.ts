@@ -1,4 +1,4 @@
-const FORBIDDEN_LINE_START = '。、」』）！？…ー';
+const FORBIDDEN_LINE_START = '。、」』）！？…ーぁぃぅぇぉっゃゅょァィゥェォッャュョ';
 
 export function wrapDialogue(value: string, width: number, measure: (text: string) => number): string[] {
   const lines: string[] = [];

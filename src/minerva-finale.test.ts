@@ -70,9 +70,10 @@ it.each([false, true])('5面撃破後は白→動画→対峙→既存3行→退
   run(game, 60); expect(game.scene).toBe('dialogue');
   expect(game.bgm.cue).toBe('boss-minerva'); expect(game.afterDialogue).toBe('clear');
   expect(game.lines).toEqual([
-    { who: 'minerva', text: '完了の印だけで決めつけた説は撤回するわ。約束は、まだこれからだった。' },
-    { who: 'mimiko', text: 'ふわっ。「朝、みんなで屋上へ。」今度は、あたしが届けるのね。' },
-    { who: 'minerva', text: '私の返事も書いて。もちろん、行くわ。続きは、みんなで。' },
+    { who: 'minerva', text: '……私の負けね。招待してよかったわ。' },
+    { who: 'mimiko', text: '名前を書かなかったのは、わざとなの？' },
+    { who: 'minerva', text: 'ええ。誰が待っているか、会ってからのお楽しみにしたかったのよ。' },
+    { who: 'mimiko', text: '……最後まで、楽しませてもらったの。' },
   ]);
   expect(game.whiteAlpha).toBe(0);
   finishDialogue(game);

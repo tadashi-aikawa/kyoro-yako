@@ -56,7 +56,7 @@ it('難易度選択の次は自機選択を飛ばして1面を始める', () => 
   expect(game.scene).toBe('difficulty');
   game.menu = 2;
   press(game, 'KeyZ');
-  expect(game.scene).toBe('stage');
+  expect(game.scene).toBe('letter');
   expect(game.stage).toBe(1);
   expect(game.player).toBe('mimiko');
   expect(game.difficulty).toBe('hard');

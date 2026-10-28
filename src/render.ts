@@ -1,5 +1,5 @@
 import { bossSpriteId, createBossMotion, isCasting, updateBossMotion } from './boss-motion';
-import { CREDITS_ART, CREDITS_CROSSFADE_FRAMES, CREDITS_HOLD_FRAMES, CREDITS_ROLL_FRAMES, CREDITS_SCENE_FRAMES } from './ending';
+import { CREDITS_ART, CREDITS_STAFF, creditsFade, creditsScene } from './ending';
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
 import { PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
@@ -25,7 +25,7 @@ import { GRAPH_FADE, GRAPH_LINE_WIDTH, graphEdgeState, graphNodeState } from './
 import { FIELD, MAX_BOMBS, MAX_POWER } from './rules';
 import { drawScenery } from './stage-scenery';
 import { NAMES, STAGES } from './stages';
-import { GAME_TITLE, RECORDS } from './story';
+import { GAME_TITLE, INVITATION, RECORDS } from './story';
 import { wrapDialogue } from './text-layout';
 
 const PALETTE = ['#a674ff', '#6ddaf5', '#fbd768', '#ff9dbe'];
@@ -95,6 +95,7 @@ export class Renderer {
     if (game.scene === 'ending' || game.scene === 'credits') { this.drawEnding(game); return; }
     this.drawField(game);
     this.drawPanel(game);
+    if (game.scene === 'letter' || (game.scene === 'pause' && game.resumeScene === 'letter')) this.drawLetter();
     if (game.scene === 'dialogue') this.drawDialogue(game);
     if (game.scene === 'pause') this.fade(game.whiteAlpha, '#fff');
     if (game.scene === 'clear' || game.scene === 'pause' || game.scene === 'gameover') this.drawOverlay(game);
@@ -250,7 +251,7 @@ export class Renderer {
       const y = 135 + i * 53;
       this.card(29, y, 147, 42, selected ? '#dacfb0' : '#172337', selected ? '#dacfb0' : '#44504c');
       this.uiText(`${i + 1}階  ${['門', '書庫', '回廊', '夜桜', '天文台'][i]}`, 41, y + 14, 12, selected ? '#24332f' : '#e2decc');
-      this.uiText(found ? record.title.split('：')[1] : 'まだ書かれていない頁', 41, y + 31, 9, selected ? '#526257' : '#899ca5', 'left', 123);
+      this.uiText(found ? record.title : 'まだ書かれていない頁', 41, y + 31, 9, selected ? '#526257' : '#899ca5', 'left', 123);
     });
     this.card(190, 135, 420, 254, '#ded6be', '#e8dcba');
     const record = RECORDS[game.menu];
@@ -456,7 +457,7 @@ export class Renderer {
     this.jinraiThunderbolts(game);
     if (game.bombFrames > 0) this.bombEffect(game);
     if (game.cutin > 0 && game.boss) this.cutin(game);
-    if (game.phase?.spell && game.cutin <= 20 && !(game.phase.pattern === 'jinraiDash' && game.phaseFrame < DASH_CUTIN)) {
+    if (game.phase?.spell && !game.finaleIntro && game.cutin <= 20 && !(game.phase.pattern === 'jinraiDash' && game.phaseFrame < DASH_CUTIN)) {
       c.save();
       // 頭上を召喚の舞台に使う終符では、技名を読ませた後に帯を退ける。
       if (game.phase.pattern === 'owlDawn') c.globalAlpha = Math.max(0, Math.min(1, (150 - game.phaseFrame) / 45));
@@ -1589,24 +1590,32 @@ export class Renderer {
       c.restore();
     }
     rule(382, 0.3);
-    this.image(game, `${game.player}-face`, 444, 390, 52, 52);
-    this.text('集めた記録', 504, 401, 11, '#d9c5a0');
-    for (let i = 0; i < RECORDS.length; i++) notebookPage(c, 512 + i * 21, 424, i < game.collectedRecords.length);
-    this.uiText(`${game.collectedRecords.length} / ${RECORDS.length}`, 608, 448, 9, '#a1b6ad', 'right');
+    if (game.battleComment && game.battleCommentFrames > 0 && (game.scene === 'stage' || (game.scene === 'pause' && game.resumeScene === 'stage'))) {
+      this.image(game, `${game.battleComment.who}-face`, 448, 389, 34, 34);
+      this.uiText(NAMES[game.boss!], 490, 402, 12, '#f0dfbb');
+      c.font = '12px "Hiragino Kaku Gothic ProN", sans-serif';
+      const rows = wrapDialogue(game.battleComment.text, 156, value => c.measureText(value).width);
+      rows.forEach((row, i) => { this.uiText(row, 448, 433 + i * 16, 12, '#f4e8ce'); });
+    } else {
+      this.image(game, `${game.player}-face`, 444, 390, 52, 52);
+      this.text('集めた記録', 504, 401, 11, '#d9c5a0');
+      for (let i = 0; i < RECORDS.length; i++) notebookPage(c, 512 + i * 21, 424, i < game.collectedRecords.length);
+      this.uiText(`${game.collectedRecords.length} / ${RECORDS.length}`, 608, 448, 9, '#a1b6ad', 'right');
+    }
     c.restore();
   }
 
   private drawDialogue(game: Game): void {
     const c = this.ctx;
     const line = game.lines[game.lineIndex]; if (!line) return;
-    const opponent = game.boss!;
+    const opponent = game.boss;
     c.fillStyle = '#080915aa'; c.fillRect(FIELD.x, FIELD.y, FIELD.w, FIELD.h);
     this.image(game, `${game.player}-stand`, 30, 135, 168, 250, line.who === game.player ? 0.9 : 0.34);
     if (opponent === 'etokichi') this.image(game, 'etokichi-stand', 192, 93, 220, 220, line.who === opponent ? 0.95 : 0.34);
-    else this.image(game, `${opponent}-stand`, 242, 87, 170, 275, line.who === opponent ? 0.95 : 0.34);
+    else if (opponent) this.image(game, `${opponent}-stand`, 242, 87, 170, 275, line.who === opponent ? 0.95 : 0.34);
     c.fillStyle = '#100f2ee8'; c.fillRect(39, 330, 369, 110);
     c.strokeStyle = '#c4a8e9'; c.strokeRect(39, 330, 369, 110);
-    this.text(line.who === game.player ? PLAYER_NAMES[game.player] : NAMES[opponent], 54, 350, 16, '#fbe8b9');
+    this.text(line.who === game.player ? PLAYER_NAMES[game.player] : opponent ? NAMES[opponent] : '', 54, 350, 16, '#fbe8b9');
     this.wrapText(line.text, 53, 379, 340, 16);
     this.text('Z ▶   Ctrl 早送り', 397, 429, 10, '#aaa5c4', 'right');
   }
@@ -1622,13 +1631,13 @@ export class Renderer {
   private drawOverlay(game: Game): void {
     const c = this.ctx; c.fillStyle = '#080615cf'; c.fillRect(32, 16, 384, 448);
     if (game.scene === 'clear') {
-      this.text('頁を、書き留めた。', 224, 115, 27, '#ffebc2', 'center');
+      this.text('この階の勝負、勝ったの！', 224, 115, 24, '#ffebc2', 'center');
       const record = RECORDS[game.stage - 1];
       this.card(56, 162, 336, 145, '#1e2837', '#64766a');
       this.uiText(record.title, 72, 184, 15, '#eadbb9', 'left', 300);
       record.lines.forEach((line, i) => { this.uiText(line, 72, 224 + i * 25, 12, '#d8ded4', 'left', 300); });
       this.uiText(`クリアボーナス  ${game.clearBonus.toLocaleString()}`, 224, 345, 14, '#fff', 'center');
-      this.uiText(game.practice ? 'Z  タイトルへ' : game.stage === 5 ? 'Z  朝の約束へ' : 'Z  次の階へ', 224, 399, 13, '#e0d4f8', 'center');
+      this.uiText(game.practice ? 'Z  タイトルへ' : game.stage === 5 ? 'Z  エンディングへ' : 'Z  次の階へ', 224, 399, 13, '#e0d4f8', 'center');
     }
     if (game.scene === 'pause') { this.text('PAUSE', 224, 139, 32, '#ffebc2', 'center'); this.overlayMenu(['再開', 'タイトルへ戻る', 'やり直し'], game.menu); }
     if (game.scene === 'gameover') { this.text('GAME OVER', 224, 139, 32, '#ffb9c8', 'center'); this.overlayMenu(['コンティニュー', 'タイトルへ戻る'], game.menu); }
@@ -1636,6 +1645,16 @@ export class Renderer {
 
   private overlayMenu(entries: string[], selected: number): void {
     entries.forEach((entry, i) => { this.text(`${selected === i ? '◆  ' : '    '}${entry}`, 224, 222 + i * 39, 18, selected === i ? '#ffebc2' : '#aea8c5', 'center'); });
+  }
+
+  private drawLetter(): void {
+    const c = this.ctx; c.save();
+    c.fillStyle = '#080915bb'; c.fillRect(32, 16, 384, 448);
+    c.fillStyle = '#f4edda'; c.fillRect(56, 88, 336, 280); c.strokeStyle = '#b9ac87'; c.strokeRect(56.5, 88.5, 335, 279);
+    c.fillStyle = '#3d3540'; c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+    c.font = '20px "Hiragino Mincho ProN", serif'; c.fillText(INVITATION[0], 82, 135);
+    c.font = '17px "Hiragino Mincho ProN", serif'; INVITATION.slice(1).forEach((line, i) => { c.fillText(line, 82, 185 + i * 33); });
+    c.font = '12px "Hiragino Sans", sans-serif'; c.fillStyle = '#716773'; c.fillText('Z　進む', 314, 348); c.restore();
   }
 
   private drawEnding(game: Game): void {
@@ -1656,29 +1675,7 @@ export class Renderer {
       c.globalAlpha = 1;
       if (!game.endingComplete) this.text('Z  すべて読む', 584, 451, 12, ink, 'right', shadow);
       this.fade(game.endingExitAlpha, '#f5efe1');
-    } else {
-      this.drawCreditsArt(game.creditsFrame);
-      const lines = ['企画・仕様  チャッピー', '制作・調整  迅雷 / Codex', 'キャラクター  owleryのみんな', 'エトキチ  エトキチの大冒険より', '遊んでくれたあなたへ、ありがとう。'];
-      const rowGap = 48;
-      const distance = 520 + 132 + (lines.length - 1) * rowGap / 2 - 240;
-      const y = 520 - Math.min(1, game.creditsFrame / CREDITS_ROLL_FRAMES) * distance;
-      const ink = '#3c283c';
-      // 下端の操作案内へスクロール中の文字を重ねない。
-      c.save(); c.beginPath(); c.rect(380, 0, 260, 420); c.clip();
-      const line = (value: string, baseline: number, size: number, ui = true) => {
-        // クリップ境界へ届く前に消し、文字が上下半分だけ現れる状態を避ける。
-        c.globalAlpha = Math.max(0, Math.min(1, (baseline - 12) / 30, (414 - baseline) / 30));
-        if (ui) this.uiText(value, 505, baseline, size, ink, 'center');
-        else this.text(value, 505, baseline, size, ink, 'center', 0);
-      };
-      line(GAME_TITLE, y, 28, false);
-      line('弾幕シューティング / owlery', y + 52, 11);
-      lines.forEach((value, i) => { line(value, y + 132 + i * rowGap, 12); });
-      c.restore();
-      if (game.creditsFrame < CREDITS_ROLL_FRAMES) this.text('Z  早送り    X  スキップ', 608, 451, 10, ink, 'right', 0);
-      const fadeOut = Math.max(0, (game.creditsFrame - CREDITS_ROLL_FRAMES - CREDITS_HOLD_FRAMES + 60) / 60);
-      this.fade(fadeOut, '#080817');
-    }
+    } else this.drawCredits(game.creditsFrame);
   }
 
   private preloadCreditsArt(): void {
@@ -1688,30 +1685,44 @@ export class Renderer {
     }
   }
 
-  private drawCreditsArt(frame: number): void {
-    const c = this.ctx;
-    c.fillStyle = '#f5efe1'; c.fillRect(0, 0, 640, 480);
-    const index = Math.min(CREDITS_ART.length - 1, Math.floor(frame / CREDITS_SCENE_FRAMES));
-    const draw = (scene: number, alpha: number) => {
-      const image = this.creditsArt.get(CREDITS_ART[scene]);
-      if (!image?.complete || !image.naturalWidth) return;
-      const progress = Math.max(0, Math.min(1, (frame - scene * CREDITS_SCENE_FRAMES) / CREDITS_SCENE_FRAMES));
-      const zoom = Math.max(640 / image.naturalWidth, 480 / image.naturalHeight) * (1 + progress * 0.025);
-      const width = image.naturalWidth * zoom; const height = image.naturalHeight * zoom;
-      c.save(); c.globalAlpha = alpha;
+  private drawCredits(frame: number): void {
+    const c = this.ctx, { scene, index, local, progress, alpha } = creditsScene(frame);
+    c.save(); c.globalAlpha = 1; c.fillStyle = '#f5efe1'; c.fillRect(0, 0, 640, 480); c.globalAlpha = alpha;
+    const image = this.creditsArt.get(scene.art);
+    if (image?.complete && image.naturalWidth) {
+      const zoom = Math.max(640 / image.naturalWidth, 480 / image.naturalHeight) * (index < 11 ? 1 + progress * 0.025 : 1);
+      const width = image.naturalWidth * zoom, height = image.naturalHeight * zoom;
       c.drawImage(image, (640 - width) / 2, (480 - height) / 2, width, height);
-      c.restore();
+    }
+    const text = (value: string, x: number, y: number, size: number, color = '#49392f') => {
+      c.font = `${size}px "Hiragino Sans", sans-serif`; c.fillStyle = color; c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.fillText(value, x, y);
     };
-    const local = frame - index * CREDITS_SCENE_FRAMES;
-    if (index > 0 && local < CREDITS_CROSSFADE_FRAMES) {
-      // 同じ位置にある顔を重ねず、紙へ消えてから次の絵を出す。
-      const progress = local / CREDITS_CROSSFADE_FRAMES;
-      if (progress < 0.5) draw(index - 1, 1 - progress * 2);
-      else draw(index, (progress - 0.5) * 2);
-    } else draw(index, Math.min(1, local / CREDITS_CROSSFADE_FRAMES));
-    // 顔を暗くせず、クレジットが通る側だけ紙の色へなじませる。
-    const paper = c.createLinearGradient(340, 0, 640, 0);
-    paper.addColorStop(0, '#f5efe100'); paper.addColorStop(0.55, '#f5efe1d9'); paper.addColorStop(1, '#f5efe1f2');
-    c.fillStyle = paper; c.fillRect(0, 0, 640, 480);
+    if ('cast' in scene) {
+      const paper = c.createLinearGradient(0, 378, 0, 480);
+      paper.addColorStop(0, '#f5efe100'); paper.addColorStop(0.45, '#f5efe18c'); paper.addColorStop(1, '#f5efe1e6');
+      c.fillStyle = paper; c.fillRect(0, 378, 640, 102);
+      text('出演', 320, index === 4 ? 428 : 430, 11, '#665344');
+      text(scene.cast, 320, index === 4 ? 451 : 460, 21);
+      if (index === 4) text('エトキチの大冒険より', 320, 472, 10);
+    } else if (index < 4) {
+      const paper = c.createLinearGradient(340, 0, 640, 0);
+      paper.addColorStop(0, '#f5efe100'); paper.addColorStop(0.55, '#f5efe1d9'); paper.addColorStop(1, '#f5efe1f2');
+      c.fillStyle = paper; c.fillRect(0, 0, 640, 480);
+      if (index === 0) { text(GAME_TITLE, 510, 46, 27); text('制作スタッフ', 510, 72, 11); }
+      const first = index === 0 ? 116 : 66, gap = index === 0 ? 65 : 66;
+      CREDITS_STAFF.slice(index * 5, index * 5 + 5).forEach((row, i) => { text(row.role, 510, first + i * gap, 11); text(row.name, 510, first + 23 + i * gap, 12); });
+      if (index === 3) {
+        text('制作支援', 510, 348, 11); text('Codex・Claude Code・Gemini', 510, 371, 11);
+        text('画像生成　Codex内蔵imagegen', 510, 393, 10); text('BGM生成　Lyria 3.5', 510, 414, 11);
+      }
+    } else {
+      text('主演', 504, 303, 12); text('みみこ', 504, 333, 24);
+      if (local >= 240) {
+        c.globalAlpha = alpha * Math.min(1, (local - 240) / 90);
+        const paper = c.createLinearGradient(0, 412, 0, 480); paper.addColorStop(0, '#f5efe100'); paper.addColorStop(1, '#f5efe1e6');
+        c.fillStyle = paper; c.fillRect(0, 412, 640, 68); text('遊んでくれたあなたへ、ありがとう。', 320, 455, 13);
+      }
+    }
+    c.restore(); this.fade(creditsFade(frame), '#080817');
   }
 }

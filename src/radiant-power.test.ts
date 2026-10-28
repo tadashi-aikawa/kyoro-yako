@@ -142,7 +142,7 @@ it('ステージ移動・通常ボム・ポーズのやり直しで最高形態�
 it.each(['difficulty', 'practice', 'gameover'] as const)('%sから新しいプレイを始めると最高形態を解除する', (scene) => {
   const game = start(); pick(game, 'radiant'); game.scene = scene; game.menu = 0;
   press(game, 'Enter');
-  expect(game.awakened).toBe(false); expect(game.power).toBe(0); expect(game.scene).toBe('stage');
+  expect(game.awakened).toBe(false); expect(game.power).toBe(0); expect(game.scene).toBe(scene === 'difficulty' ? 'letter' : 'stage');
 });
 
 it.each([0, 4.99, 5])('検証クエリmaxform=1もPower%sの条件を守る', (power) => {

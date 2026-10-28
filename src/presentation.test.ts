@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { CREDITS_FADE_FRAMES, CREDITS_FIN_FRAME, CREDITS_ROLL_FRAMES } from './ending';
 import { Game } from './game';
 import { MOVIE_SETTINGS, MOVIES, MoviePlayer } from './movies';
 
@@ -75,7 +76,7 @@ it('タイトルでopeningを先読みし、難易度決定後に動画の音を
   run(game, 20); expect(game.stageFrame).toBe(0);
   press(game, 'Escape'); expect(game.scene).toBe('movie');
   video('opening').emit('ended');
-  expect(game.scene).toBe('stage'); expect(game.stageIntroFrame).toBe(0);
+  expect(game.scene).toBe('letter'); expect(game.stageIntroFrame).toBe(180);
   expect(game.bgm.cue).toBe('stage-gate');
   expect(game.difficulty).toBe('lunatic');
 });
@@ -217,7 +218,7 @@ it.each(MOVIES)('?movie=%sは指定した1本だけを再生する', (name) => {
   vi.stubGlobal('location', { search: `?movie=${name}` }); const game = new Game();
   expect(game.movieName).toBe(name); video(name).emit('ended');
   if (name === 'lastboss' || name === 'jinrai-gift' || name === 'minerva-finale') run(game, 210);
-  expect(game.scene).toBe(name === 'opening' ? 'stage' : name === 'lastboss' || name === 'jinrai-gift' || name === 'minerva-finale' ? 'arrival' : 'ending');
+  expect(game.scene).toBe(name === 'opening' ? 'letter' : name === 'lastboss' || name === 'jinrai-gift' || name === 'minerva-finale' ? 'arrival' : 'ending');
   expect(game.movieName).toBeUndefined();
   expect(videos.filter((entry) => entry.play.mock.calls.length > 0)).toHaveLength(1);
 });
@@ -249,7 +250,7 @@ it('読み込み待ちは1秒で切り上げ、遅れてcanplayが来ても再�
 it('autoplay制限以外のplay失敗では直ちに次の場面へ進む', async () => {
   const game = new Game(); video('opening').play.mockRejectedValue(new Error('decode failed'));
   press(game); press(game); await Promise.resolve(); await Promise.resolve();
-  expect(game.scene).toBe('stage'); expect(game.movieName).toBeUndefined();
+  expect(game.scene).toBe('letter'); expect(game.movieName).toBeUndefined();
 });
 
 it.each(['opening'] as const)('%sのNotAllowedErrorは無音で1度だけ再試行し、場面のBGM設定を保つ', async (name) => {
@@ -261,7 +262,7 @@ it.each(['opening'] as const)('%sのNotAllowedErrorは無音で1度だけ再試�
   expect(video(name).play).toHaveBeenCalledTimes(2);
   expect(video(name).muted).toBe(true); expect(game.scene).toBe('movie');
   expect(game.bgm.cue).toBe('stage-gate'); expect(game.movies.usesAudio(name)).toBe(false);
-  video(name).emit('ended'); expect(game.scene).toBe('stage');
+  video(name).emit('ended'); expect(game.scene).toBe('letter');
   expect(game.bgm.cue).toBe('stage-gate');
 });
 
@@ -271,7 +272,7 @@ it.each(['NotAllowedError', 'NotSupportedError'])('無音での再試行も%sな
     .mockRejectedValueOnce(new DOMException('retry failed', name));
   press(game); press(game); await vi.advanceTimersByTimeAsync(0);
   expect(video('opening').play).toHaveBeenCalledTimes(2);
-  expect(game.scene).toBe('stage'); expect(game.bgm.cue).toBe('stage-gate');
+  expect(game.scene).toBe('letter'); expect(game.bgm.cue).toBe('stage-gate');
 });
 
 it.each(['jinrai-gift', 'lastboss'] as const)('もともと無音の%sはNotAllowedErrorでも再試行しない', async (name) => {
@@ -294,7 +295,7 @@ it('スキップ後に届くNotAllowedErrorでは動画を再開しない', asyn
   video('opening').play.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; }));
   press(game); press(game); press(game, 'KeyX');
   reject(new DOMException('blocked', 'NotAllowedError')); await vi.advanceTimersByTimeAsync(0);
-  expect(video('opening').play).toHaveBeenCalledOnce(); expect(game.scene).toBe('stage');
+  expect(video('opening').play).toHaveBeenCalledOnce(); expect(game.scene).toBe('letter');
 });
 
 it('無音再試行が保留になっても最初の1秒の上限を超えて待たない', async () => {
@@ -303,7 +304,7 @@ it('無音再試行が保留になっても最初の1秒の上限を超えて待
     .mockImplementationOnce(() => new Promise(() => {}));
   press(game); press(game); await vi.advanceTimersByTimeAsync(0);
   vi.advanceTimersByTime(999); expect(game.scene).toBe('movie');
-  vi.advanceTimersByTime(1); expect(game.scene).toBe('stage');
+  vi.advanceTimersByTime(1); expect(game.scene).toBe('letter');
 });
 
 it.each(MOVIES)('?movie=%s&bgm=0は動画の音も無効にする', (name) => {
@@ -315,7 +316,7 @@ it.each(MOVIES)('?movie=%s&bgm=0は動画の音も無効にする', (name) => {
 it('playのPromiseが解決しなくても1秒で次へ進む', () => {
   const game = new Game(); video('opening').play.mockImplementation(() => new Promise(() => {}));
   press(game); press(game); vi.advanceTimersByTime(1000);
-  expect(game.scene).toBe('stage');
+  expect(game.scene).toBe('letter');
 });
 
 it('再生できている動画はstalled通知後も1秒で切らない', async () => {
@@ -365,21 +366,22 @@ it('?credits=1でスタッフロールから確認できる', () => {
   expect(new Game().scene).toBe('credits');
 });
 
-it('ロールは4枚を48秒で流し、3秒の余韻でタイトルへ戻る', () => {
-  const game = new Game(); game.scene = 'credits'; run(game, 2880);
-  expect(game.scene).toBe('credits'); run(game, 179); expect(game.scene).toBe('credits');
+it('ロールは12枚を201秒で見せ、最後の暗転からタイトルへ戻る', () => {
+  const game = new Game(); game.scene = 'credits'; run(game, CREDITS_ROLL_FRAMES - CREDITS_FADE_FRAMES);
+  expect(game.scene).toBe('credits'); run(game, CREDITS_FADE_FRAMES - 1); expect(game.scene).toBe('credits');
   game.update(); expect(game.scene).toBe('title'); expect(game.menu).toBe(0);
 });
 
-it('ロールのZは2倍速、Xは終端へ飛ぶ', () => {
+it('ロールのZは2倍速、XはFinへ、再度Xで暗転へ進む', () => {
   const game = new Game(); game.scene = 'credits'; game.keys.add('KeyZ'); run(game, 100);
   expect(game.creditsFrame).toBe(200); game.keys.delete('KeyZ'); press(game, 'KeyX');
-  expect(game.creditsFrame).toBe(2880); run(game, 180); expect(game.scene).toBe('title');
+  expect(game.creditsFrame).toBe(CREDITS_FIN_FRAME); press(game, 'KeyX');
+  expect(game.creditsFrame).toBe(CREDITS_ROLL_FRAMES - CREDITS_FADE_FRAMES); run(game, CREDITS_FADE_FRAMES); expect(game.scene).toBe('title');
 });
 
 it('ロール終了後の3秒はZを押していても短縮しない', () => {
-  const game = new Game(); game.scene = 'credits'; game.keys.add('KeyZ'); run(game, 1440);
-  expect(game.creditsFrame).toBe(2880); run(game, 179); expect(game.scene).toBe('credits');
+  const game = new Game(); game.scene = 'credits'; game.keys.add('KeyZ'); run(game, (CREDITS_ROLL_FRAMES - CREDITS_FADE_FRAMES) / 2);
+  expect(game.creditsFrame).toBe(CREDITS_ROLL_FRAMES - CREDITS_FADE_FRAMES); run(game, CREDITS_FADE_FRAMES - 1); expect(game.scene).toBe('credits');
   game.update(); expect(game.scene).toBe('title');
 });
 

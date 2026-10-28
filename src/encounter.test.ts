@@ -181,6 +181,6 @@ it('openingとendingには白フェードを付けない', () => {
   for (const name of ['opening', 'ending']) {
     vi.stubGlobal('location', { search: `?movie=${name}` }); const game = new Game();
     expect(game.whiteAlpha).toBe(0); press(game, 'KeyX');
-    expect(game.scene).toBe(name === 'opening' ? 'stage' : 'ending'); expect(game.whiteAlpha).toBe(0);
+    expect(game.scene).toBe(name === 'opening' ? 'letter' : 'ending'); expect(game.whiteAlpha).toBe(0);
   }
 });

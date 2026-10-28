@@ -182,6 +182,12 @@ it('演出倍率とポーズ倍率を独立に掛け、道中曲を再開せず�
     bgm.setVolume(80); expect(bgm.effectiveVolume).toBeCloseTo(0.098);
     bgm.sync('stage-dawn', false, 0.35);
     expect(bgm.effectiveVolume).toBeCloseTo(0.28);
+    bgm.sync('stage-dawn', false, 0.5, 1 / 60);
+    expect(stage.linearRampToValueAtTime).toHaveBeenLastCalledWith(0.5, 10 + 1 / 60);
+    bgm.sync('stage-dawn', false, 0, 0);
+    expect(stage.setValueAtTime).toHaveBeenLastCalledWith(0, 10);
+    expect(stage.value).toBe(0);
+    bgm.sync('stage-dawn', false, 0.35);
     const gainCount = gains.length;
     bgm.preload('boss-minerva');
     await vi.advanceTimersByTimeAsync(0);

@@ -112,7 +112,7 @@ export class BgmPlayer {
     if (this.unlocked) void this.load(cue);
   }
 
-  sync(cue: BgmCue | null, duck: boolean, sceneGain = 1): void {
+  sync(cue: BgmCue | null, duck: boolean, sceneGain = 1, transitionSeconds = 1): void {
     const targetDuck = duck ? 0.35 : 1;
     if (targetDuck !== this.duck) {
       this.duck = targetDuck;
@@ -126,8 +126,11 @@ export class BgmPlayer {
         const now = this.context.currentTime;
         const gain = this.voice.bus.gain;
         gain.cancelScheduledValues(now);
-        gain.setValueAtTime(gain.value, now);
-        gain.linearRampToValueAtTime(this.sceneGain, now + 1);
+        if (transitionSeconds <= 0) gain.setValueAtTime(this.sceneGain, now);
+        else {
+          gain.setValueAtTime(gain.value, now);
+          gain.linearRampToValueAtTime(this.sceneGain, now + transitionSeconds);
+        }
       }
       return;
     }

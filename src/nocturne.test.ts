@@ -76,7 +76,7 @@ it('タイトルの5番目からノートを開き、未獲得頁も選べ、戻
   press(g, 'ArrowUp'); expect(g.menu).toBe(4);
   press(g, 'ArrowDown'); expect(g.menu).toBe(0);
   press(g, 'KeyX'); expect(g.scene).toBe('title'); expect(g.menu).toBe(0);
-  press(g, 'KeyZ'); press(g, 'KeyZ'); expect(g.scene).toBe('stage');
+  press(g, 'KeyZ'); press(g, 'KeyZ'); expect(g.scene).toBe('letter');
 });
 
 it('ノートのZとEscは選択をリセットして戻り、保存不可でもクリアできる', () => {

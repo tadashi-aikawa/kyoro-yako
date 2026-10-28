@@ -1,0 +1,7 @@
+Use case: precise-object-edit. Image1 is the EDIT TARGET. Images2 and3 are Mimiko's approved identity/color references ONLY, not composition references. Correct ONLY the feather coloring of Mimiko's visible BACK in image1. She is viewed from behind over her shoulder, so almost all her visible round back must be the same solid deep grey-green feather color as the crown/top of her head, with NO light grey area and NO dark polka dots on her back. The pale grey dotted belly exists only on her front, hidden from this rear view; a tiny front edge may remain only where it turns near the visible eye on the right. Preserve her spherical silhouette and the visible white eye patch, eye and beak exactly. Preserve EVERYTHING else exactly: camera, crop, placement, size, Claudine face, hair, costume, both human hands and swatches, notebook, background, lighting, watercolor pencil style. No added ears, wings, limbs, people, lettering or logos. Only change the color/pattern of the owl's visible back, do not redraw the composition.
+
+References:
+1: /Users/tadashi-aikawa/work/owlery-danmaku/_Unversioned/assets/credits-v2/09-claudine-mimiko-v2.webp
+2: /Users/tadashi-aikawa/work/owlery-danmaku/public/assets/members/mimiko-stand.webp
+3: /Users/tadashi-aikawa/work/owlery-danmaku/public/assets/members/mimiko-face.webp
+Tool: built-in imagegen, transparent_background=false

@@ -12,4 +12,10 @@ describe('会話の禁則処理', () => {
     const lines = wrapDialogue('「よろしく。」！次へ', 70, measure);
     expect(lines.slice(1).every((line) => !'。、」』）！？…ー'.includes(line[0]))).toBe(true);
   });
+
+  it('小さい仮名を行頭へ分けない', () => {
+    const lines = wrapDialogue('終わりにいたしましょう。', 100, measure);
+    expect(lines.slice(1).every(line => !'ぁぃぅぇぉっゃゅょァィゥェォッャュョ'.includes(line[0]))).toBe(true);
+    expect(lines.join('')).toBe('終わりにいたしましょう。');
+  });
 });
