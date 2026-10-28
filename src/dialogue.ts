@@ -131,7 +131,7 @@ export const FINAL_COMMENTS: Partial<Record<BossId, string>> = {
   obsidia: 'これで、終わりにいたしましょう。',
   claudine: '最後の弾幕です。よろしければ、また。',
   jinrai: '……見せたるわ。ウチの本気を。',
-  minerva: '私だけでは厳しそうね。みんなの力を借りるわ。',
+  minerva: '見事だわ。私の力だけでは\n勝つのは難しそうね……',
 };
 export const ENDINGS: Record<PlayerId, string[]> = { mimiko: [
   '朝の光が、天文台の窓を照らした。',

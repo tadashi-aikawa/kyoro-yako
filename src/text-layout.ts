@@ -15,8 +15,8 @@ export function wrapDialogue(value: string, width: number, measure: (text: strin
 }
 
 export function wrapBattleComment(value: string, width: number, measure: (text: string) => number): string[] {
-  const lines = wrapDialogue(value, width, measure);
-  if (lines.length <= 1) return lines;
+  const lines = value.split('\n').flatMap(line => wrapDialogue(line, width, measure));
+  if (value.includes('\n') || lines.length <= 1) return lines;
   const breaks = [...value.matchAll(/[、。！？]/g)].map(match => match.index! + 1);
   const split = breaks.filter(index => index < value.length && measure(value.slice(0, index)) <= width && measure(value.slice(index)) <= width)
     .sort((a, b) => Math.abs(a * 2 - value.length) - Math.abs(b * 2 - value.length))[0];

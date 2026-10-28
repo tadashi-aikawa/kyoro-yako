@@ -25,8 +25,8 @@ it('吹き出しの全コメントを欠落なく2行以内へ収め、長い文
   const measure = (text: string) => text.length * 12;
   for (const text of [...Object.values(BATTLE_COMMENTS), ...Object.values(FINAL_COMMENTS)]) {
     const lines = wrapBattleComment(text, 156, measure);
-    expect(lines.join('')).toBe(text); expect(lines.length).toBeLessThanOrEqual(2);
+    expect(lines.join('')).toBe(text.replaceAll('\n', '')); expect(lines.length).toBeLessThanOrEqual(2);
     expect(lines.every(line => measure(line) <= 156)).toBe(true);
   }
-  expect(wrapBattleComment(FINAL_COMMENTS.minerva!, 156, measure)).toEqual(['私だけでは厳しそうね。', 'みんなの力を借りるわ。']);
+  expect(wrapBattleComment(FINAL_COMMENTS.minerva!, 156, measure)).toEqual(['見事だわ。私の力だけでは', '勝つのは難しそうね……']);
 });
