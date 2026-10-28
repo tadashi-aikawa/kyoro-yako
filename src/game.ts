@@ -129,7 +129,6 @@ export class Game {
   flash = 0;
   message = '';
   messageFrames = 0;
-  messageY = 205;
   battleComment?: Line;
   battleCommentFrames = 0;
   finaleIntro?: { frame: number; from: [number, number]; target: [number, number] };
@@ -303,7 +302,6 @@ export class Game {
     this.frame++;
     if (this.flash > 0) this.flash--;
     if (this.messageFrames > 0) this.messageFrames--;
-    if (this.messageFrames === 0) this.messageY = 205;
     if (this.cutin > 0) this.cutin--;
     if (this.scene === 'stage' && this.battleCommentFrames > 0) this.battleCommentFrames--;
     if (this.scene === 'stage') this.updateStage();
@@ -313,7 +311,6 @@ export class Game {
     else if (this.scene === 'gift') this.updateGift();
     else if (this.scene === 'departure') this.updateDeparture();
     else if (this.scene !== 'movie') this.updateMenu();
-    if (this.messageFrames > 0 && this.battleCommentFrames > 0) this.messageY = 300;
     this.syncBgm();
     this.pressed.clear();
   }
@@ -956,7 +953,6 @@ export class Game {
     this.clearBullets(); this.shots.clear(); this.clones.clear();
     if (introduceFinale && this.boss && FINAL_COMMENTS[this.boss]) {
       this.finaleIntro = { frame: 0, from: this.bossEntry, target: phase.pattern === 'sweep' ? sweepPosition(0, 0) : [192, 132] };
-      if (this.messageFrames > 0) this.messageY = 300;
       this.cutin = 0; this.flash = 0;
       if (phase.spell) this.spellBonus = 1_000_000 + this.stage * 500_000;
       return;
@@ -968,7 +964,6 @@ export class Game {
   private showBattleComment(text: string): void {
     if (this.boss) {
       this.battleComment = { who: this.boss, text }; this.battleCommentFrames = BATTLE_COMMENT_FRAMES;
-      if (this.messageFrames > 0) this.messageY = 300;
     }
   }
 

@@ -54,22 +54,6 @@ it('最終技前のリトライで演出とコメントを持ち越さない', (
   expect(game.finaleIntro).toBeUndefined(); expect(game.battleComment).toBeUndefined(); expect(game.battleCommentFrames).toBe(0);
 });
 
-it('技のボーナスはコメントが消えた後も同じ位置で消える', () => {
-  const game = new Game(); game.invincible = true; game.startStage(1); game.startBoss(false, 5); game.skipPhase();
-  expect(game.messageY).toBe(300);
-  run(game, FINAL_MOVE_FRAMES + BATTLE_COMMENT_FRAMES);
-  expect(game.battleCommentFrames).toBe(0); expect(game.messageFrames).toBeGreaterThan(0); expect(game.messageY).toBe(300);
-  run(game, game.messageFrames); expect(game.messageFrames).toBe(0); expect(game.messageY).toBe(205);
-});
-
-it.each(['point', 'radiant'] as const)('コメント中の%s回収で新しく出たメッセージも帯の下へ固定する', kind => {
-  const game = new Game(); game.invincible = true; game.startStage(1); game.startBoss(false, 1); run(game, 30);
-  game.score = 9_999_999; game.power = 5; game.spawnItem(game.px, game.py, kind, false); game.update();
-  expect(game.message).toBe(kind === 'point' ? 'EXTEND!' : '光の羽根'); expect(game.messageY).toBe(300);
-  run(game, game.battleCommentFrames);
-  expect(game.messageFrames).toBeGreaterThan(0); expect(game.messageY).toBe(300);
-});
-
 it('通常の掛け声は指定した7戦だけに出し、技の予備動作中に消す', () => {
   const checks = [[1, false, true], [2, false, true], [3, false, true], [4, false, true], [5, false, true], [3, true, true], [5, true, true], [1, true, false], [2, true, false], [4, true, false]] as const;
   for (const [stage, mid, expected] of checks) {

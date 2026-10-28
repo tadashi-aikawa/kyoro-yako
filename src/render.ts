@@ -2,7 +2,7 @@ import { bossSpriteId, createBossMotion, isCasting, updateBossMotion } from './b
 import { CREDITS_ART, CREDITS_STAFF, CREDITS_STAFF_FRAMES, creditsFade, creditsScene } from './ending';
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
-import { BATTLE_COMMENT_FRAMES, PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
+import { PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
 import { notebookBomb, notebookBookmark, notebookFeather, notebookOwl, notebookPage, notebookStar } from './notebook-icons';
 import { CHAPPY_PORTS, CHAPPY_THROW, PARALLEL_BEAT } from './patterns/chappy';
 import { claudineScene, complementBoundary, whiteSpaceCircle } from './patterns/claudine';
@@ -456,8 +456,8 @@ export class Renderer {
     }
     this.jinraiThunderbolts(game);
     if (game.bombFrames > 0) this.bombEffect(game);
-    if (game.cutin > 0 && game.boss && game.battleCommentFrames <= 0) this.cutin(game);
-    if (game.phase?.spell && !game.finaleIntro && game.battleCommentFrames <= 0 && game.cutin <= 20 && !(game.phase.pattern === 'jinraiDash' && game.phaseFrame < DASH_CUTIN)) {
+    if (game.cutin > 0 && game.boss) this.cutin(game);
+    if (game.phase?.spell && !game.finaleIntro && game.cutin <= 20 && !(game.phase.pattern === 'jinraiDash' && game.phaseFrame < DASH_CUTIN)) {
       c.save();
       // 頭上を召喚の舞台に使う終符では、技名を読ませた後に帯を退ける。
       if (game.phase.pattern === 'owlDawn') c.globalAlpha = Math.max(0, Math.min(1, (150 - game.phaseFrame) / 45));
@@ -473,11 +473,10 @@ export class Renderer {
     }
     if (game.messageFrames > 0) {
       c.globalAlpha = Math.min(1, game.messageFrames / 30);
-      this.text(game.message, 192, game.messageY, game.message.length > 28 ? 15 : 21, '#fff5cd', 'center');
+      this.text(game.message, 192, 205, game.message.length > 28 ? 15 : 21, '#fff5cd', 'center');
       c.globalAlpha = 1;
     }
     if (game.flash > 0) { c.fillStyle = `rgba(255,255,255,${game.flash / 50})`; c.fillRect(0, 0, FIELD.w, FIELD.h); }
-    if (game.battleComment && game.battleCommentFrames > 0 && (game.scene === 'stage' || (game.scene === 'pause' && game.resumeScene === 'stage'))) this.battleComment(game);
     if (!thunder) this.focusMarker(game);
     if (game.stageIntroFrame < 180) this.stageIntro(game);
     c.restore();
@@ -1595,37 +1594,6 @@ export class Renderer {
     this.text('集めた記録', 504, 401, 11, '#d9c5a0');
     for (let i = 0; i < RECORDS.length; i++) notebookPage(c, 512 + i * 21, 424, i < game.collectedRecords.length);
     this.uiText(`${game.collectedRecords.length} / ${RECORDS.length}`, 608, 448, 9, '#a1b6ad', 'right');
-    c.restore();
-  }
-
-  private battleComment(game: Game): void {
-    const line = game.battleComment!, c = this.ctx, age = BATTLE_COMMENT_FRAMES - game.battleCommentFrames;
-    const enter = 1 - (1 - Math.min(1, age / 10)) ** 3;
-    const leave = Math.max(0, (age - BATTLE_COMMENT_FRAMES + 10) / 10);
-    const alpha = Math.max(0, Math.min(1, age / 6, game.battleCommentFrames / 10));
-    const accent = STAGES[game.stage - 1].colors[2];
-    c.save(); c.globalAlpha = alpha;
-    c.beginPath(); c.rect(0, 130, FIELD.w, 132); c.clip();
-    c.translate((1 - enter) * 110 - leave * 70, 0);
-    c.fillStyle = '#090d20'; c.fillRect(0, 136, FIELD.w, 120);
-    c.strokeStyle = accent; c.lineWidth = 1;
-    c.beginPath(); c.moveTo(0, 136.5); c.lineTo(FIELD.w, 136.5); c.moveTo(0, 255.5); c.lineTo(FIELD.w, 255.5); c.stroke();
-    const portrait = game.images[`${line.who}-stand`];
-    if (portrait?.complete && portrait.naturalWidth) {
-      const height = line.who === 'etokichi' ? portrait.naturalHeight : portrait.naturalHeight * 0.55;
-      c.drawImage(portrait, 0, 0, portrait.naturalWidth, height, 0, 136, 132, 132 * height / portrait.naturalWidth);
-    }
-    this.uiText(NAMES[line.who as keyof typeof NAMES], 140, 160, 12, accent);
-    c.font = '16px "Hiragino Kaku Gothic ProN", sans-serif';
-    const measure = (text: string) => c.measureText(text).width;
-    let rows = wrapDialogue(line.text, 232, measure);
-    if (rows.length > 1) {
-      const breaks = [...line.text.matchAll(/[、。！？]/g)].map(match => match.index! + 1);
-      const split = breaks.filter(index => index < line.text.length && measure(line.text.slice(0, index)) <= 232 && measure(line.text.slice(index)) <= 232)
-        .sort((a, b) => Math.abs(a * 2 - line.text.length) - Math.abs(b * 2 - line.text.length))[0];
-      if (split !== undefined) rows = [line.text.slice(0, split), line.text.slice(split)];
-    }
-    rows.forEach((row, i) => { this.uiText(row, 140, 194 + i * 24, 16, '#fff5e7'); });
     c.restore();
   }
 
