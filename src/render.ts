@@ -2,7 +2,7 @@ import { bossSpriteId, createBossMotion, isCasting, updateBossMotion } from './b
 import { CREDITS_ART, CREDITS_STAFF, CREDITS_STAFF_FRAMES, creditsFade, creditsScene } from './ending';
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
-import { BATTLE_COMMENT_FRAMES, PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
+import { BATTLE_COMMENT_FADE_FRAMES, BATTLE_COMMENT_FRAMES, BATTLE_COMMENT_REVEAL_FRAMES, PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
 import { notebookBomb, notebookBookmark, notebookFeather, notebookOwl, notebookPage, notebookStar } from './notebook-icons';
 import { CHAPPY_PORTS, CHAPPY_THROW, PARALLEL_BEAT } from './patterns/chappy';
 import { claudineScene, complementBoundary, whiteSpaceCircle } from './patterns/claudine';
@@ -1607,12 +1607,15 @@ export class Renderer {
   private battleComment(game: Game): void {
     const c = this.ctx, [bx, by] = game.bossXY;
     const age = BATTLE_COMMENT_FRAMES - game.battleCommentFrames;
-    c.save(); c.globalAlpha = Math.min(1, age / 8, game.battleCommentFrames / 12);
+    const reveal = Math.min(1, age / BATTLE_COMMENT_REVEAL_FRAMES), fade = Math.min(1, game.battleCommentFrames / BATTLE_COMMENT_FADE_FRAMES);
+    const ease = reveal * reveal * (3 - 2 * reveal);
+    c.save(); c.globalAlpha = Math.min(ease, fade * fade * (3 - 2 * fade));
     c.font = '12px "Hiragino Kaku Gothic ProN", sans-serif';
-    const rows = wrapBattleComment(game.battleComment!.text, 156, text => c.measureText(text).width);
-    const width = Math.max(124, Math.min(172, Math.ceil(Math.max(...rows.map(text => c.measureText(text).width))) + 16));
+    const maxWidth = game.battleComment!.text.includes('\n') ? 208 : 172;
+    const rows = wrapBattleComment(game.battleComment!.text, maxWidth - 16, text => c.measureText(text).width);
+    const width = Math.max(124, Math.min(maxWidth, Math.ceil(Math.max(...rows.map(text => c.measureText(text).width))) + 16));
     const height = rows.length * 16 + 10;
-    const x = Math.max(6, Math.min(FIELD.w - width - 6, bx - width / 2)), y = Math.max(36, by - 48 - height);
+    const x = Math.max(6, Math.min(FIELD.w - width - 6, bx - width / 2)), y = Math.max(36, by - 48 - height) + (1 - ease) * 6;
     const tailX = Math.max(x + 10, Math.min(x + width - 10, bx)), tipY = by - 36;
     c.fillStyle = '#120c28d9'; c.strokeStyle = '#d5ace699'; c.lineWidth = 1;
     c.beginPath(); c.moveTo(x + 4, y); c.lineTo(x + width - 4, y); c.quadraticCurveTo(x + width, y, x + width, y + 4);

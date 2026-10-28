@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { BATTLE_COMMENTS, dialogue, FINAL_COMMENTS } from './dialogue';
 import { CREDITS_ROLL_FRAMES } from './ending';
-import { BATTLE_COMMENT_FRAMES, Game, PHASE_MOVE_FRAMES } from './game';
+import { BATTLE_COMMENT_DELAY_FRAMES, BATTLE_COMMENT_FRAMES, Game, PHASE_MOVE_FRAMES } from './game';
 import { DASH_CUTIN } from './patterns/jinrai';
 import { STAGES } from './stages';
 import { INVITATION, RECORDS } from './story';
@@ -36,6 +36,9 @@ it.each([1, 2, 3, 4, 5])('%s階は前の技を終えてから吹き出しを読�
   expect(game.phaseIntro?.frame).toBe(0); expect(game.cutin).toBe(0); expect(game.phaseFrame).toBe(0);
   game.keys.add('KeyZ'); run(game, PHASE_MOVE_FRAMES); expect(game.shots.count).toBe(0);
   expect(game.bossXY).toEqual(stage === 2 ? [192, 150] : [192, 132]);
+  run(game, 59 - PHASE_MOVE_FRAMES);
+  expect(game.battleComment).toBeUndefined(); expect(game.phaseFrame).toBe(0); expect(game.cutin).toBe(0);
+  game.update();
   expect(game.battleComment?.text).toBe(FINAL_COMMENTS[game.boss!]);
   expect(game.phaseIntro).toBeDefined(); expect(game.phaseFrame).toBe(0);
   expect(game.battleCommentFrames).toBe(BATTLE_COMMENT_FRAMES);
@@ -62,7 +65,7 @@ it('通常の掛け声は指定した7戦の技の間だけに出す', () => {
     const game = new Game(); game.invincible = true; game.startStage(stage); game.startBoss(mid, 0); game.skipPhase();
     expect(!!game.phaseIntro).toBe(expected);
     if (expected) {
-      run(game, PHASE_MOVE_FRAMES); expect(game.battleComment?.text).toBe(BATTLE_COMMENTS[game.boss!]);
+      run(game, BATTLE_COMMENT_DELAY_FRAMES); expect(game.battleComment?.text).toBe(BATTLE_COMMENTS[game.boss!]);
       run(game, BATTLE_COMMENT_FRAMES - 1); expect(game.phaseFrame).toBe(0); expect(game.cutin).toBe(0); expect(game.bullets.count).toBe(0);
       game.update(); expect(game.battleComment).toBeUndefined(); expect(game.cutin).toBe(100);
     }
@@ -70,7 +73,7 @@ it('通常の掛け声は指定した7戦の技の間だけに出す', () => {
 });
 
 it('吹き出し中のポーズでは次の技と読む時間を進めない', () => {
-  const game = new Game(); game.startStage(1); game.startBoss(false, 0); game.skipPhase(); run(game, PHASE_MOVE_FRAMES + 20);
+  const game = new Game(); game.startStage(1); game.startBoss(false, 0); game.skipPhase(); run(game, BATTLE_COMMENT_DELAY_FRAMES + 20);
   const frame = game.phaseIntro!.frame, remaining = game.battleCommentFrames;
   press(game, 'Escape'); run(game, 100);
   expect(game.phaseIntro!.frame).toBe(frame); expect(game.battleCommentFrames).toBe(remaining); expect(game.phaseFrame).toBe(0);

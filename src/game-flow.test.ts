@@ -87,7 +87,7 @@ it.each(['defeat', 'timeout'] as const)('5面エトキチは%sで3技を順に�
   game.update();
   expect(game.debugState).toMatchObject({ boss: 'エトキチ', bossRole: 'midboss', bgm: 'stage-dawn' });
   for (let index = 0; index < 3; index++) {
-    for (let frame = 0; game.phaseIntro && frame < 180; frame++) game.update();
+    for (let frame = 0; game.phaseIntro && frame < 300; frame++) game.update();
     expect(game.phaseIntro).toBeUndefined();
     expect(game.remainingSpells).toBe(3 - index);
     expect(game.phaseIndex).toBe(index);

@@ -48,7 +48,11 @@ export const SAKURA_PERIOD = 300;
 export const SAKURA_WARNING = [84, 60, 48, 36] as const;
 export const SAKURA_GUST = 90;
 export const SAKURA_SWIRL = 24;
-export const BATTLE_COMMENT_FRAMES = 120;
+export const BATTLE_COMMENT_DELAY_FRAMES = 60;
+export const BATTLE_COMMENT_REVEAL_FRAMES = 24;
+export const BATTLE_COMMENT_HOLD_FRAMES = 120;
+export const BATTLE_COMMENT_FADE_FRAMES = 18;
+export const BATTLE_COMMENT_FRAMES = BATTLE_COMMENT_REVEAL_FRAMES + BATTLE_COMMENT_HOLD_FRAMES + BATTLE_COMMENT_FADE_FRAMES;
 export const PHASE_MOVE_FRAMES = 18;
 const makeShot = (): Shot => ({ active: false, x: 0, y: 0, vx: 0, vy: -9, damage: 1, radius: 2, homing: false });
 const makeEnemy = (): Enemy => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, hp: 5, age: 0, hitFrames: 0, color: 0, kind: 'return', originX: 0, originY: 0, side: 1, slot: 0 });
@@ -616,8 +620,8 @@ export class Game {
       const intro = this.phaseIntro;
       if (this.pendingHit >= 0 && ++this.pendingHit >= 8) this.commitHit();
       if (this.scene !== 'stage') return;
-      if (++intro.frame === PHASE_MOVE_FRAMES) this.showBattleComment(intro.text);
-      if (intro.frame >= PHASE_MOVE_FRAMES + BATTLE_COMMENT_FRAMES) {
+      if (++intro.frame === BATTLE_COMMENT_DELAY_FRAMES) this.showBattleComment(intro.text);
+      if (intro.frame >= BATTLE_COMMENT_DELAY_FRAMES + BATTLE_COMMENT_FRAMES) {
         this.phaseIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
         this.bossEntry = intro.target; this.startPhasePresentation();
       }
