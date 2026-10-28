@@ -4,12 +4,14 @@ Geminiアプリで動画を生成し、MP4で保存する。1本は最長10秒�
 
 エンディングの原本3本は `_Unversioned/assets/movies/` に保存する。このフォルダはGit管理外で、配信対象にも含めない。
 
+エンディングの試作・不採用動画は `public/` に置かず、Downloadsか `_Unversioned/` で確認する。Gitへ追加するのは、採用後に編集した通し用の `public/assets/movies/ending.mp4` だけにする。没動画をコミットしてから削除する運用はしない。
+
 `sh scripts/build-ending.sh` で原本3本から通し用の `public/assets/movies/ending.mp4` を作る。別の保存先を使う場合は `sh scripts/build-ending.sh <原本ディレクトリ>` と指定する。
 
 - 室内→塔: 1.5秒の白フェード
-- 塔→屋上: 1秒の白フェード
+- 塔→朝空: 3本目の冒頭1秒を切り、0.25秒のディゾルブで上昇をつなぐ
 - 冒頭: 0.75秒のフェードイン
-- 終わり: 最後の空を2秒延長する。飛び去ったあとの余韻を残してから1.5秒かけて暗転し、エンディング本文へつなぐ
+- 終わり: 最後の空を2.25秒延長する。飛び去ったあとの余韻を残してから1.5秒かけて暗転し、エンディング本文へつなぐ
 - 再生: 約29.5秒。動画音声は使わず、ゲームのエンディングBGMを流す
 - 確認: `?movie=ending` で通し再生する。原本単体は保存先のMP4を動画プレイヤーで確認する
 
@@ -60,7 +62,7 @@ Geminiアプリで動画を生成し、MP4で保存する。1本は最長10秒�
 | 2 | `lastboss.mp4` | なし。白フェード・動画・白保持中は道中曲を通常の35%で継続。登場開始でボス曲へクロスフェード | 5面の道中が終わり、ミネルヴァの会話の前 | みみこ、ミネルヴァの立ち絵(キービジュアルは渡さない) |
 | 6 | `jinrai-gift.mp4` | なし。白演出・動画中はボス曲を35%で継続 | 4面の最終撃破から白へ90f → 動画の白明け90f → 終了後の白フェード150f・保持60f → 対峙の白明け120f → 会話 → 餞別 → 退場60f。迅雷一閃の最後の攻防でみみこがとどめを刺す | 迅雷の立ち絵、みみこの立ち絵(みみこの形が崩れた版は捨てる) |
 | 7 | `minerva-finale.mp4` | なし。白演出・動画中はボス曲を35%で継続 | 5面の最終撃破から白へ90f → 動画の白明け90f → 終了後の白フェード150f・保持60f → 対峙の白明け120f → 会話 → 退場60f。最終技の最後の攻防でみみこがとどめを刺す | ミネルヴァの立ち絵、みみこの立ち絵(造形が崩れた版は捨てる) |
-| 8 | `ending.mp4` | なし | 5面クリア後、原本3本を白フェードでつないだ29.5秒の動画 | 原本3本から編集 |
+| 8 | `ending.mp4` | なし | 5面クリア後、室内→塔を白フェード、塔→朝空をディゾルブでつないだ29.5秒の動画 | 原本3本から編集 |
 
 以下の原本は `_Unversioned/assets/movies/` に保存する。
 
@@ -116,7 +118,7 @@ Animate the reference image as it is: a wide exterior shot of the tall stone owl
 
 ### ending-3.mp4
 
-差し替え用の採用案は「そのまま朝空へ抜ける」。1・2本目は維持する。本文とシナリオの台詞は全面的に見直す予定のため、今回の映像設計には使わない。現行の3本目と通し用動画は、新しい生成結果を確認するまで差し替えない。
+採用した3本目は「そのまま朝空へ抜ける」。原本は `gemini_generated_video_df93f7f0.mp4`。1・2本目は維持する。本文とシナリオの台詞は全面的に見直す予定のため、今回の映像設計には使わない。
 
 再生成では次の2枚を順番に添付する。2本目の最終フレームを始点にし、同じフレームのみみこを切り出した詳細参照で輪郭の固定を狙う。新しい人物の配置や集合場面は作らない。
 
@@ -141,7 +143,7 @@ Animate the reference image as it is: a wide exterior shot of the tall stone owl
 - 既存の紙片と桜の花びらは漂い続け、上を向くにつれて自然に減り、8秒までに画面から抜ける。紙に文字を足さない
 - 文字・字幕・ロゴ・新しい小物やキャラは出さない
 
-新しいMP4を受け取ったら、旧3本目をGit管理外で保持してから差し替える。最後の空の余韻と暗転を映像に合わせて編集する。エンディング本文・台詞の改稿は別途扱う。
+採用版は冒頭1秒でみみこの高さが戻るため、1.000秒から使う。2本目との位置差を6フレームのディゾルブでなじませ、最後の空を2.25秒延長して暗転する。旧ティーカップ版はGit管理外の `_Unversioned/assets/movies/archive/ending-3-tea.mp4` に保持する。エンディング本文・台詞の改稿は別途扱う。
 
 ```text
 Create a continuous 10-second, 16:9 continuation of image 1. Animate the supplied illustration, rather than drawing a new version of its characters.
@@ -161,11 +163,11 @@ Match the illustrated style and soft painterly light of image 1. The low sun sli
 
 #### 不採用の屋上合流案
 
-屋上で8人が合流する案は、生成結果で人物の原型が保たれないとの指摘を受けて不採用とした。当時のプロンプトと参照5枚の指定はコミット `ccb7f25` を参照する。新案の生成では使わない。
+屋上で8人が合流する案は、生成結果で人物の原型が保たれないとの指摘を受けて不採用とした。当時のプロンプトと参照5枚の指定はコミット `9b8b25f` を参照する。新案の生成では使わない。
 
-#### 現行版の生成プロンプト
+#### 旧ティーカップ版の生成プロンプト
 
-差し替え前の原本 `ending-3.mp4` は、次の指定で生成した。参照はキービジュアルとみみこの立ち絵の2枚。新案の生成には上記の最終フレームと詳細参照の2枚を使う。
+差し替え前のティーカップ版は、次の指定で生成した。参照はキービジュアルとみみこの立ち絵の2枚。採用した朝空版の生成には上記の最終フレームと詳細参照の2枚を使った。
 
 ```text
 The rooftop of the tall stone owl tower from the first reference image, bathed in bright morning light, with a small round table, teacups and a few fallen cherry petals. A sealed letter gently lands on the table. Then Mimiko, the character from the second reference image, lifts off from the rooftop, seen from behind and below, and flies up into the wide, clear morning sky. Draw Mimiko exactly as in the second reference image: the same 2D anime illustration, the same design, colors and proportions, the same clean flat cel shading. Mimiko is a perfectly round ball-shaped owl, a sphere with no neck and no body below the head, grey-green, with big white eyes, a small yellow beak, two short stubby wings on the sides and a spotted light-grey belly. Mimiko has NO ear tufts, no feather horns and no pointed ears: the top of the head is smooth and round. Do not reinterpret the design, do not render it as a photographic stuffed toy, a real bird or a 3D render. Mimiko never turns to face the camera. The camera follows it upward, the tower falling away below, ending on the bright morning sky with soft clouds. No people, no other characters. Hopeful and serene. 2D anime illustration style matching the reference images, soft painterly lighting, slow smooth camera movement, 16:9. No text, no letters, no captions, no subtitles, no logos, no watermark.
