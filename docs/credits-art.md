@@ -34,7 +34,7 @@
 - オブシディアとの絵: 距離と左右の配置を変えた最終プロンプトを保存した。
 - クロディーヌとの絵: `claudine-mimiko.txt` は、背中の色を直す編集プロンプト。元の構図のプロンプトは `claudine-mimiko-original.txt`。
 - 6〜11枚目: カメラの高さ・距離・配置を変え、同じ並びが続かないよう制作した。
-- `morning.webp` は旧構成の4枚目。新構成には使わず、制作記録として保持している。
+- `morning.webp` は旧構成の4枚目。Git管理外の `_Unversioned/assets/credits/archive/morning.webp` へ退避している。
 
 ## 既存1〜3枚目と旧4枚目の生成記録
 
