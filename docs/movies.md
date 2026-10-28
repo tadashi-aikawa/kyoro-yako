@@ -118,13 +118,14 @@ Animate the reference image as it is: a wide exterior shot of the tall stone owl
 
 差し替え用の採用案は「そのまま朝空へ抜ける」。1・2本目は維持する。本文とシナリオの台詞は全面的に見直す予定のため、今回の映像設計には使わない。現行の3本目と通し用動画は、新しい生成結果を確認するまで差し替えない。
 
-添付する画像は次の1枚だけ。2本目の最終フレームをそのまま始点に使い、新しい人物の配置や集合場面を作らない。
+再生成では次の2枚を順番に添付する。2本目の最終フレームを始点にし、同じフレームのみみこを切り出した詳細参照で輪郭の固定を狙う。新しい人物の配置や集合場面は作らない。
 
 | 順番 | パス | 役割 |
 |---|---|---|
-| 1 | `_Unversioned/exports/ending-sky-v3/1-ending2-last-frame.webp` | 採用済み2本目の最終フレーム。構図・みみこ・塔・朝日の色の連続性を保つ始点 |
+| 1 | `_Unversioned/exports/ending-sky-v4/1-ending2-last-frame.webp` | 採用済み2本目の最終フレーム。構図・みみこ・塔・朝日の色の連続性を保つ始点 |
+| 2 | `_Unversioned/exports/ending-sky-v4/2-mimiko-detail.webp` | 同じ最終フレームのみみこの詳細参照。別のキャラや場面として出さない |
 
-参照画像は、原本 `_Unversioned/assets/movies/ending-2.mp4` の最終フレームをFFmpegで取り出したもの。生成用ZIPに同梱する。
+参照画像は、原本 `_Unversioned/assets/movies/ending-2.mp4` の最終フレームとその切り出し。生成用ZIPに同梱する。最初の朝空案ではみみこに頭・胴・尾が生じたため、再生成では翼や表情を動かさず、描かれた全身を一体で上昇させる指定に絞る。
 
 - 0〜4秒: みみこの上昇をそのまま継ぐ。カメラもゆっくり上を向き、塔の頂部が下へ抜けていく
 - 4〜8秒: カメラの上向き移動を緩めて止め、みみこだけが上昇を続ける。高くなるにつれて少し小さくなり、正面向きのまま上端へ抜ける
@@ -134,6 +135,7 @@ Animate the reference image as it is: a wide exterior shot of the tall stone owl
 
 - 初めは2本目と同じ構図と金色の朝。着地・再離陸・屋上テーブルへの切り替えを挟まない
 - みみこは参照画像の丸い全身を保ち、拡大しない。新しい梟や別の顔へ変わらない
+- 頭・胴を分けず、尾・耳羽・白い縁取りを足さない。目・くちばし・足・翼の形を固定し、羽ばたきや口の開閉を挟まない
 - 窓辺の人物は元の位置に小さく残り、カメラの上向き移動で画面の下へ抜ける。集合・移動・顔の寄りはない
 - 塔の階数や屋根を大きく変えない。最後は空だけになり、人物・街・塔へカメラを戻さない
 - 既存の紙片と桜の花びらは漂い続け、上を向くにつれて自然に減り、8秒までに画面から抜ける。紙に文字を足さない
@@ -142,15 +144,19 @@ Animate the reference image as it is: a wide exterior shot of the tall stone owl
 新しいMP4を受け取ったら、旧3本目をGit管理外で保持してから差し替える。最後の空の余韻と暗転を映像に合わせて編集する。エンディング本文・台詞の改稿は別途扱う。
 
 ```text
-Create only the next 10 seconds of a continuous 16:9 anime ending shot, starting from the attached frame. This frame is the end of the previous clip, not a style moodboard. Begin with this exact composition, the same round grey-green owl Mimiko, the same stone tower and the same golden sunrise. Continue the upward movement already in progress.
+Create a continuous 10-second, 16:9 continuation of image 1. Animate the supplied illustration, rather than drawing a new version of its characters.
 
-0-4 seconds: Mimiko gently floats straight upward as one intact round shape, with its short wings spread as in the frame. The previous slow camera pull-back eases into a slow upward tilt to follow. Mimiko keeps facing the viewer head-on, exactly as in the attached frame, with both eyes, the yellow beak and spotted belly visible. It must not turn its head, rotate or show its back. Keep its design, proportions and colors exactly as in the attached frame; do not enlarge it. The tower and its existing balcony figures gradually move downward through the frame because of the camera tilt. The people remain where they are with their existing appearance; no gathering, walking, close-ups or new people. Reveal only enough of the existing roofline for Mimiko to clear the top of the tower; do not add floors or redesign the architecture. The loose paper sheets and cherry petals already in the air keep drifting and gradually thin out as the camera rises, passing out of frame by 8 seconds; add no writing to them.
+Image 1 is the exact starting frame: preserve its composition, stone tower, existing balcony figures and golden sunrise. Image 2 is a cropped detail of the SAME Mimiko from image 1, only to lock its appearance; it is not an additional character or a separate shot. Use image 2 only for detail, never for framing or size. Mimiko stays at its small size from image 1. Show exactly one Mimiko.
 
-4-8 seconds: the tower finishes slipping out of the bottom of the frame. The camera tilt slows and stops; Mimiko keeps rising straight up faster than the camera, growing slightly smaller with height. It keeps facing the viewer head-on with the same silhouette and passes out through the top edge by 8 seconds. Do not make it turn and fly away into the depth of the scene. No landing, no pause on a rooftop, no second takeoff, no backward glance, no transformation into a realistic bird.
+Most important: preserve Mimiko's existing artwork as one locked 2D image throughout. Its fluffy round body is one ball, with no separate head and torso, no neck, no tail, and no new ear tufts or brow bumps. Keep the same soft feathered edge and warm rim light; do not add a hard black outline or a white sticker border. Preserve the exact eyes, closed beak, spotted belly, little yellow feet and the short wings spread in the starting frame. No blinking, mouth movement, gaze changes or wing flapping. Every feature remains fixed to the same round silhouette. Do not turn it into a generic cartoon owl, an outlined mascot, a realistic bird or a 3D character. Mimiko must never become larger than it is in the first frame. Its only motion is a smooth upward translation and, later, a gentle uniform reduction in size; do not redraw, rotate, stretch or articulate any part of its body.
 
-8-10 seconds: hold on the empty warm morning sky and softly drifting clouds. Mimiko, the tower and all people are now out of frame. Keep the camera steady for this final quiet moment. Do not return to the tower or reveal a town.
+0-4 seconds: continue Mimiko's existing upward drift, facing the viewer head-on exactly as in both references. Ease the previous slow pull-back into a gentle upward camera tilt that keeps Mimiko at about the same height in frame. The tower and the existing balcony figures slide downward out of view through camera movement; keep them in place without changing their appearance. Preserve the existing roofline, no added floors. The existing paper sheets and petals continue drifting, gradually leaving the frame without added writing.
 
-Keep the low sunrise glow from the left and the soft peach-gold clouds from the reference. The sun slips below the frame as the camera looks up; the upper sky stays warm peach-gold, with no sudden shift to night, cold blue daylight or pure white. Smooth slow movement, no cuts, no orbit, no dramatic zoom, no fade-in, no fade-out. Exactly one Mimiko; no extra owls, human characters, tables, teacups, envelopes or new props. Keep the existing drifting paper sheets unmarked until they leave the frame. Anime illustration style matching the reference image, soft painterly lighting. No text, no letters, no captions, no subtitles, no logos, no watermark. No dialogue. One finished moving scene, not a storyboard or split screen.
+4-8 seconds: let the camera tilt slow and stop as the tower clears the bottom edge. The unchanged round character keeps rising, becomes slightly smaller, and passes out through the top edge by 8 seconds. Its face remains toward the viewer. Do not make it turn or fly into the depth of the scene. No landing or second takeoff.
+
+8-10 seconds: hold a steady view of only the warm peach-gold morning sky and soft clouds. Mimiko, the tower, people, papers and petals are all out of frame. No return to the tower.
+
+Match the illustrated style and soft painterly light of image 1. The low sun slips below the frame as the view tilts up; keep the upper sky warm, without a sudden color change. Slow smooth movement, no cuts, no orbit, no zoom-in, no fade-in or fade-out. No new characters, tables, teacups, envelopes or props. No dialogue. No text, no letters, no captions, no subtitles, no logos, no watermark. One finished moving scene, not a storyboard, split screen or reference sheet.
 ```
 
 #### 不採用の屋上合流案
@@ -159,7 +165,7 @@ Keep the low sunrise glow from the left and the soft peach-gold clouds from the 
 
 #### 現行版の生成プロンプト
 
-差し替え前の原本 `ending-3.mp4` は、次の指定で生成した。参照はキービジュアルとみみこの立ち絵の2枚。新案の生成には上記の最終フレーム1枚を使う。
+差し替え前の原本 `ending-3.mp4` は、次の指定で生成した。参照はキービジュアルとみみこの立ち絵の2枚。新案の生成には上記の最終フレームと詳細参照の2枚を使う。
 
 ```text
 The rooftop of the tall stone owl tower from the first reference image, bathed in bright morning light, with a small round table, teacups and a few fallen cherry petals. A sealed letter gently lands on the table. Then Mimiko, the character from the second reference image, lifts off from the rooftop, seen from behind and below, and flies up into the wide, clear morning sky. Draw Mimiko exactly as in the second reference image: the same 2D anime illustration, the same design, colors and proportions, the same clean flat cel shading. Mimiko is a perfectly round ball-shaped owl, a sphere with no neck and no body below the head, grey-green, with big white eyes, a small yellow beak, two short stubby wings on the sides and a spotted light-grey belly. Mimiko has NO ear tufts, no feather horns and no pointed ears: the top of the head is smooth and round. Do not reinterpret the design, do not render it as a photographic stuffed toy, a real bird or a 3D render. Mimiko never turns to face the camera. The camera follows it upward, the tower falling away below, ending on the bright morning sky with soft clouds. No people, no other characters. Hopeful and serene. 2D anime illustration style matching the reference images, soft painterly lighting, slow smooth camera movement, 16:9. No text, no letters, no captions, no subtitles, no logos, no watermark.
