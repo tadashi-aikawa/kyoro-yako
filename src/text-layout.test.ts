@@ -28,5 +28,5 @@ it('吹き出しの全コメントを欠落なく2行以内へ収め、長い文
     expect(lines.join('')).toBe(text); expect(lines.length).toBeLessThanOrEqual(2);
     expect(lines.every(line => measure(line) <= 156)).toBe(true);
   }
-  expect(wrapBattleComment(FINAL_COMMENTS.minerva!, 156, measure)).toEqual(['最後は、', '私とフクロウたちが相手よ。']);
+  expect(wrapBattleComment(FINAL_COMMENTS.minerva!, 156, measure)).toEqual(['私だけでは厳しそうね。', 'みんなの力を借りるわ。']);
 });
