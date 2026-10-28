@@ -48,8 +48,8 @@ export const SAKURA_PERIOD = 300;
 export const SAKURA_WARNING = [84, 60, 48, 36] as const;
 export const SAKURA_GUST = 90;
 export const SAKURA_SWIRL = 24;
-export const BATTLE_COMMENT_FRAMES = 100;
-export const FINAL_MOVE_FRAMES = 18;
+export const BATTLE_COMMENT_FRAMES = 120;
+export const PHASE_MOVE_FRAMES = 18;
 const makeShot = (): Shot => ({ active: false, x: 0, y: 0, vx: 0, vy: -9, damage: 1, radius: 2, homing: false });
 const makeEnemy = (): Enemy => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, hp: 5, age: 0, hitFrames: 0, color: 0, kind: 'return', originX: 0, originY: 0, side: 1, slot: 0 });
 const makeItem = (): Item => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, kind: 'point', auto: false, manual: false, gift: false, tossed: false, launchFrames: 0 });
@@ -131,7 +131,7 @@ export class Game {
   messageFrames = 0;
   battleComment?: Line;
   battleCommentFrames = 0;
-  finaleIntro?: { frame: number; from: [number, number]; target: [number, number] };
+  phaseIntro?: { frame: number; from: [number, number]; target: [number, number]; text: string };
   lines: Line[] = [];
   lineIndex = 0;
   afterDialogue: 'boss' | 'mid' | 'stage' | 'clear' | 'gift' | 'intro' = 'stage';
@@ -303,7 +303,6 @@ export class Game {
     if (this.flash > 0) this.flash--;
     if (this.messageFrames > 0) this.messageFrames--;
     if (this.cutin > 0) this.cutin--;
-    if (this.scene === 'stage' && this.battleCommentFrames > 0) this.battleCommentFrames--;
     if (this.scene === 'stage') this.updateStage();
     else if (this.scene === 'arrival') this.updateArrival();
     else if (this.scene === 'transition') this.updateTransition();
@@ -417,7 +416,7 @@ export class Game {
   }
 
   private resetBossPresentation(): void {
-    this.finaleIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
+    this.phaseIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
     this.postBoss = false; this.departureFrame = 0; this.boss = undefined; this.phase = undefined;
     this.transition = undefined; this.transitionFrame = 0;
     this.arrivalFrame = 0; this.arrivalFromWhite = false; this.giftFrame = 0;
@@ -456,7 +455,7 @@ export class Game {
   }
 
   private clearEncounter(): void {
-    this.finaleIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
+    this.phaseIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
     this.clearBullets(); this.enemies.clear(); this.shots.clear(); this.clones.clear();
     this.pendingHit = -1; this.bombFrames = 0; this.flash = 0;
   }
@@ -574,7 +573,7 @@ export class Game {
   endingLineAlpha(index: number): number { return Math.max(0, Math.min(1, (this.endingFrame - index * ENDING_LINE_GAP) / ENDING_LINE_FADE)); }
 
   startStage(stage: number): void {
-    this.finaleIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
+    this.phaseIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
     this.movies.stop();
     this.movieName = undefined;
     this.movieDone = undefined;
@@ -607,17 +606,20 @@ export class Game {
 
   private updateStage(): void {
     if (this.just('Escape')) { this.resumeScene = 'stage'; this.scene = 'pause'; this.menu = 0; return; }
-    if (this.finaleIntro) {
+    if (this.battleCommentFrames > 0) this.battleCommentFrames--;
+    if (this.phaseIntro) {
       this.sceneryDistance += 0.65;
       if (this.invulnFrames > 0) this.invulnFrames--;
       if (this.bombFrames > 0) this.bombFrames--;
       this.updatePlayer(false); this.updateItems(); this.updateParticles();
       if (this.pendingHit >= 0 && this.just('KeyX') && this.bombs > 0 && this.bombFrames <= 0) this.useBomb();
-      const intro = this.finaleIntro;
+      const intro = this.phaseIntro;
       if (this.pendingHit >= 0 && ++this.pendingHit >= 8) this.commitHit();
-      if (++intro.frame >= FINAL_MOVE_FRAMES) {
-        this.finaleIntro = undefined; this.bossEntry = intro.target; this.startPhasePresentation();
-        if (this.boss) this.showBattleComment(FINAL_COMMENTS[this.boss]!);
+      if (this.scene !== 'stage') return;
+      if (++intro.frame === PHASE_MOVE_FRAMES) this.showBattleComment(intro.text);
+      if (intro.frame >= PHASE_MOVE_FRAMES + BATTLE_COMMENT_FRAMES) {
+        this.phaseIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
+        this.bossEntry = intro.target; this.startPhasePresentation();
       }
       return;
     }
@@ -915,10 +917,10 @@ export class Game {
     this.beginPhase(phases[this.phaseIndex]);
   }
 
-  private beginPhase(phase: Phase, introduceFinale = false): void {
+  private beginPhase(phase: Phase, introduce = false): void {
     this.audio.stopEnergy();
     this.bossEntry = this.phase ? this.bossPosition() : [192, phase.spell ? 132 : 77];
-    this.finaleIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
+    this.phaseIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
     this.phase = phase;
     this.keyboardWord = '';
     this.phaseFrame = 0;
@@ -951,14 +953,17 @@ export class Game {
     this.bombUsed = false;
     this.hitDuringSpell = false;
     this.clearBullets(); this.shots.clear(); this.clones.clear();
-    if (introduceFinale && this.boss && FINAL_COMMENTS[this.boss]) {
-      this.finaleIntro = { frame: 0, from: this.bossEntry, target: phase.pattern === 'sweep' ? sweepPosition(0, 0) : [192, 132] };
+    const final = !this.midboss && this.phaseIndex === STAGES[this.stage - 1].phases.length - 1;
+    const comment = this.boss && (final ? FINAL_COMMENTS[this.boss] : this.phaseIndex === 1 && (!this.midboss || this.boss === 'chappy' || (this.boss === 'etokichi' && this.stage === 5)) ? BATTLE_COMMENTS[this.boss] : undefined);
+    if (introduce && comment) {
+      const from = this.bossEntry;
+      this.bossEntry = [192, phase.spell ? 132 : 77];
+      this.phaseIntro = { frame: 0, from, target: this.bossPosition(), text: comment };
       this.cutin = 0; this.flash = 0;
       if (phase.spell) this.spellBonus = 1_000_000 + this.stage * 500_000;
       return;
     }
     this.startPhasePresentation();
-    if (this.boss && this.phaseIndex === 1 && (!this.midboss || this.boss === 'chappy' || (this.boss === 'etokichi' && this.stage === 5))) this.showBattleComment(BATTLE_COMMENTS[this.boss]);
   }
 
   private showBattleComment(text: string): void {
@@ -1013,7 +1018,7 @@ export class Game {
     for (const node of this.graphNodes) this.spawnItem(node.x, node.y, 'point', true);
     this.clearBullets(); this.clones.clear();
     this.flash = 8;
-    if (next) { this.phaseIndex++; this.beginPhase(next, this.presentation && !this.midboss && this.phaseIndex === STAGES[this.stage - 1].phases.length - 1); }
+    if (next) { this.phaseIndex++; this.beginPhase(next, this.presentation); }
     else {
       // 会話へ進む前に手で拾う時間を残す。近づいて拾うまで補充を直接加算しない。
       this.phase = undefined;
@@ -1090,9 +1095,9 @@ export class Game {
   }
 
   bossPosition(): [number, number] {
-    if (this.finaleIntro) {
-      const progress = Math.min(1, this.finaleIntro.frame / FINAL_MOVE_FRAMES), ease = progress * progress * (3 - 2 * progress);
-      return [this.finaleIntro.from[0] + (this.finaleIntro.target[0] - this.finaleIntro.from[0]) * ease, this.finaleIntro.from[1] + (this.finaleIntro.target[1] - this.finaleIntro.from[1]) * ease];
+    if (this.phaseIntro) {
+      const progress = Math.min(1, this.phaseIntro.frame / PHASE_MOVE_FRAMES), ease = progress * progress * (3 - 2 * progress);
+      return [this.phaseIntro.from[0] + (this.phaseIntro.target[0] - this.phaseIntro.from[0]) * ease, this.phaseIntro.from[1] + (this.phaseIntro.target[1] - this.phaseIntro.from[1]) * ease];
     }
     if (this.postBoss) {
       if (this.scene === 'transition' && (this.transition === 'boss-defeat-flash' || this.transition === 'boss-defeat-in')) {
@@ -1369,7 +1374,7 @@ export class Game {
   }
 
   private damageBoss(damage: number): void {
-    if (this.finaleIntro) return;
+    if (this.phaseIntro) return;
     // 印とカットインを撃ち込みで飛ばせないよう、導入中はダメージを受けない。
     if (this.phase?.pattern === 'jinraiDash' && this.phaseFrame < DASH_ATTACK) return;
     if (this.phase?.pattern === 'owlDawn' && this.minervaReprise && !this.minervaReprise.prayer && repriseLocal(this.phaseFrame, this.minervaReprise) < reprisePrepare(this.minervaReprise)) return;

@@ -34,6 +34,8 @@ it('各技の時間切れで補充し、3→2→1→0のあとに回収・会話
   const game = start(); game.invincible = true;
   const stageFrame = game.stageFrame;
   for (let index = 0; index < 3; index++) {
+    for (let frame = 0; game.phaseIntro && frame < 180; frame++) game.update();
+    expect(game.phaseIntro).toBeUndefined();
     game.items.clear();
     game.phaseFrame = game.phase!.duration * 60 - 1; game.update();
     expect(game.items.objects.filter((i) => i.active && i.manual && i.kind === 'small')).toHaveLength(10);

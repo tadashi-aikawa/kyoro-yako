@@ -222,6 +222,8 @@ it('残り10秒で旧弾を消し、1秒の構えから薔薇と自機狙いを�
 it('5面中ボスはエトキチの3技を使い、ネオのキーやVimを再演しない', () => {
   const game = start(5, 0, true);
   for (let index = 0; index < 3; index++) {
+    for (let frame = 0; game.phaseIntro && frame < 180; frame++) game.update();
+    expect(game.phaseIntro).toBeUndefined();
     expect(game.remainingSpells).toBe(3 - index);
     game.phaseFrame = 104;
     game.update();

@@ -2,7 +2,7 @@ import { bossSpriteId, createBossMotion, isCasting, updateBossMotion } from './b
 import { CREDITS_ART, CREDITS_STAFF, CREDITS_STAFF_FRAMES, creditsFade, creditsScene } from './ending';
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
-import { PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
+import { BATTLE_COMMENT_FRAMES, PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
 import { notebookBomb, notebookBookmark, notebookFeather, notebookOwl, notebookPage, notebookStar } from './notebook-icons';
 import { CHAPPY_PORTS, CHAPPY_THROW, PARALLEL_BEAT } from './patterns/chappy';
 import { claudineScene, complementBoundary, whiteSpaceCircle } from './patterns/claudine';
@@ -26,7 +26,7 @@ import { FIELD, MAX_BOMBS, MAX_POWER } from './rules';
 import { drawScenery } from './stage-scenery';
 import { NAMES, STAGES } from './stages';
 import { GAME_TITLE, INVITATION, RECORDS } from './story';
-import { wrapDialogue } from './text-layout';
+import { wrapBattleComment, wrapDialogue } from './text-layout';
 
 const PALETTE = ['#a674ff', '#6ddaf5', '#fbd768', '#ff9dbe'];
 
@@ -310,13 +310,15 @@ export class Renderer {
       this.fieldCharacter(game, this.readySprite(game, sprite), x, y, 64, 0, alpha);
       c.shadowBlur = 0;
     }
-    if (game.phase?.spell) {
+    if (game.phase?.spell && !game.phaseIntro) {
       c.fillStyle = '#06031977'; c.fillRect(0, 0, FIELD.w, FIELD.h);
       this.magic(192, 80, game.frame, stage.colors[2], 130, 0.25);
     }
-    this.claudineFinaleBackdrop(game);
-    this.minervaEcho(game);
-    if (game.phase && game.boss) {
+    if (!game.phaseIntro) { this.claudineFinaleBackdrop(game); this.minervaEcho(game); }
+    if (game.phaseIntro && game.boss) {
+      const [x, y] = game.bossXY;
+      this.fieldCharacter(game, this.readySprite(game, bossSpriteId(game.boss, 'idle', game.frame)), x, y + Math.sin(game.frame * 0.045) * 2, 64, 0);
+    } else if (game.phase && game.boss) {
       const thunder = thunderScene(game);
       const attack = game.attackContext();
       const clones = attack.phase?.pattern === 'jinraiClone' && (attack === game || attack.phaseFrame >= 105) ? jinraiCloneScene(attack.phaseFrame, attack.phase.duration) : undefined;
@@ -422,23 +424,28 @@ export class Renderer {
         }
         c.restore();
       }
+    }
+    if (game.phase && game.boss) {
       c.fillStyle = '#140c27aa'; c.fillRect(15, 6, 350, 13);
       c.fillStyle = '#e4aeea'; c.fillRect(17, 8, 346 * Math.max(0, game.phaseHp / game.phaseMaxHp), 9);
       this.text(NAMES[game.boss], 18, 29, 12, '#f9ebff');
       this.text('★'.repeat(game.remainingSpells), 330, 29, 12, '#ffe1a7', 'right');
       this.text(Number.isFinite(game.phase.duration) ? `${Math.ceil((game.phase.duration * 60 - game.phaseFrame) / 60)}` : '∞', 367, 29, 14, '#fff', 'right');
     }
-    this.repriseCutin(game);
+    if (!game.phaseIntro) this.repriseCutin(game);
     game.enemies.forEach((enemy) => { this.enemy(game, enemy); });
     game.clones.forEach((clone) => { this.clone(clone, game.frame); });
     game.items.forEach((item) => { this.item(game, item); });
     const attack = game.attackContext();
-    this.jinraiSpellTelegraphs(attack);
-    this.stageTelegraphs(attack);
-    this.galaxyFlash(game);
-    this.minervaTelegraphs(game);
-    this.minervaSummon(game);
-    this.obsidiaGraph(game);
+    if (!game.phaseIntro) {
+      this.jinraiSpellTelegraphs(attack);
+      this.stageTelegraphs(attack);
+      this.galaxyFlash(game);
+      this.minervaTelegraphs(game);
+      this.minervaSummon(game);
+      this.obsidiaGraph(game);
+    }
+    if (game.phaseIntro && game.battleComment && game.battleCommentFrames > 0 && (game.scene === 'stage' || (game.scene === 'pause' && game.resumeScene === 'stage'))) this.battleComment(game);
     game.bullets.forEach((b) => { this.bullet(b); });
     for (const ring of game.interviewRings) this.interviewRing(ring);
     game.shots.forEach((shot) => {
@@ -457,7 +464,7 @@ export class Renderer {
     this.jinraiThunderbolts(game);
     if (game.bombFrames > 0) this.bombEffect(game);
     if (game.cutin > 0 && game.boss) this.cutin(game);
-    if (game.phase?.spell && !game.finaleIntro && game.cutin <= 20 && !(game.phase.pattern === 'jinraiDash' && game.phaseFrame < DASH_CUTIN)) {
+    if (game.phase?.spell && !game.phaseIntro && game.cutin <= 20 && !(game.phase.pattern === 'jinraiDash' && game.phaseFrame < DASH_CUTIN)) {
       c.save();
       // 頭上を召喚の舞台に使う終符では、技名を読ませた後に帯を退ける。
       if (game.phase.pattern === 'owlDawn') c.globalAlpha = Math.max(0, Math.min(1, (150 - game.phaseFrame) / 45));
@@ -1595,6 +1602,26 @@ export class Renderer {
     for (let i = 0; i < RECORDS.length; i++) notebookPage(c, 512 + i * 21, 424, i < game.collectedRecords.length);
     this.uiText(`${game.collectedRecords.length} / ${RECORDS.length}`, 608, 448, 9, '#a1b6ad', 'right');
     c.restore();
+  }
+
+  private battleComment(game: Game): void {
+    const c = this.ctx, [bx, by] = game.bossXY;
+    const age = BATTLE_COMMENT_FRAMES - game.battleCommentFrames;
+    c.save(); c.globalAlpha = Math.min(1, age / 8, game.battleCommentFrames / 12);
+    c.font = '12px "Hiragino Kaku Gothic ProN", sans-serif';
+    const rows = wrapBattleComment(game.battleComment!.text, 156, text => c.measureText(text).width);
+    const width = Math.max(124, Math.min(172, Math.ceil(Math.max(...rows.map(text => c.measureText(text).width))) + 16));
+    const height = rows.length * 16 + 10;
+    const x = Math.max(6, Math.min(FIELD.w - width - 6, bx - width / 2)), y = Math.max(36, by - 48 - height);
+    const tailX = Math.max(x + 10, Math.min(x + width - 10, bx)), tipY = by - 36;
+    c.fillStyle = '#120c28d9'; c.strokeStyle = '#d5ace699'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(x + 4, y); c.lineTo(x + width - 4, y); c.quadraticCurveTo(x + width, y, x + width, y + 4);
+    c.lineTo(x + width, y + height - 4); c.quadraticCurveTo(x + width, y + height, x + width - 4, y + height);
+    c.lineTo(tailX + 5, y + height); c.lineTo(bx, tipY); c.lineTo(tailX - 5, y + height);
+    c.lineTo(x + 4, y + height); c.quadraticCurveTo(x, y + height, x, y + height - 4);
+    c.lineTo(x, y + 4); c.quadraticCurveTo(x, y, x + 4, y); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#fff2dd'; c.textAlign = 'left'; c.textBaseline = 'top'; c.shadowBlur = 0;
+    rows.forEach((text, i) => { c.fillText(text, x + 8, y + 6 + i * 16); }); c.restore();
   }
 
   private drawDialogue(game: Game): void {

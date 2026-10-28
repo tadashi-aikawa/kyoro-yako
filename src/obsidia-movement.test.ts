@@ -44,14 +44,18 @@ it('弧と8の字は左右と上下へ動き、巡回とは異なる軌道を通
   }
 });
 
-it('次の技は直前の位置から宣言中に中央へ戻り、途中の再描画でも動かない', () => {
+it('次の技の前に中央へ戻り、吹き出し中と再描画では位置を進めない', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   game.startStage(2); game.startBoss(false, 0); game.phaseFrame = 400;
   const before = game.bossPosition();
   game.skipPhase();
   expect(game.bossPosition()).toEqual(before);
   expect(game.bossPosition()).toEqual(before);
-  game.phaseFrame = 90;
+  for (let frame = 0; frame < 18; frame++) game.update();
+  expect(game.phaseFrame).toBe(0);
+  expect(game.bossPosition()).toEqual([192, 132]);
+  game.update();
+  expect(game.phaseFrame).toBe(0);
   expect(game.bossPosition()).toEqual([192, 132]);
 });
 
@@ -68,4 +72,12 @@ it('移動した本体から弾が出て、本体位置へのショットが命�
   Object.assign(game.shots.acquire()!, { x: position[0], y: position[1], vx: 0, vy: 0, radius: 3, damage: 10, homing: false });
   game.update();
   expect(game.phaseHp).toBe(hp - 10);
+});
+
+it('吹き出しのない技切替は従来どおり宣言中に直前の位置から中央へ戻る', () => {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true;
+  game.startStage(2); game.startBoss(false, 1); game.phaseFrame = 400;
+  const before = game.bossPosition(); game.skipPhase();
+  expect(game.phaseIntro).toBeUndefined(); expect(game.bossPosition()).toEqual(before);
+  game.phaseFrame = 90; expect(game.bossPosition()).toEqual([192, 77]);
 });

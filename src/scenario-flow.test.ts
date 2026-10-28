@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { dialogue, FINAL_COMMENTS } from './dialogue';
+import { BATTLE_COMMENTS, dialogue, FINAL_COMMENTS } from './dialogue';
 import { CREDITS_ROLL_FRAMES } from './ending';
-import { BATTLE_COMMENT_FRAMES, FINAL_MOVE_FRAMES, Game } from './game';
+import { BATTLE_COMMENT_FRAMES, Game, PHASE_MOVE_FRAMES } from './game';
+import { DASH_CUTIN } from './patterns/jinrai';
 import { STAGES } from './stages';
 import { INVITATION, RECORDS } from './story';
 
@@ -29,38 +30,57 @@ it('新規プレイは匿名の招待状とみみこの反応を読んでから�
   expect(dialogue('mimiko', 'minerva', 'before').some(line => line.text.includes('あなたが送ったの'))).toBe(true);
 });
 
-it.each([1, 2, 3, 4, 5])('%s階の最終技前は短く移動し、技の予備動作と重ねたコメントから攻撃へ進む', stage => {
+it.each([1, 2, 3, 4, 5])('%s階は前の技を終えてから吹き出しを読み、既存カットインと次の技へ進む', stage => {
   const game = new Game(); game.startStage(stage); game.startBoss(false, STAGES[stage - 1].phases.length - 2);
   game.phaseHp = 0; game.update();
-  expect(game.finaleIntro?.frame).toBe(0); expect(game.cutin).toBe(0); expect(game.phaseFrame).toBe(0);
-  game.keys.add('KeyZ'); run(game, FINAL_MOVE_FRAMES); expect(game.shots.count).toBe(0);
+  expect(game.phaseIntro?.frame).toBe(0); expect(game.cutin).toBe(0); expect(game.phaseFrame).toBe(0);
+  game.keys.add('KeyZ'); run(game, PHASE_MOVE_FRAMES); expect(game.shots.count).toBe(0);
   expect(game.bossXY).toEqual(stage === 2 ? [192, 150] : [192, 132]);
   expect(game.battleComment?.text).toBe(FINAL_COMMENTS[game.boss!]);
-  expect(game.finaleIntro).toBeUndefined(); expect(game.phaseFrame).toBe(0);
+  expect(game.phaseIntro).toBeDefined(); expect(game.phaseFrame).toBe(0);
   expect(game.battleCommentFrames).toBe(BATTLE_COMMENT_FRAMES);
+  run(game, BATTLE_COMMENT_FRAMES - 1);
+  expect(game.battleCommentFrames).toBe(1); expect(game.phaseFrame).toBe(0); expect(game.cutin).toBe(0);
+  expect(game.shots.count).toBe(0); expect(game.bullets.count).toBe(0); expect(game.jinraiLasers).toHaveLength(0);
   expect(game.phaseHp).toBe(game.phaseMaxHp);
-  game.keys.delete('KeyZ');
-  press(game, 'Escape'); run(game, 60);
-  expect(game.phaseFrame).toBe(0); expect(game.battleCommentFrames).toBe(BATTLE_COMMENT_FRAMES - 1);
-  press(game, 'Escape'); run(game, BATTLE_COMMENT_FRAMES - 1);
-  expect(game.battleCommentFrames).toBe(0); expect(game.phaseFrame).toBe(BATTLE_COMMENT_FRAMES - 1);
-  expect(game.bullets.count).toBe(0);
-  run(game, 6); expect(game.phaseFrame).toBe(105);
+  game.keys.delete('KeyZ'); game.update();
+  expect(game.phaseIntro).toBeUndefined(); expect(game.battleComment).toBeUndefined(); expect(game.phaseFrame).toBe(0);
+  expect(game.cutin).toBe(stage === 4 ? 0 : 100);
+  if (stage === 4) { run(game, DASH_CUTIN); expect(game.cutin).toBe(100); }
+  else { run(game, 105); expect(game.phaseFrame).toBe(105); expect(game.cutin).toBe(0); }
 });
 
 it('最終技前のリトライで演出とコメントを持ち越さない', () => {
   const game = new Game(); game.startStage(1); game.startBoss(false, 5); game.skipPhase(); run(game, 70);
   expect(game.battleComment).toBeDefined(); game.startStage(2);
-  expect(game.finaleIntro).toBeUndefined(); expect(game.battleComment).toBeUndefined(); expect(game.battleCommentFrames).toBe(0);
+  expect(game.phaseIntro).toBeUndefined(); expect(game.battleComment).toBeUndefined(); expect(game.battleCommentFrames).toBe(0);
 });
 
-it('通常の掛け声は指定した7戦だけに出し、技の予備動作中に消す', () => {
+it('通常の掛け声は指定した7戦の技の間だけに出す', () => {
   const checks = [[1, false, true], [2, false, true], [3, false, true], [4, false, true], [5, false, true], [3, true, true], [5, true, true], [1, true, false], [2, true, false], [4, true, false]] as const;
   for (const [stage, mid, expected] of checks) {
-    const game = new Game(); game.invincible = true; game.startStage(stage); game.startBoss(mid, 1);
-    expect(!!game.battleComment).toBe(expected);
-    if (expected) { run(game, BATTLE_COMMENT_FRAMES); expect(game.battleCommentFrames).toBe(0); }
+    const game = new Game(); game.invincible = true; game.startStage(stage); game.startBoss(mid, 0); game.skipPhase();
+    expect(!!game.phaseIntro).toBe(expected);
+    if (expected) {
+      run(game, PHASE_MOVE_FRAMES); expect(game.battleComment?.text).toBe(BATTLE_COMMENTS[game.boss!]);
+      run(game, BATTLE_COMMENT_FRAMES - 1); expect(game.phaseFrame).toBe(0); expect(game.cutin).toBe(0); expect(game.bullets.count).toBe(0);
+      game.update(); expect(game.battleComment).toBeUndefined(); expect(game.cutin).toBe(100);
+    }
   }
+});
+
+it('吹き出し中のポーズでは次の技と読む時間を進めない', () => {
+  const game = new Game(); game.startStage(1); game.startBoss(false, 0); game.skipPhase(); run(game, PHASE_MOVE_FRAMES + 20);
+  const frame = game.phaseIntro!.frame, remaining = game.battleCommentFrames;
+  press(game, 'Escape'); run(game, 100);
+  expect(game.phaseIntro!.frame).toBe(frame); expect(game.battleCommentFrames).toBe(remaining); expect(game.phaseFrame).toBe(0);
+  press(game, 'Escape'); game.update(); expect(game.phaseIntro!.frame).toBe(frame + 1);
+});
+
+it('技の直行と演出を省いたシミュレーションは吹き出しの待機を挟まない', () => {
+  const direct = new Game(); direct.startStage(1); direct.startBoss(false, 1); expect(direct.phaseIntro).toBeUndefined();
+  const simulation = new Game(false); simulation.startStage(1); simulation.startBoss(false, 0); simulation.skipPhase();
+  expect(simulation.phaseIntro).toBeUndefined(); expect(simulation.battleComment).toBeUndefined();
 });
 
 it('暗転中のX連打で時間を戻さず、Zでも暗転3秒を短縮しない', () => {
@@ -72,7 +92,7 @@ it('暗転中のX連打で時間を戻さず、Zでも暗転3秒を短縮しな�
 it('最終技へ移る直前の被弾を取り消さず、被弾猶予中のボムも使える', () => {
   for (const bomb of [false, true]) {
     const game = new Game(); game.startStage(1); game.startBoss(false, 5); game.phaseHp = 0; game.pendingHit = 0; game.update();
-    expect(game.finaleIntro).toBeDefined(); expect(game.pendingHit).toBe(1);
+    expect(game.phaseIntro).toBeDefined(); expect(game.pendingHit).toBe(1);
     if (bomb) press(game, 'KeyX'); else run(game, 7);
     expect(game.lives).toBe(bomb ? 2 : 1); expect(game.pendingHit).toBe(-1);
     expect(game.bombs).toBe(bomb ? 2 : 3); expect(game.phaseHp).toBe(game.phaseMaxHp);

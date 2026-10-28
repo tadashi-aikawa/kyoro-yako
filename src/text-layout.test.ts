@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { wrapDialogue } from './text-layout';
+import { BATTLE_COMMENTS, FINAL_COMMENTS } from './dialogue';
+import { wrapBattleComment, wrapDialogue } from './text-layout';
 
 describe('会話の禁則処理', () => {
   const measure = (text: string) => [...text].length * 10;
@@ -18,4 +19,14 @@ describe('会話の禁則処理', () => {
     expect(lines.slice(1).every(line => !'ぁぃぅぇぉっゃゅょァィゥェォッャュョ'.includes(line[0]))).toBe(true);
     expect(lines.join('')).toBe('終わりにいたしましょう。');
   });
+});
+
+it('吹き出しの全コメントを欠落なく2行以内へ収め、長い文は句読点で分ける', () => {
+  const measure = (text: string) => text.length * 12;
+  for (const text of [...Object.values(BATTLE_COMMENTS), ...Object.values(FINAL_COMMENTS)]) {
+    const lines = wrapBattleComment(text, 156, measure);
+    expect(lines.join('')).toBe(text); expect(lines.length).toBeLessThanOrEqual(2);
+    expect(lines.every(line => measure(line) <= 156)).toBe(true);
+  }
+  expect(wrapBattleComment(FINAL_COMMENTS.minerva!, 156, measure)).toEqual(['最後は、', '私とフクロウたちが相手よ。']);
 });

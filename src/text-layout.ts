@@ -13,3 +13,12 @@ export function wrapDialogue(value: string, width: number, measure: (text: strin
   if (current) lines.push(current);
   return lines;
 }
+
+export function wrapBattleComment(value: string, width: number, measure: (text: string) => number): string[] {
+  const lines = wrapDialogue(value, width, measure);
+  if (lines.length <= 1) return lines;
+  const breaks = [...value.matchAll(/[、。！？]/g)].map(match => match.index! + 1);
+  const split = breaks.filter(index => index < value.length && measure(value.slice(0, index)) <= width && measure(value.slice(index)) <= width)
+    .sort((a, b) => Math.abs(a * 2 - value.length) - Math.abs(b * 2 - value.length))[0];
+  return split === undefined ? lines : [value.slice(0, split), value.slice(split)];
+}

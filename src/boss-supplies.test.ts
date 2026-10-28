@@ -196,6 +196,8 @@ it('5面エトキチは各技の時間切れで補充し、3技目だけ回収�
   const game = start(5, 0, true);
   game.invincible = true;
   for (let i = 0; i < 3; i++) {
+    for (let frame = 0; game.phaseIntro && frame < 180; frame++) game.update();
+    expect(game.phaseIntro).toBeUndefined();
     game.items.clear();
     game.phaseFrame = game.phase!.duration * 60 - 1;
     game.update();
