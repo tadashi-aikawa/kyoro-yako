@@ -1,4 +1,4 @@
-import { SUGAR_PERIOD, SUGAR_WARNING } from './patterns/chappy';
+import { SUGAR_PERIOD, SUGAR_WARNING, yoyoPosition } from './patterns/chappy';
 import { FINALE_START } from './patterns/claudine-finale';
 import { thunderPosition } from './patterns/jinrai-thunder';
 import type { Phase } from './stages';
@@ -55,7 +55,7 @@ const MOVEMENTS: Record<string, Movement> = {
   dotfiles: curve(82, 24, 660, 'eight'),
   enter: patrol([[112, -24], [272, -24]], 84, 180),
   neoEncore: patrol([[108, -12], [276, -12], [192, 16]], 96, 160),
-  // ヨーヨーはその場で回収する。ステッチも中央付近だけで縫い、撃ち込みを途切れさせない。
+  // ヨーヨーは発射後にゆっくり位置を替える。キャロムは中央付近で小さく動く。
   chappyYoyo: () => CENTER,
   chappyStitch: curve(24, 5, 420, 'eight'),
   chappySugar: () => CENTER,
@@ -109,6 +109,7 @@ export function patternPosition(phase: Phase, frame: number, entry: Point, encor
   if (frame < 105 && encoreCount === 0) return moveBetween(entry, [192, baseY], frame / 90);
   // ネオの延長では射撃時計だけが巻き戻る。移動時計は通算し、延長のたびに本体が飛ぶのを防ぐ。
   const time = Math.max(0, frame - 105) + (encoreCount > 0 ? encoreCount * (phase.duration * 60 - 105) : 0);
+  if (phase.pattern === 'chappyYoyo') return yoyoPosition(time, level);
   if (phase.pattern === 'chappySugar') {
     const step = time % SUGAR_PERIOD[level], snap = SUGAR_WARNING[level] - 1;
     // 一歩前へ出て決め、斉射後に同じ速さで戻る。周期の境目では中央に収まる。

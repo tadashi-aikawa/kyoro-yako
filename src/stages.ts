@@ -105,7 +105,7 @@ export const ETOKICHI_DAWN_PHASES: Phase[] = [
 ];
 export const CHAPPY_PHASES: Phase[] = [
   MID_PHASE.chappy,
-  { ...phase(3, 'リトル・ステッチ', 'midboss', 'chappyStitch', 28), hp: 583 },
+  { ...phase(3, 'キャンディ・キャロム', 'midboss', 'chappyStitch', 28), hp: 583 },
   { ...phase(3, 'シュガー・スナップ', 'midboss', 'chappySugar', 34), hp: 778 },
 ];
 export function midPhases(boss: BossId, stage = 1): Phase[] {

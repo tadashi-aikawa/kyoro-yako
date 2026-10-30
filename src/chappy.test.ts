@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
-import { STITCH_REVEAL, STITCH_WARNING, SUGAR_WARNING, sugarCasting, YOYO_BOTTOM, YOYO_FLIGHT, YOYO_WARNING, yoyoPeriod } from './patterns/chappy';
+import { CAROM_BURST, CAROM_CAP, CAROM_PERIOD, CAROM_SPEED, CAROM_WARNING, SUGAR_WARNING, sugarCasting, YOYO_BOTTOM, YOYO_FLIGHT, YOYO_STATIONS, YOYO_WARNING, yoyoPeriod } from './patterns/chappy';
 import { midPhases } from './stages';
 
 const listeners: Record<string, (event: { code: string; repeat: boolean; preventDefault: () => void }) => void> = {};
@@ -20,7 +20,7 @@ function run(game: Game, frames: number): void { for (let i = 0; i < frames; i++
 function key(code: string): void { listeners.keydown({ code, repeat: false, preventDefault: () => {} }); }
 
 it('新3技へ直行でき、合計HPはPower3の理論40秒未満に収まる', () => {
-  expect(midPhases('chappy').map((p) => p.name)).toEqual(['スリーピー・ヨーヨー', 'リトル・ステッチ', 'シュガー・スナップ']);
+  expect(midPhases('chappy').map((p) => p.name)).toEqual(['スリーピー・ヨーヨー', 'キャンディ・キャロム', 'シュガー・スナップ']);
   expect(midPhases('chappy').reduce((sum, p) => sum + p.hp, 0) / 48.6).toBeLessThan(40);
   for (let index = 0; index < 3; index++) {
     vi.stubGlobal('location', { search: `?boss=3&mid=1&phase=${index}` });
@@ -55,48 +55,33 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sのヨーヨーは画
   run(game, Math.floor(YOYO_FLIGHT[level] / 2));
   expect(lead.y).toBeCloseTo(lead.swayPhase); expect(Math.max(...original.map((b) => b.y))).toBeCloseTo(YOYO_BOTTOM); expect(lead.y).toBeLessThan(448);
   run(game, Math.ceil(YOYO_FLIGHT[level] / 2) + 16);
-  expect(original.every((b) => Math.hypot(b.x - origin[0], b.y - origin[1]) < 0.001)).toBe(true);
+  const destination = YOYO_STATIONS[1];
+  expect(original.every((b) => Math.hypot(b.x - destination[0], b.y - destination[1]) < 0.001)).toBe(true);
+  expect(game.bossPosition()).toEqual([...destination]);
   run(game, yoyoPeriod(level));
   expect(game.bullets.count).toBe(count);
   expect(game.bullets.objects.filter((b) => b.active)).toEqual(original);
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの縫い目は実体化の前に24フレームの合図を出す', (difficulty) => {
-  const game = start(1, difficulty); game.invincible = true;
-  const states = new Map<import('./game').Bullet, { warning: number; previous: number }>();
-  let transitions = 0;
-  for (let i = 1; i < 1200; i++) {
-    game.update();
-    for (const line of game.bullets.objects.filter((b) => b.active && b.gridColumn === 0)) {
-      const state = states.get(line) ?? { warning: 0, previous: 0 };
-      if (line.dashOrder === 1) state.warning++;
-      if (line.dashOrder === 2 && state.previous !== 2) { expect(state.warning).toBeGreaterThanOrEqual(STITCH_WARNING); state.warning = 0; transitions++; }
-      if (line.dashOrder === 0) state.warning = 0;
-      state.previous = line.dashOrder; states.set(line, state);
-    }
-  }
-  expect(transitions).toBeGreaterThan(0);
-});
-
-it('点線の縫い目とスナップの溜めには接触・グレイズ判定がなく、実体には当たる', () => {
+it('キャロムとスナップの溜めは無害で、発射したボールには当たる', () => {
   for (const index of [1, 2]) {
     const game = start(index); game.invulnFrames = 0;
     const b = game.bullets.objects.find((bullet) => bullet.active)!;
-    if (index === 1) { b.y = 150; }
     for (let i = 0; i < 10; i++) { game.px = b.x; game.py = b.y; game.update(); }
     expect(game.pendingHit).toBe(-1); expect(game.graze).toBe(0);
-    if (index === 1) run(game, STITCH_REVEAL - b.age);
-    else run(game, b.releaseAt - b.age);
-    game.invulnFrames = 0; game.px = b.x + b.vx; game.py = b.y + b.vy; game.update();
+    const warning = index === 1 ? CAROM_WARNING : b.releaseAt;
+    run(game, warning - b.age - 1);
+    expect(game.pendingHit).toBe(-1);
+    game.invulnFrames = 0; game.px = b.x + (index === 1 ? b.vx : b.targetX); game.py = b.y + (index === 1 ? b.vy : b.targetY); game.update();
     expect(game.pendingHit).toBeGreaterThanOrEqual(0);
   }
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sで下端のヨーヨーと本体直下の縫い目を静止して避け続けられない', (difficulty) => {
-  for (const [phase, x, y] of [[0, 192, 439], [0, 150, 436], [1, 192, 139], [1, 170, 137]]) {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sでヨーヨーの下端を静止して避け続けられない', (difficulty) => {
+  for (const [phase, x, y] of [[0, 192, 439], [0, 150, 436]]) {
     const game = start(phase, difficulty); game.px = x; game.py = y; game.invulnFrames = 0;
-    for (let i = 0; i < 1500 && game.pendingHit < 0 && game.lives === 3; i++) game.update();
-    expect(game.pendingHit >= 0 || game.lives < 3, `${phase}:${x},${y}`).toBe(true);
+    for (let i = 0; i < 1500 && game.pendingHit < 0; i++) game.update();
+    expect(game.pendingHit, `${phase}:${x},${y}`).toBeGreaterThanOrEqual(0);
   }
 });
 
@@ -105,24 +90,80 @@ it('ボムで飛ばしたスナップの波では前進も構えも残らない'
   expect(game.bossPosition()).toEqual([192, 132]); expect(sugarCasting(game)).toBe(false);
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sのヨーヨーは本体の斜め下の帯にも糸を予告して投げ返す', (difficulty) => {
-  for (const x of [160, 168, 172, 176, 208, 212, 216, 224]) for (const y of [136, 140, 146, 156, 164]) {
-    const game = start(0, difficulty); game.px = x; game.py = y; game.invulnFrames = 0;
-    for (let i = 0; i < 1500 && game.pendingHit < 0 && game.lives === 3; i++) game.update();
-    expect(game.pendingHit >= 0 || game.lives < 3, `${x},${y}`).toBe(true);
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sのヨーヨーは放った後にゆっくり動き、移動先から次を投げる', (difficulty) => {
+  const game = start(0, difficulty); game.invincible = true;
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
+  const first = game.bossPosition(); let previous = first, movedDuringFlight = false;
+  for (let i = 0; i < yoyoPeriod(level) * 4; i++) {
+    game.update(); const point = game.bossPosition();
+    expect(Math.hypot(point[0] - previous[0], point[1] - previous[1])).toBeLessThan(2);
+    if (i < YOYO_WARNING[level]) expect(point).toEqual(first);
+    else if (Math.hypot(point[0] - first[0], point[1] - first[1]) > 10) movedDuringFlight = true;
+    previous = point;
+    for (const b of game.bullets.objects.filter((bullet) => bullet.active)) {
+      expect(b.x).toBeGreaterThanOrEqual(0); expect(b.x).toBeLessThanOrEqual(384);
+      expect(b.y).toBeGreaterThanOrEqual(0); expect(b.y).toBeLessThanOrEqual(448);
+    }
+  }
+  expect(movedDuringFlight).toBe(true);
+  expect(game.bossPosition()).not.toEqual(first);
+  expect(game.bullets.objects.filter((b) => b.active).every((b) => b.targetX === game.bossPosition()[0] && b.targetY === game.bossPosition()[1])).toBe(true);
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sのキャロムは少数から段階的に増え、上限で止まる', (difficulty) => {
+  const game = start(1, difficulty); game.invincible = true;
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
+  expect(game.bullets.count).toBe(CAROM_BURST[level]);
+  const original = game.bullets.objects.filter((b) => b.active);
+  for (let wave = 1; wave <= 6; wave++) {
+    run(game, CAROM_PERIOD[level] - 1);
+    expect(game.bullets.count).toBe(Math.min(wave * CAROM_BURST[level], CAROM_CAP[level]));
+    game.update();
+    expect(game.bullets.count).toBe(Math.min((wave + 1) * CAROM_BURST[level], CAROM_CAP[level]));
+    expect(game.bullets.objects.filter((b) => b.active).every((b) => Math.abs(b.vx) >= Math.hypot(b.vx, b.vy) * 0.3)).toBe(true);
+    expect(original.every((b) => b.active)).toBe(true);
   }
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sで投げる直前だけ本体の上へ往復してもヨーヨーの脇に居続けられない', (difficulty) => {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sのキャロムは四辺で反射し、速さを保って画面内に残る', (difficulty) => {
+  const game = start(1, difficulty); game.invincible = true;
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
-  for (const [x, y] of [[172, 140], [212, 146]]) {
-    const game = start(0, difficulty); game.px = x; game.py = y; game.invulnFrames = 0;
-    for (let i = 0; i < 1500 && game.pendingHit < 0 && game.lives === 3; i++) {
-      const local = (game.phaseFrame - 105) % yoyoPeriod(level), target = local < 8 || local > yoyoPeriod(level) - 8 ? 124 : y;
-      game.py += Math.max(-3.65, Math.min(3.65, target - game.py)); game.update();
-    }
-    expect(game.pendingHit >= 0 || game.lives < 3, `${x},${y}`).toBe(true);
+  const ball = game.bullets.objects.find((b) => b.active)!;
+  run(game, CAROM_WARNING - 2);
+  for (const [x, y, vx, vy] of [[10.2, 220, -2, 0.5], [373.8, 220, 2, 0.5], [192, 10.2, 0.5, -2], [192, 437.8, 0.5, 2], [10.2, 10.2, -2, -2]]) {
+    ball.x = x; ball.y = y; ball.vx = vx; ball.vy = vy; ball.grazed = true;
+    const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
+    game.update();
+    expect(ball.vx).toBe(x < 11 || x > 373 ? -vx : vx); expect(ball.vy).toBe(y < 11 || y > 437 ? -vy : vy);
+    expect(Math.hypot(ball.vx, ball.vy)).toBeCloseTo(Math.hypot(vx, vy));
+    expect(ball.grazed).toBe(false);
+    expect(play).toHaveBeenCalledWith('caromTap'); play.mockRestore();
   }
+  ball.vx = CAROM_SPEED[level]; ball.vy = CAROM_SPEED[level] * 0.4;
+  for (let frame = 0; frame < 900; frame++) {
+    game.update();
+    for (const b of game.bullets.objects.filter((bullet) => bullet.active)) {
+      expect(b.x).toBeGreaterThanOrEqual(10); expect(b.x).toBeLessThanOrEqual(374);
+      expect(b.y).toBeGreaterThanOrEqual(10); expect(b.y).toBeLessThanOrEqual(438);
+      if (b.age >= CAROM_WARNING) expect(b.delay).toBe(0);
+    }
+  }
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sのキャロムはボム後に少数から構え直す', (difficulty) => {
+  const game = start(1, difficulty); game.invincible = true;
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
+  run(game, CAROM_PERIOD[level] * 2);
+  const old = game.bullets.objects.filter((b) => b.active);
+  key('KeyX'); game.update(); game.keys.delete('KeyX');
+  while (game.bombFrames > 0) game.update();
+  const balls = game.bullets.objects.filter((b) => b.active);
+  expect(old.every((b) => !b.active)).toBe(true);
+  expect(balls).toHaveLength(CAROM_BURST[level]);
+  expect(balls.every((b) => b.age === 1 && b.delay === 1)).toBe(true);
+  run(game, CAROM_WARNING - 2);
+  expect(balls.every((b) => b.delay === 1)).toBe(true);
+  game.update(); expect(balls.every((b) => b.delay === 0)).toBe(true);
 });
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sのスナップは方向を固定し、1回の音で一斉に加速する', (difficulty) => {

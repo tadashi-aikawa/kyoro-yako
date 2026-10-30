@@ -7,10 +7,13 @@ export const YOYO_REST = 30;
 export const YOYO_BEADS = 3;
 export const YOYO_STAGGER = 8;
 export const YOYO_BOTTOM = FIELD.h - 3;
-export const STITCH_BEAT = [102, 90, 78, 66] as const;
-export const STITCH_PERIOD = [234, 210, 186, 162] as const;
-export const STITCH_WARNING = 24;
-export const STITCH_REVEAL = 42;
+export const YOYO_STATIONS = [[192, 132], [136, 116], [248, 140], [160, 120], [224, 144]] as const;
+export const YOYO_MOVE = 90;
+export const CAROM_BURST = [2, 3, 4, 5] as const;
+export const CAROM_CAP = [10, 15, 20, 25] as const;
+export const CAROM_PERIOD = [240, 210, 180, 150] as const;
+export const CAROM_SPEED = [1.5, 1.8, 2.1, 2.4] as const;
+export const CAROM_WARNING = 42;
 export const SUGAR_PERIOD = [300, 276, 252, 228] as const;
 export const SUGAR_WARNING = [114, 102, 90, 84] as const;
 export const SUGAR_CUE = 54;
@@ -18,11 +21,23 @@ export const SUGAR_CUE = 54;
 export function chappyLevel(game: Game): number { return ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty); }
 export function yoyoPeriod(level: number): number { return YOYO_WARNING[level] + YOYO_FLIGHT[level] + YOYO_STAGGER * (YOYO_BEADS - 1) + YOYO_REST; }
 
+export function yoyoPosition(time: number, level: number): [number, number] {
+  const period = yoyoPeriod(level), wave = Math.floor(time / period), local = time % period;
+  const from = YOYO_STATIONS[wave % YOYO_STATIONS.length], to = YOYO_STATIONS[(wave + 1) % YOYO_STATIONS.length];
+  const progress = Math.max(0, Math.min(1, (local - YOYO_WARNING[level] - YOYO_STAGGER * (YOYO_BEADS - 1) - 12) / YOYO_MOVE));
+  const ease = progress * progress * (3 - 2 * progress);
+  return [from[0] + (to[0] - from[0]) * ease, from[1] + (to[1] - from[1]) * ease];
+}
+
 // 往復とも画面内で完結する。復路を別の弧にして、同じ場所を待つだけの往復にしない。
 export function yoyoPoint(b: Bullet, progress: number): [number, number] {
   const angle = Math.PI * Math.max(0, Math.min(1, progress));
-  return [b.targetX + (b.sway - b.targetX) * Math.sin(angle) + b.swayRate * Math.sin(angle * 2),
-    b.targetY + (b.swayPhase - b.targetY) * Math.sin(angle)];
+  // 往路は発射点から。復路の終盤だけ移動先へ寄せ、動いた本体の手元で回収する。
+  const returning = Math.max(0, Math.min(1, (progress - 0.72) / 0.28));
+  const ease = returning * returning * (3 - 2 * returning);
+  const x = b.targetX + (b.sway - b.targetX) * Math.sin(angle) + b.swayRate * Math.sin(angle * 2);
+  const y = b.targetY + (b.swayPhase - b.targetY) * Math.sin(angle);
+  return [x + (b.rotation - b.targetX) * ease, y + (b.spin - b.targetY) * ease];
 }
 
 export function yoyoStep(b: Bullet): number { return (b.age - 1) % yoyoPeriod(b.dashWave) - b.gridRow * YOYO_STAGGER; }
@@ -49,17 +64,24 @@ export function emitChappy(game: Game, pattern: string, t: number): void {
       b.targetX = x; b.targetY = y; b.launchSoundPending = false;
     }
   }
-  if (pattern === 'chappyStitch' && t % STITCH_PERIOD[level] === 0) {
-    const wave = Math.floor(t / STITCH_PERIOD[level]);
-    for (let row = 0; row < 2; row++) for (let col = 0; col < 29; col++) {
-      // 無害な導入は上端の外で済ませる。本体直下へ張り付いたまま撃てる帯を作らない。
-      const b = game.spawnBullet(24 + col * 12, -64 + row * 28 + col % 2 * 6, 0, [0.8, 1.0, 1.18, 1.36][level], row ? 3 : 1);
+  if (pattern === 'chappyStitch') {
+    // 既存の技IDを維持し、交互切替から少数のビリヤード弾へ置き換える。
+    const balls = game.bullets.objects.filter((b) => b.active && b.motion === 'chappyStitch');
+    const latest = balls.reduce((last, b) => Math.max(last, b.releaseAt), -Infinity);
+    if (balls.length >= CAROM_CAP[level] || t - latest < CAROM_PERIOD[level]) return;
+    const wave = balls.reduce((last, b) => Math.max(last, b.dashWave), -1) + 1;
+    const count = Math.min(CAROM_BURST[level], CAROM_CAP[level] - balls.length);
+    for (let index = 0; index < count; index++) {
+      let angle = Math.PI * (0.2 + index * 0.6 / Math.max(1, count - 1) + Math.sin(wave * 1.7) * 0.045);
+      // 縦だけの往復を避け、中央の球も側壁まで転がす。
+      if (Math.abs(Math.cos(angle)) < 0.3) angle = Math.PI * (wave % 2 ? 0.62 : 0.38);
+      const speed = CAROM_SPEED[level] * (0.94 + index % 3 * 0.06);
+      const b = game.spawnBullet(x + Math.cos(angle) * 22, y + Math.sin(angle) * 22, Math.cos(angle) * speed, Math.sin(angle) * speed, index % 2 ? 3 : 1);
       if (!b) continue;
-      b.motion = 'chappyStitch'; b.radius = [2.7, 3, 3.2, 3.4][level];
-      b.targetX = b.x; b.gridColumn = col; b.gridRow = row; b.swayPhase = wave * 0.7;
-      b.dashWave = (wave + row) % 2; b.dashOrder = 0; b.launchSoundPending = false;
+      b.motion = 'chappyStitch'; b.radius = 7; b.releaseAt = t; b.delay = 1;
+      b.gridColumn = index; b.gridRow = balls.length + index; b.dashWave = wave; b.swayPhase = 0; b.launchSoundPending = false;
     }
-    game.audio.play('enemyShot'); game.triggerBossCast();
+    game.triggerBossCast();
   }
   if (pattern === 'chappySugar' && t % SUGAR_PERIOD[level] === 0) {
     const wave = Math.floor(t / SUGAR_PERIOD[level]), columns = [7, 8, 9, 10][level], rows = [3, 4, 5, 5][level];
@@ -84,9 +106,11 @@ export function emitChappy(game: Game, pattern: string, t: number): void {
 export function updateChappyBullet(game: Game, b: Bullet): 'harmless' | 'moving' | undefined {
   const level = chappyLevel(game);
   if (b.motion === 'chappyYoyo') {
-    const period = yoyoPeriod(level), local = (b.age - 1) % period, wave = Math.floor((b.age - 1) / period);
+    const period = yoyoPeriod(level), local = (b.age - 1) % period, wave = Math.floor((game.phaseFrame - 105) / period);
     if (local === 0) {
       const [x, y] = game.bossPosition(); b.targetX = x; b.targetY = y;
+      // rotation/spinは専用描画では使わないため、ヨーヨーの帰還先X/Yとして保持する。
+      [b.rotation, b.spin] = YOYO_STATIONS[(wave + 1) % YOYO_STATIONS.length];
       const end = 28 + b.gridColumn * (FIELD.w - 56) / (b.dashOrder - 1);
       b.sway = Math.max(22, Math.min(FIELD.w - 22, end + Math.sin(wave * 1.6) * 18));
       b.swayPhase = YOYO_BOTTOM;
@@ -109,20 +133,21 @@ export function updateChappyBullet(game: Game, b: Bullet): 'harmless' | 'moving'
     return step <= warning || step >= warning + flight ? 'harmless' : 'moving';
   }
   if (b.motion === 'chappyStitch') {
-    b.y += b.vy;
-    const nx = b.targetX + Math.sin((b.y - 140) * 0.019 + b.swayPhase) * 16;
-    b.vx = nx - b.x; b.x = nx;
-    const beat = STITCH_BEAT[level], step = (game.phaseFrame - 105 + b.dashWave * beat) % (beat * 2);
-    const previous = b.dashOrder;
-    const firstSolid = (game.phaseFrame - 105 + STITCH_REVEAL - b.age + b.dashWave * beat) % (beat * 2) < beat;
-    // 新しい列の無害時間と全体の拍がずれても、次の実体化まで24フレームの合図を省かない。
-    const approaching = step >= beat * 2 - STITCH_WARNING;
-    b.dashOrder = b.age < STITCH_REVEAL ? approaching || firstSolid && b.age >= STITCH_REVEAL - STITCH_WARNING ? 1 : 0
-      : step < beat ? 2 : step >= beat * 2 - STITCH_WARNING ? 1 : 0;
-    if (previous !== 2 && b.dashOrder === 2 && b.gridColumn === 0) game.audio.play('split');
-    if (b.y > FIELD.h + 20) b.active = false;
-    b.delay = b.dashOrder === 2 ? 0 : 1;
-    return !b.active || b.dashOrder !== 2 || b.y < 0 ? 'harmless' : 'moving';
+    if (b.age < CAROM_WARNING) return 'harmless';
+    if (b.age === CAROM_WARNING) {
+      b.delay = 0;
+      if (b.gridColumn === 0) game.audio.play('enemyShot');
+    }
+    b.x += b.vx; b.y += b.vy; b.swayPhase = Math.max(0, b.swayPhase - 1);
+    const left = b.radius + 3, right = FIELD.w - b.radius - 3;
+    const top = b.radius + 3, bottom = FIELD.h - b.radius - 3;
+    let bounced = false;
+    if (b.x < left) { b.x = left * 2 - b.x; b.vx = Math.abs(b.vx); bounced = true; }
+    if (b.x > right) { b.x = right * 2 - b.x; b.vx = -Math.abs(b.vx); bounced = true; }
+    if (b.y < top) { b.y = top * 2 - b.y; b.vy = Math.abs(b.vy); bounced = true; }
+    if (b.y > bottom) { b.y = bottom * 2 - b.y; b.vy = -Math.abs(b.vy); bounced = true; }
+    if (bounced) { b.swayPhase = 10; b.grazed = false; game.audio.play('caromTap'); }
+    return 'moving';
   }
   if (b.motion === 'chappySugar') {
     const leader = b.gridColumn === 0 && b.gridRow === 0;
