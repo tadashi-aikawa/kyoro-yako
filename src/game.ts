@@ -10,6 +10,7 @@ import { obsidiaPosition } from './obsidia-movement';
 import { emitBossNormal } from './patterns/boss-normal';
 import { emitChappy, hasSugarWave, updateChappyBullet } from './patterns/chappy';
 import { claudineScene, complementBoundary, emitClaudine, whiteSpaceCircle } from './patterns/claudine';
+import { reflowPlayer, updateBloomBullet } from './patterns/claudine-finale';
 import { reflectEnterShot } from './patterns/enter-reflect';
 import { emitEtokichi, emitGalaxyFlash, type GalaxyFlash, updateGalaxyFlash } from './patterns/etokichi';
 import { emitEtokichiDawn } from './patterns/etokichi-dawn';
@@ -34,7 +35,7 @@ import { readRecords } from './story';
 
 export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'letter' | 'stage' | 'arrival' | 'transition' | 'dialogue' | 'gift' | 'departure' | 'clear' | 'pause' | 'gameover' | 'movie' | 'ending' | 'credits';
 type AfterBossMovie = 'jinrai-gift' | 'minerva-finale';
-export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'starOwl' | 'starTrail' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSpark' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'tagPull' | 'sweepRadial' | 'chappyYoyo' | 'chappyStitch' | 'chappySugar' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
+export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'starOwl' | 'starTrail' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSpark' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'tagPull' | 'sweepRadial' | 'chappyYoyo' | 'chappyStitch' | 'chappySugar' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'bloomRocket' | 'bloomSpark'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
 export interface JinraiLaser { x: number; y: number; angle: number; age: number; warning: number; life: number; speed: number; }
 export interface Shot { active: boolean; x: number; y: number; vx: number; vy: number; damage: number; radius: number; homing: boolean; }
 export type WaveKind = 'arc' | 'ring' | 'cross' | 'threeWay' | 'return' | 'sweep' | 'pincer' | 'serpent' | 'orbit' | 'chevron';
@@ -682,6 +683,7 @@ export class Game {
     this.playerDx = dx;
     this.px = Math.max(9, Math.min(FIELD.w - 9, this.px + dx));
     this.py = Math.max(12, Math.min(FIELD.h - 9, this.py + dy));
+    reflowPlayer(this);
     if (!canAttack) return;
     if ((this.held('KeyZ') || this.autoshot) && this.frame % 5 === 0) this.fireShot(focus);
     if (this.just('KeyX') && this.bombs > 0 && this.bombFrames <= 0) this.useBomb();
@@ -1183,6 +1185,7 @@ export class Game {
   }
 
   private clearBullets(): void {
+    this.audio.stopFireworks();
     this.bullets.clear();
     this.jinraiBolts.length = 0; this.jinraiThunderstorm = undefined;
     this.vimAttack = undefined;
@@ -1210,6 +1213,12 @@ export class Game {
     const windFrame = sakuraTime >= SAKURA_PERIOD ? (sakuraTime - SAKURA_PERIOD) % SAKURA_PERIOD : -1;
     this.bullets.forEach((b) => {
       b.age++;
+      const bloomMotion = updateBloomBullet(this, b);
+      if (bloomMotion === 'harmless') {
+        if (b.fadeAt > 0 && b.age >= b.fadeAt) b.active = false;
+        return;
+      }
+      if (!b.active) return;
       if (b.motion === 'typographyRain') { b.vx = b.targetX + Math.sin(b.age * b.swayRate + b.swayPhase) * b.sway; b.rotation += b.spin; }
       if (b.motion === 'layoutGrid') {
         if (b.age < b.releaseAt) { b.x += (b.targetX - b.x) * 0.13; b.y += (b.targetY - b.y) * 0.13; }
@@ -1324,12 +1333,12 @@ export class Game {
           b.y += Math.sin(angle) * 0.9 + b.vy * 0.25;
           b.rotation += 0.1;
         } else b.y += b.vy;
-      } else if (b.motion !== 'etoileOrbit' && chappyMotion !== 'moving') {
+      } else if (b.motion !== 'etoileOrbit' && chappyMotion !== 'moving' && bloomMotion !== 'moving') {
         const bog = this.phase?.pattern === 'dotfiles' || (this.phase?.pattern === 'neoEncore' && this.encoreCount === 3);
         const bogTime = this.phase?.pattern === 'neoEncore' ? encoreBogTime(this) : this.phaseFrame - 105;
         const slow = bog && inBog(b.x, b.y, bogTime) ? 0.28 : 1;
         if (b.motion === 'complement') {
-          const blue = b.x < complementBoundary(attack.phase?.pattern === 'final' ? (attackFrame - 105) % 600 : attackFrame - 105);
+          const blue = b.x < complementBoundary(attackFrame - 105);
           b.color = blue ? 1 : 3;
           b.x += b.vx; b.y += b.vy * (blue ? 0.58 : 1.55);
         // 扇の頂点を固定すると中央の弾が上端で永久に凍る。視線は帯ごと左右へ掃く。
@@ -1338,7 +1347,7 @@ export class Game {
         }
       }
       if (b.motion === 'whiteSpace' && claudineScene(attack) === 'whiteSpace') {
-        const local = attack.phase?.pattern === 'final' ? (attackFrame - 105) % 600 : attackFrame - 105;
+        const local = attackFrame - 105;
         const [cx, cy, r] = whiteSpaceCircle(local);
         if (Math.hypot(b.x - cx, b.y - cy) < r + b.radius + 5) { b.active = false; return; }
       }
@@ -1351,7 +1360,7 @@ export class Game {
       }
       const margin = b.motion === 'wing' ? 130 : 25;
       // 宵の誘いは画面外から戻る。通常弾の画面外削除から外し、10秒の寿命で必ず回収する。
-      if (b.motion !== 'jinraiHeart' && b.motion !== 'recall' && (b.x < -margin || b.x > FIELD.w + margin || b.y < -30 || b.y > FIELD.h + 25)) { b.active = false; return; }
+      if (bloomMotion === 'none' && b.motion !== 'jinraiHeart' && b.motion !== 'recall' && (b.x < -margin || b.x > FIELD.w + margin || b.y < -30 || b.y > FIELD.h + 25)) { b.active = false; return; }
       // 点滅中に見えない弾へ当たらないよう、消える最後の1秒は無害にする。
       if (b.motion === 'jinraiHeart' && b.age >= b.fadeAt - KISS_FADE) return;
       if (this.invulnFrames > 0 || this.invincible || this.pendingHit >= 0) return;

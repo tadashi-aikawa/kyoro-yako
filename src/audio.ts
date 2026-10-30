@@ -1,5 +1,5 @@
 export type Sound = 'shot' | 'hit' | 'graze' | 'kill' | 'bomb' | 'declare' | 'capture' | 'item' | 'extend'
-  | 'enemyShot' | 'jinraiShot' | 'jinraiCharge' | 'jinraiCrackle' | 'jinraiWarp' | 'laser' | 'thunder' | 'thunderBurst' | 'ninpo' | 'slash' | 'wind' | 'turn' | 'split' | 'sweepCharge' | 'sweepBurst' | 'prayerCharge' | 'roseCharge' | 'roseBloom' | 'chappySnap' | 'caromTap';
+  | 'enemyShot' | 'jinraiShot' | 'jinraiCharge' | 'jinraiCrackle' | 'jinraiWarp' | 'laser' | 'thunder' | 'thunderBurst' | 'ninpo' | 'slash' | 'wind' | 'turn' | 'split' | 'sweepCharge' | 'sweepBurst' | 'prayerCharge' | 'roseCharge' | 'roseBloom' | 'chappySnap' | 'caromTap' | 'fireworkRise' | 'fireworkGrandRise' | 'fireworkBoom';
 // 周波数・秒数・波形・終端周波数・音量・最短間隔。
 // 常時鳴る自機ショットを抑え、敵の発射と仕掛けの切り替わりを聞き取れる比率にする。
 const tones: Record<Sound, [number, number, OscillatorType, number, number, number]> = {
@@ -22,6 +22,9 @@ const tones: Record<Sound, [number, number, OscillatorType, number, number, numb
   roseBloom: [1047, 0.28, 'triangle', 262, 0.21, 0.2],
   chappySnap: [2100, 0.055, 'triangle', 180, 0.3, 0.2],
   caromTap: [1550, 0.045, 'triangle', 1150, 0.16, 0.085],
+  fireworkRise: [520, 0.86, 'sine', 2450, 0.18, 1],
+  fireworkGrandRise: [330, 1.52, 'sine', 3000, 0.23, 2],
+  fireworkBoom: [75, 1.2, 'sine', 32, 0.32, 2],
 };
 
 export class AudioBank {
@@ -29,8 +32,16 @@ export class AudioBank {
   private context?: AudioContext;
   private last: Partial<Record<Sound, number>> = {};
   private readonly energySources = new Set<AudioBufferSourceNode>();
+  private readonly fireworkSources = new Set<AudioScheduledSourceNode>();
+
+  stopFireworks(): void {
+    for (const source of this.fireworkSources) source.stop();
+    this.fireworkSources.clear();
+    delete this.last.fireworkRise; delete this.last.fireworkGrandRise; delete this.last.fireworkBoom;
+  }
 
   stopEnergy(): void {
+    this.stopFireworks();
     for (const source of this.energySources) source.stop();
     this.energySources.clear();
     delete this.last.jinraiCharge; delete this.last.jinraiCrackle; delete this.last.jinraiWarp;
@@ -73,12 +84,19 @@ export class AudioBank {
         overtone.connect(mix).connect(gain);
         overtone.onended = () => { overtone.disconnect(); mix.disconnect(); };
         overtone.start(now); overtone.stop(now + duration);
+      } else if (sound === 'fireworkRise' || sound === 'fireworkGrandRise') {
+        // 息を含んだ「ヒュー」。大玉は長く低いところから高く打ち上げる。
+        gain.gain.linearRampToValueAtTime(this.volume * peak, now + 0.12);
+        gain.gain.linearRampToValueAtTime(this.volume * peak * 0.6, now + duration * 0.72);
       } else gain.gain.linearRampToValueAtTime(this.volume * peak, now + (sound === 'jinraiShot' ? 0.0015 : 0.005));
       gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
       oscillator.connect(gain).connect(this.context.destination);
-      oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+      const firework = sound === 'fireworkRise' || sound === 'fireworkGrandRise' || sound === 'fireworkBoom';
+      oscillator.onended = () => { this.fireworkSources.delete(oscillator); oscillator.disconnect(); gain.disconnect(); };
       oscillator.start(now);
       oscillator.stop(now + duration);
+      if (firework) this.fireworkSources.add(oscillator);
+      if (sound === 'fireworkRise' || sound === 'fireworkGrandRise' || sound === 'fireworkBoom') this.noise(now, duration, sound);
       if (sound === 'thunder' || sound === 'thunderBurst' || sound === 'ninpo' || sound === 'slash' || sound === 'wind' || sound === 'declare' || sound === 'sweepBurst' || sound === 'jinraiShot') this.noise(now, sound === 'thunderBurst' ? 0.55 : duration, sound);
     } catch { /* audio is optional when browser blocks it */ }
   }
@@ -128,21 +146,24 @@ export class AudioBank {
 
   private noise(now: number, duration: number, sound: Sound): void {
     const context = this.context!;
+    const rising = sound === 'fireworkRise' || sound === 'fireworkGrandRise';
     const buffer = context.createBuffer(1, Math.ceil(context.sampleRate * duration), context.sampleRate);
     const samples = buffer.getChannelData(0);
     for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
     const source = context.createBufferSource(); source.buffer = buffer;
     const filter = context.createBiquadFilter();
-    filter.type = sound === 'thunder' ? 'lowpass' : 'bandpass';
-    filter.frequency.setValueAtTime(sound === 'thunderBurst' ? 3800 : sound === 'thunder' ? 900 : 2200, now);
+    filter.type = sound === 'thunder' || sound === 'fireworkBoom' ? 'lowpass' : 'bandpass';
+    filter.frequency.setValueAtTime(rising ? 700 : sound === 'fireworkBoom' ? 1200 : sound === 'thunderBurst' ? 3800 : sound === 'thunder' ? 900 : 2200, now);
+    if (rising) filter.Q.value = 5;
     if (sound === 'thunderBurst') filter.Q.value = 0.55;
-    filter.frequency.exponentialRampToValueAtTime(sound === 'wind' ? 3200 : 160, now + duration);
+    filter.frequency.exponentialRampToValueAtTime(rising ? 2800 : sound === 'fireworkBoom' ? 70 : sound === 'wind' ? 3200 : 160, now + duration);
     const gain = context.createGain();
     gain.gain.setValueAtTime(0.001, now);
-    gain.gain.linearRampToValueAtTime(this.volume * (sound === 'declare' ? 0.14 : sound === 'thunderBurst' ? 0.3 : 0.22), now + (sound === 'wind' ? 0.15 : sound === 'jinraiShot' ? 0.002 : 0.008));
+    gain.gain.linearRampToValueAtTime(this.volume * (rising ? 0.12 : sound === 'fireworkBoom' ? 0.28 : sound === 'declare' ? 0.14 : sound === 'thunderBurst' ? 0.3 : 0.22), now + (sound === 'wind' || rising ? 0.15 : sound === 'jinraiShot' ? 0.002 : 0.008));
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
     source.connect(filter).connect(gain).connect(context.destination);
-    source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); };
+    source.onended = () => { this.fireworkSources.delete(source); source.disconnect(); filter.disconnect(); gain.disconnect(); };
     source.start(now); source.stop(now + duration);
+    if (rising || sound === 'fireworkBoom') this.fireworkSources.add(source);
   }
 }

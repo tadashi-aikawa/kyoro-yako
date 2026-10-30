@@ -1,5 +1,6 @@
 import { bossSpriteId, createBossMotion, isCasting, updateBossMotion } from './boss-motion';
 import { drawChappyBullet } from './chappy-render';
+import { drawBloomBackdrop, drawBloomBullet } from './claudine-render';
 import { CREDITS_ART, CREDITS_STAFF, CREDITS_STAFF_FRAMES, creditsFade, creditsScene } from './ending';
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
@@ -7,8 +8,8 @@ import { BATTLE_COMMENT_FADE_FRAMES, BATTLE_COMMENT_FRAMES, BATTLE_COMMENT_REVEA
 import { notebookBomb, notebookBookmark, notebookFeather, notebookOwl, notebookPage, notebookStar } from './notebook-icons';
 import { sugarCasting } from './patterns/chappy';
 import { claudineScene, complementBoundary, whiteSpaceCircle } from './patterns/claudine';
-import { FINALE_CHARGE, FINALE_CRESCENDO, finaleTime, rosePulse } from './patterns/claudine-finale';
-import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, GRID_REPLAY_PERIOD, gridLayoutAt, gridPoint, gridRows, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_NAMES, WEATHER_PERIOD, WEATHER_REPLAY_PERIOD, weatherAt } from './patterns/claudine-weather-grid';
+import { bloomPose } from './patterns/claudine-finale';
+import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, gridLayoutAt, gridPoint, gridRows, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_NAMES, WEATHER_PERIOD, weatherAt } from './patterns/claudine-weather-grid';
 import { BURST_MOVE, BURST_RETURN, burstVisibility, DASH_ATTACK, DASH_CHARGE, DASH_CHARGE_START, DASH_CHARGED, DASH_CUTIN, DASH_TRAIL_LIFE, dashBurstStep, dashMotion } from './patterns/jinrai';
 import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
 import { KISS_CHARGE, KISS_FADE, KISS_ORIGIN, KISS_POSE_END, kissEdgeWarning, kissStep } from './patterns/jinrai-kiss';
@@ -315,7 +316,7 @@ export class Renderer {
       c.fillStyle = '#06031977'; c.fillRect(0, 0, FIELD.w, FIELD.h);
       this.magic(192, 80, game.frame, stage.colors[2], 130, 0.25);
     }
-    if (!game.phaseIntro) { this.claudineFinaleBackdrop(game); this.minervaEcho(game); }
+    if (!game.phaseIntro) { drawBloomBackdrop(c, game); this.minervaEcho(game); }
     if (game.phaseIntro && game.boss) {
       const [x, y] = game.bossXY;
       this.fieldCharacter(game, this.readySprite(game, bossSpriteId(game.boss, 'idle', game.frame)), x, y + Math.sin(game.frame * 0.045) * 2, 64, 0);
@@ -402,23 +403,23 @@ export class Renderer {
           c.restore();
         }
       } else {
-        const rose = finaleTime(game);
+        const bloom = bloomPose(game);
         const kiss = game.phase.pattern === 'jinraiKiss' ? kissStep(game.phaseFrame - 105, game.difficulty) : -1;
         const kissing = kiss >= 0 && kiss < KISS_POSE_END;
-        const tilt = channeling || seal || thunder?.charging || sweepCharging || kissing || rose >= 0 ? 0 : dash?.moving ? -game.jinraiDashDirection * 0.18 : Math.cos(game.phaseFrame * 0.012) * 0.045;
+        const tilt = bloom ? bloom.tilt : channeling || seal || thunder?.charging || sweepCharging || kissing ? 0 : dash?.moving ? -game.jinraiDashDirection * 0.18 : Math.cos(game.phaseFrame * 0.012) * 0.045;
         const motionPose = updateBossMotion(this.bossMotion, `${game.boss}:${game.phase.name}`, game.frame, x);
         const pose = dash?.moving ? game.jinraiDashDirection > 0 ? 'right' : 'left' : motionPose;
         const solo = game.boss === 'minerva' && game.phase.pattern === 'owlDawn';
         const summoning = solo && game.minervaReprise && !game.minervaReprise.prayer && repriseLocal(game.phaseFrame, game.minervaReprise) < reprisePrepare(game.minervaReprise);
         const casting = !!summoning || !!game.galaxyFlash || sugarCasting(game) || isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
-        const spriteId = rose >= FINALE_CHARGE ? 'claudine-finale' : kissing ? 'jinrai-kiss' : bossSpriteId(game.boss, rose >= 0 || casting && !dash?.moving ? 'cast' : pose, game.frame);
+        const spriteId = bloom ? bloom.sprite : kissing ? 'jinrai-kiss' : bossSpriteId(game.boss, casting && !dash?.moving ? 'cast' : pose, game.frame);
         const bossSprite = this.readySprite(game, spriteId);
         c.save();
         if (seal && !dashIntro) { c.shadowColor = '#ffe591'; c.shadowBlur = 8 + Math.min(20, (burst - BURST_MOVE) * 0.6); }
-        const roseSize = rose < 0 ? 64 : 74 + (rose >= FINALE_CHARGE ? rosePulse(rose, ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty)) * 3 : 0);
+        const bossSize = bloom ? bloom.size : 64;
         const soloSprite = minervaSoloSprite(channeling ? 'prayer' : casting ? 'cast' : pose, game.frame, game.phaseFrame);
         if (game.phase.pattern === 'jinraiDash') this.jinraiDashTrail(game);
-        this.fieldCharacter(game, solo ? this.readySprite(game, soloSprite) : channeling ? 'minerva-prayer' : seal || thunder?.charging ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || thunder?.charging || sweepCharging || kissing || rose >= 0 ? 0 : Math.sin(game.frame * 0.045) * 2), roseSize, tilt, burstVisibility(burst));
+        this.fieldCharacter(game, solo ? this.readySprite(game, soloSprite) : channeling ? 'minerva-prayer' : seal || thunder?.charging ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || thunder?.charging || sweepCharging || kissing || bloom ? 0 : Math.sin(game.frame * 0.045) * 2), bossSize, tilt, burstVisibility(burst));
         if (game.boss === 'jinrai' && game.phase.pattern === 'jinraiDash' && game.phaseFrame >= DASH_CHARGED) {
           const direction = dash?.moving ? game.jinraiDashDirection : 0;
           this.jinraiLightningAura(x, y + (seal ? 0 : Math.sin(game.frame * 0.045) * 2), tilt, game.frame, burstVisibility(burst), direction);
@@ -447,7 +448,7 @@ export class Renderer {
       this.obsidiaGraph(game);
     }
     if (game.phaseIntro && game.battleComment && game.battleCommentFrames > 0 && (game.scene === 'stage' || (game.scene === 'pause' && game.resumeScene === 'stage'))) this.battleComment(game);
-    game.bullets.forEach((b) => { this.bullet(b); });
+    game.bullets.forEach((b) => { if (!drawBloomBullet(c, game, b)) this.bullet(b); });
     for (const ring of game.interviewRings) this.interviewRing(ring);
     game.shots.forEach((shot) => {
       c.save(); c.translate(shot.x, shot.y); c.rotate(Math.atan2(shot.vx, -shot.vy));
@@ -473,10 +474,15 @@ export class Renderer {
       const eased = 1 - (1 - progress) ** 3;
       const y = 43 + (260 - 43) * (1 - eased);
       const failed = game.hitDuringSpell || game.bombUsed || game.pendingHit >= 0;
-      c.fillStyle = '#160e30e8'; c.fillRect(84, y, 300, 44);
-      c.strokeStyle = '#d5ace680'; c.strokeRect(84.5, y + 0.5, 299, 43);
-      this.text(game.phase.name, 373, y + 15, 13, '#fff2dd', 'right');
-      this.text(failed ? 'Failed' : `BONUS  ${game.spellBonus.toLocaleString()}`, 373, y + 34, 11, failed ? '#ff9da8' : '#ffe0aa', 'right');
+      if (game.boss === 'claudine' && game.phase.pattern === 'final') {
+        this.text(game.phase.name, 18, 39, 10, '#fff2dd');
+        this.text(failed ? 'Failed' : `BONUS  ${game.spellBonus.toLocaleString()}`, 373, 39, 9, failed ? '#ff9da8' : '#ffe0aa', 'right');
+      } else {
+        c.fillStyle = '#160e30e8'; c.fillRect(84, y, 300, 44);
+        c.strokeStyle = '#d5ace680'; c.strokeRect(84.5, y + 0.5, 299, 43);
+        this.text(game.phase.name, 373, y + 15, 13, '#fff2dd', 'right');
+        this.text(failed ? 'Failed' : `BONUS  ${game.spellBonus.toLocaleString()}`, 373, y + 34, 11, failed ? '#ff9da8' : '#ffe0aa', 'right');
+      }
       c.restore();
     }
     if (game.messageFrames > 0) {
@@ -946,7 +952,7 @@ export class Renderer {
         const size = b.radius / 3;
         c.save(); c.translate(b.x, b.y); c.rotate(b.rotation);
         c.drawImage(sprite, -14 * size, -14 * size, 28 * size, 28 * size); c.restore();
-      } else if (b.motion === 'jinraiSakura' || b.motion === 'farewellRose' || b.motion === 'farewellLance' || b.kind === 'needle' && b.rotation !== 0) {
+      } else if (b.motion === 'jinraiSakura' || b.kind === 'needle' && b.rotation !== 0) {
         c.save(); c.translate(b.x, b.y); c.rotate(b.rotation);
         c.drawImage(sprite, -14, -14, 28, 28); c.restore();
       } else c.drawImage(sprite, b.x - 14, b.y - 14, 28, 28);
@@ -977,68 +983,12 @@ export class Renderer {
     c.restore();
   }
 
-  private claudineFinaleBackdrop(game: Game): void {
-    const t = finaleTime(game);
-    if (t < 0) return;
-    const c = this.ctx;
-    const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
-    const charge = Math.min(1, t / FINALE_CHARGE);
-    const pulse = rosePulse(t, level);
-    const [x, y] = game.bossXY;
-    c.save();
-    c.fillStyle = `rgba(19, 4, 14, ${0.65 * Math.min(1, t / 24)})`;
-    c.fillRect(0, 0, FIELD.w, FIELD.h);
-    // 発射する薔薇を背景にも描く。細い金の輪郭は弾より暗くし、自機周辺を覆わない。
-    c.strokeStyle = '#ba8b65'; c.lineWidth = 0.8;
-    for (let layer = 0; layer < 3; layer++) {
-      c.globalAlpha = (0.12 + pulse * 0.08) * charge;
-      c.beginPath();
-      for (let i = 0; i <= 180; i++) {
-        const angle = i * Math.PI / 90;
-        const radius = (75 + layer * 34) * (0.76 + Math.cos(6 * angle) * 0.24);
-        const turn = (layer % 2 ? -1 : 1) * t * 0.002;
-        const px = x + Math.cos(angle + turn) * radius;
-        const py = y + Math.sin(angle + turn) * radius;
-        if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
-      }
-      c.closePath(); c.stroke();
-    }
-    c.globalAlpha = 0.3 + pulse * 0.35; c.strokeStyle = '#edc697'; c.lineWidth = 1.2;
-    const radius = t < FINALE_CHARGE ? 100 - charge * 65 : 35 + (1 - pulse) * 55;
-    c.beginPath(); c.arc(x, y, radius, -t * 0.01, Math.PI * 1.5 - t * 0.01); c.stroke();
-    const impact = t >= FINALE_CRESCENDO ? t - FINALE_CRESCENDO : t - FINALE_CHARGE;
-    if (impact >= 0 && impact < 40) {
-      const fade = 1 - impact / 40;
-      c.globalAlpha = fade * 0.1; c.fillStyle = '#ffe1c4'; c.fillRect(0, 0, FIELD.w, FIELD.h);
-      c.globalAlpha = fade * 0.7; c.strokeStyle = '#ffe5bd'; c.lineWidth = 1.5;
-      c.beginPath(); c.arc(x, y, 28 + impact * 8, 0, Math.PI * 2); c.stroke();
-    }
-    if (t < FINALE_CHARGE) {
-      const alpha = Math.min(1, t / 12, (FINALE_CHARGE - t) / 14);
-      c.globalAlpha = alpha;
-      this.fieldCharacter(game, this.readySprite(game, 'claudine-finale'), 292 - charge * 22, 230, 205, -0.04, alpha);
-      if (game.messageFrames <= 0) this.text('では、遠慮なく。', 28, 224, 18, '#f5dfb9');
-      c.fillStyle = '#eed0a3';
-      for (let i = 0; i < 18; i++) {
-        const angle = i * Math.PI / 9 + t * 0.025;
-        const r = 115 - (t * 1.7 + i * 7) % 90;
-        c.beginPath(); c.arc(x + Math.cos(angle) * r, y + Math.sin(angle) * r, 1.2, 0, Math.PI * 2); c.fill();
-      }
-    }
-    if (t >= FINALE_CRESCENDO) {
-      c.globalAlpha = 0.18; c.strokeStyle = '#e6a7bb'; c.lineWidth = 1;
-      c.strokeRect(7, 42, FIELD.w - 14, FIELD.h - 49);
-    }
-    c.restore();
-  }
-
   private stageTelegraphs(game: Game): void {
     const pattern = game.phase?.pattern === 'neoEncore' ? [undefined, 'keyRain', 'vim', 'dotfiles'][game.encoreCount] : claudineScene(game);
     if (!pattern) return;
     const c = this.ctx;
     const t = game.phaseFrame - 105;
-    const lite = game.phase?.pattern === 'final';
-    const sceneTime = lite ? t % 600 : t;
+    const sceneTime = t;
     c.save();
     if (pattern === 'keyRain') {
       c.strokeStyle = '#bbaad566'; c.lineWidth = 1;
@@ -1088,24 +1038,24 @@ export class Renderer {
     });
     if (pattern === 'grid') {
       c.strokeStyle = '#f5dbac77'; c.lineWidth = 1;
-      const layout = gridLayoutAt(sceneTime, level, lite);
+      const layout = gridLayoutAt(sceneTime, level);
       this.text(`${GRID_NAMES[layout]} ${GRID_DIRECTIONS[layout]}`, 12, 52, 11, '#fff0c6');
-      const local = Math.max(0, sceneTime) % (lite ? GRID_REPLAY_PERIOD : GRID_PERIOD[level]);
-      if (local < [90, 70, 55, 42][level] + (lite ? 18 : 0)) for (let row = 0; row < gridRows(level, lite); row++) for (let col = 0; col < GRID_COLUMNS[layout]; col++) {
-        const [x, y] = gridPoint(layout, row, col, level, lite);
+      const local = Math.max(0, sceneTime) % GRID_PERIOD[level];
+      if (local < [90, 70, 55, 42][level]) for (let row = 0; row < gridRows(level); row++) for (let col = 0; col < GRID_COLUMNS[layout]; col++) {
+        const [x, y] = gridPoint(layout, row, col, level);
         c.strokeRect(x - 12, y - 10, 24, 20);
       }
       game.bullets.forEach((b) => {
         if (b.motion !== 'layoutGrid' || b.releaseAt - b.age > 24) return;
-        const [vx, vy] = gridVelocity(layout, level, lite);
+        const [vx, vy] = gridVelocity(layout, level);
         const angle = Math.atan2(vy, vx);
         c.strokeStyle = '#fff2caaa';
         c.beginPath(); c.moveTo(b.x, b.y); c.lineTo(b.x + Math.cos(angle) * 24, b.y + Math.sin(angle) * 24); c.stroke();
       });
     }
     if (pattern === 'type') {
-      const weather = weatherAt(sceneTime, lite);
-      const period = lite ? WEATHER_REPLAY_PERIOD : WEATHER_PERIOD;
+      const weather = weatherAt(sceneTime);
+      const period = WEATHER_PERIOD;
       const local = Math.max(0, sceneTime) % period;
       const next = (weather + 1) % WEATHER_NAMES.length;
       this.text(local >= period - 45 ? `${WEATHER_NAMES[weather]} → ${WEATHER_NAMES[next]}` : WEATHER_NAMES[weather], 12, 52, 11, '#fff0c6');
@@ -1119,14 +1069,14 @@ export class Renderer {
       }
     }
     if (pattern === 'complement') {
-      const local = game.phase?.pattern === 'final' ? t % 600 : t;
+      const local = t;
       const boundary = complementBoundary(local);
       c.fillStyle = '#378beb29'; c.fillRect(0, 0, boundary, FIELD.h);
       c.fillStyle = '#ff9a3a29'; c.fillRect(boundary, 0, FIELD.w - boundary, FIELD.h);
       c.strokeStyle = '#fff1ca99'; c.setLineDash([7, 7]); c.beginPath(); c.moveTo(boundary, 0); c.lineTo(boundary, FIELD.h); c.stroke(); c.setLineDash([]);
     }
     if (pattern === 'whiteSpace') {
-      const local = game.phase?.pattern === 'final' ? t % 600 : t;
+      const local = t;
       const [x, y, r] = whiteSpaceCircle(local);
       c.fillStyle = '#fff7d22a'; c.strokeStyle = '#fff7d2cc'; c.lineWidth = 2;
       c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); c.stroke();

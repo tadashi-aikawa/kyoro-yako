@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { claudineScene } from './patterns/claudine';
-import { FINALE_CHARGE, FINALE_START, ROSE_COUNT, ROSE_PERIOD } from './patterns/claudine-finale';
 import { vimScene } from './patterns/neo';
 import { midPhases, PHASE_LIMIT, phaseHp, STAGE_DPS, STAGES } from './stages';
 
@@ -155,55 +154,18 @@ it('補色の境界で弾の色と速さが変わり、余白の円から弾が�
   expect(bullet.active).toBe(false);
 });
 
-it('耐久は5つの仕掛けを再演し、残り10秒で締めへ切り替える', () => {
-  const game = start(3, 9);
-  for (const [segment, motion] of ['trim', 'typographyRain', 'layoutGrid', 'complement', 'whiteSpace'].entries()) {
-    game.phaseFrame = 104 + segment * 600;
-    game.update();
-    expect(game.bullets.objects.some((b) => b.active && b.motion === motion), `segment ${segment}`).toBe(true);
-  }
-  game.phaseFrame = FINALE_START - 1;
-  game.update();
-  expect(game.bullets.count).toBe(0);
-});
-
-it('残り10秒で旧弾を消し、1秒の構えから薔薇と自機狙いを撃ち続ける', () => {
+it('最終耐久は再演を使わず、60秒で残弾を消して戦闘後会話へ進む', () => {
   for (const difficulty of ['easy', 'normal', 'hard', 'lunatic'] as const) {
     const game = start(3, 9, false, difficulty);
-    game.phaseFrame = FINALE_START - 2;
-    expect(claudineScene(game)).toBe('whiteSpace');
-    game.update();
-    game.spawnBullet(game.px, game.py - 100, 0, 1, 0);
-    game.message = 'EXTEND!'; game.messageFrames = 90;
-    game.update();
-    expect(claudineScene(game)).toBe('rose');
-    expect(game.messageFrames).toBe(89);
-    expect(game.bullets.count).toBe(0);
-    for (let i = 1; i < FINALE_CHARGE; i++) game.update();
-    expect(game.bullets.count).toBe(0);
-    game.update();
-    const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
-    const roses = game.bullets.objects.filter((b) => b.active && b.motion === 'farewellRose');
-    expect(roses).toHaveLength(ROSE_COUNT[level]);
-    for (let i = 0; i < ROSE_PERIOD[level] / 2; i++) game.update();
-    const fan = game.bullets.objects.filter((b) => b.active && b.motion === 'farewellLance');
-    expect(fan).toHaveLength([5, 7, 9, 11][level]);
-    const center = fan[(fan.length - 1) / 2];
-    expect(Math.atan2(center.vy, center.vx)).toBeCloseTo(Math.atan2(game.py - game.bossXY[1], game.px - game.bossXY[0]));
-    const velocity = [center.vx, center.vy];
-    game.px = 30; game.update();
-    expect([center.vx, center.vy]).toEqual(velocity);
-    // 旧来の600f区切りで新技の弾が消えない。
-    while (game.phaseFrame < 3105) game.update();
-    expect(roses.some((b) => b.active)).toBe(true);
+    expect(claudineScene(game)).toBe('responsiveBloom');
+    expect(game.phase?.name).toBe('レスポンシブ・ブルーム');
     let maxCount = 0;
     while (game.phaseFrame < 3599) {
       game.update(); maxCount = Math.max(maxCount, game.bullets.count);
-      const fired = game.bullets.objects.filter((b) => b.active && b.age === 1);
-      expect(fired.some((b) => b.motion === 'farewellRose') && fired.some((b) => b.motion === 'farewellLance')).toBe(false);
+      expect(game.bullets.objects.every((b) => !b.active || b.motion === 'bloomRocket' || b.motion === 'bloomSpark')).toBe(true);
     }
-    expect(game.bullets.objects.some((b) => b.active && b.age <= ROSE_PERIOD[level] && b.motion === 'farewellRose')).toBe(true);
-    expect(maxCount).toBeLessThan(350);
+    expect(maxCount).toBeGreaterThan(50);
+    expect(maxCount).toBeLessThan(700);
     expect(game.phase?.pattern).toBe('final');
     game.update();
     expect(game.phase).toBeUndefined();

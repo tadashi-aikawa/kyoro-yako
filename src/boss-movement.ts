@@ -1,5 +1,5 @@
 import { SUGAR_PERIOD, SUGAR_WARNING, yoyoPosition } from './patterns/chappy';
-import { FINALE_START } from './patterns/claudine-finale';
+import { bloomBossPosition } from './patterns/claudine-finale';
 import { thunderPosition } from './patterns/jinrai-thunder';
 import type { Phase } from './stages';
 
@@ -89,24 +89,13 @@ const MOVEMENTS: Record<string, Movement> = {
 
 export function enterBossX(time: number): number { return MOVEMENTS.enter(time)[0]; }
 
-function finale(time: number): Point {
-  const finaleStart = FINALE_START - 105;
-  if (time >= finaleStart) return CENTER;
-  const scene = ['trim', 'type', 'grid', 'complement', 'whiteSpace'][Math.floor(time / 600)];
-  const local = time % 600;
-  const [x, y] = MOVEMENTS[scene](local);
-  // 再演の切替と、残り10秒の構えへの移行で中央へ戻す。
-  const end = Math.min(600, finaleStart - Math.floor(time / 600) * 600);
-  const envelope = smooth(Math.min(1, local / 90, (end - local) / 90));
-  return [192 + (x - 192) * envelope, y * envelope];
-}
-
 export function hasBossMovement(pattern: string): boolean { return pattern === 'final' || Object.hasOwn(MOVEMENTS, pattern); }
 
 export function patternPosition(phase: Phase, frame: number, entry: Point, encoreCount = 0, level = 1): [number, number] | undefined {
   if (!hasBossMovement(phase.pattern)) return undefined;
   const baseY = phase.spell ? 132 : 77;
   if (frame < 105 && encoreCount === 0) return moveBetween(entry, [192, baseY], frame / 90);
+  if (phase.pattern === 'final') return bloomBossPosition(frame);
   // ネオの延長では射撃時計だけが巻き戻る。移動時計は通算し、延長のたびに本体が飛ぶのを防ぐ。
   const time = Math.max(0, frame - 105) + (encoreCount > 0 ? encoreCount * (phase.duration * 60 - 105) : 0);
   if (phase.pattern === 'chappyYoyo') return yoyoPosition(time, level);
@@ -115,6 +104,6 @@ export function patternPosition(phase: Phase, frame: number, entry: Point, encor
     // 一歩前へ出て決め、斉射後に同じ速さで戻る。周期の境目では中央に収まる。
     return [192, baseY + 16 * Math.max(0, Math.min(1, (step - snap + 28) / 28, (snap + 54 - step) / 36))];
   }
-  const [x, y] = phase.pattern === 'final' ? finale(time) : MOVEMENTS[phase.pattern](time);
+  const [x, y] = MOVEMENTS[phase.pattern](time);
   return [x, baseY + y];
 }

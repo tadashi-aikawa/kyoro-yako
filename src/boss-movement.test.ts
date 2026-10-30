@@ -39,7 +39,7 @@ it('新しい全軌道は画面上部に収まり、周期をまたいでも位�
     expect(Math.min(...xs), phase.pattern).toBeGreaterThanOrEqual(90);
     expect(Math.max(...xs), phase.pattern).toBeLessThanOrEqual(294);
     expect(Math.min(...ys), phase.pattern).toBeGreaterThanOrEqual(54);
-    expect(Math.max(...ys), phase.pattern).toBeLessThanOrEqual(172);
+    expect(Math.max(...ys), phase.pattern).toBeLessThanOrEqual(phase.pattern === 'final' ? 200 : 172);
     expect(Math.max(...speeds), phase.pattern).toBeLessThan(4);
     // チャッピーは省エネと撃ち込み時間を優先し、静止・小幅移動を使う。
     if (!phase.pattern.startsWith('chappy')) {
@@ -104,7 +104,7 @@ it('迅雷はレーザーが生きている間は止まり、次の発射前だ�
   }
 });
 
-it('クロディーヌの再演は技の境目で飛ばず、最後10秒の薔薇は中央で放つ', () => {
+it('クロディーヌはエリア変形と同じ座標で動き、境目でも飛ばない', () => {
   const game = start(3, 9);
   for (const time of [600, 1200, 1800, 2400, 3000]) {
     game.phaseFrame = 104 + time;
@@ -116,10 +116,12 @@ it('クロディーヌの再演は技の境目で飛ばず、最後10秒の薔�
   const before = game.bossPosition();
   game.update();
   expect(Math.hypot(game.bossXY[0] - before[0], game.bossXY[1] - before[1])).toBeLessThan(1);
-  for (const frame of [3000, 3060, 3105, 3195, 3380, 3500]) {
-    game.phaseFrame = frame;
-    expect(game.bossPosition()).toEqual([192, 132]);
-  }
+  game.phaseFrame = 500;
+  const wide = game.bossPosition();
+  game.phaseFrame = 1100;
+  const tall = game.bossPosition();
+  expect(wide[0]).toBeCloseTo(192); expect(tall[0]).toBeCloseTo(192);
+  expect(wide[1]).toBeGreaterThan(tall[1]);
 });
 
 it('5面エトキチは光線の予告から発射終了まで止まる', () => {

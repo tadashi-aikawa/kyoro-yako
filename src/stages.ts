@@ -51,7 +51,7 @@ export const STAGES: Stage[] = [
       phase(3, '通常攻撃・配色の準備', 'normal', 'claudineQuietRings'),
       phase(3, '補色の対比', 'spell', 'complement'),
       phase(3, '余白は語る', 'spell', 'whiteSpace'),
-      phase(3, 'よろしければ、また', 'survival', 'final'),
+      phase(3, 'レスポンシブ・ブルーム', 'survival', 'final'),
     ],
   },
   {
