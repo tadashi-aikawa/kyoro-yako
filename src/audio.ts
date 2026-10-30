@@ -1,5 +1,5 @@
 export type Sound = 'shot' | 'hit' | 'graze' | 'kill' | 'bomb' | 'declare' | 'capture' | 'item' | 'extend'
-  | 'enemyShot' | 'jinraiShot' | 'jinraiCharge' | 'jinraiCrackle' | 'jinraiWarp' | 'laser' | 'thunder' | 'thunderBurst' | 'ninpo' | 'slash' | 'wind' | 'turn' | 'split' | 'sweepCharge' | 'sweepBurst' | 'prayerCharge' | 'roseCharge' | 'roseBloom';
+  | 'enemyShot' | 'jinraiShot' | 'jinraiCharge' | 'jinraiCrackle' | 'jinraiWarp' | 'laser' | 'thunder' | 'thunderBurst' | 'ninpo' | 'slash' | 'wind' | 'turn' | 'split' | 'sweepCharge' | 'sweepBurst' | 'prayerCharge' | 'roseCharge' | 'roseBloom' | 'chappySnap';
 // 周波数・秒数・波形・終端周波数・音量・最短間隔。
 // 常時鳴る自機ショットを抑え、敵の発射と仕掛けの切り替わりを聞き取れる比率にする。
 const tones: Record<Sound, [number, number, OscillatorType, number, number, number]> = {
@@ -20,6 +20,7 @@ const tones: Record<Sound, [number, number, OscillatorType, number, number, numb
   prayerCharge: [96, 1.2, 'triangle', 150, 0.26, 0.9],
   roseCharge: [196, 0.95, 'sine', 1568, 0.24, 0.9],
   roseBloom: [1047, 0.28, 'triangle', 262, 0.21, 0.2],
+  chappySnap: [2100, 0.055, 'triangle', 180, 0.3, 0.2],
 };
 
 export class AudioBank {

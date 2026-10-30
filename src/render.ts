@@ -1,10 +1,11 @@
 import { bossSpriteId, createBossMotion, isCasting, updateBossMotion } from './boss-motion';
+import { drawChappyBullet } from './chappy-render';
 import { CREDITS_ART, CREDITS_STAFF, CREDITS_STAFF_FRAMES, creditsFade, creditsScene } from './ending';
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
 import { BATTLE_COMMENT_FADE_FRAMES, BATTLE_COMMENT_FRAMES, BATTLE_COMMENT_REVEAL_FRAMES, PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
 import { notebookBomb, notebookBookmark, notebookFeather, notebookOwl, notebookPage, notebookStar } from './notebook-icons';
-import { CHAPPY_PORTS, CHAPPY_THROW, PARALLEL_BEAT } from './patterns/chappy';
+import { sugarCasting } from './patterns/chappy';
 import { claudineScene, complementBoundary, whiteSpaceCircle } from './patterns/claudine';
 import { FINALE_CHARGE, FINALE_CRESCENDO, finaleTime, rosePulse } from './patterns/claudine-finale';
 import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, GRID_REPLAY_PERIOD, gridLayoutAt, gridPoint, gridRows, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_NAMES, WEATHER_PERIOD, WEATHER_REPLAY_PERIOD, weatherAt } from './patterns/claudine-weather-grid';
@@ -409,7 +410,7 @@ export class Renderer {
         const pose = dash?.moving ? game.jinraiDashDirection > 0 ? 'right' : 'left' : motionPose;
         const solo = game.boss === 'minerva' && game.phase.pattern === 'owlDawn';
         const summoning = solo && game.minervaReprise && !game.minervaReprise.prayer && repriseLocal(game.phaseFrame, game.minervaReprise) < reprisePrepare(game.minervaReprise);
-        const casting = !!summoning || !!game.galaxyFlash || isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
+        const casting = !!summoning || !!game.galaxyFlash || sugarCasting(game) || isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
         const spriteId = rose >= FINALE_CHARGE ? 'claudine-finale' : kissing ? 'jinrai-kiss' : bossSpriteId(game.boss, rose >= 0 || casting && !dash?.moving ? 'cast' : pose, game.frame);
         const bossSprite = this.readySprite(game, spriteId);
         c.save();
@@ -866,6 +867,7 @@ export class Renderer {
   }
 
   private bullet(b: Bullet): void {
+    if (drawChappyBullet(this.ctx, b)) return;
     if (b.motion === 'jinraiSpark') {
       const c = this.ctx;
       c.save(); c.translate(b.x, b.y); c.rotate(Math.atan2(b.vy, b.vx));
@@ -927,29 +929,6 @@ export class Renderer {
       c.fillRect(left, b.y - 9, width, 18);
       c.strokeRect(left, b.y - 9, width, 18);
       c.fillStyle = '#eee1ff'; c.fillRect(b.x - 4, b.y - 12, 5, 24); c.restore();
-      return;
-    }
-    if (b.motion === 'codexBox') {
-      const c = this.ctx;
-      c.save(); c.translate(b.x, b.y); c.fillStyle = '#174b48'; c.strokeStyle = '#a5f5e6'; c.lineWidth = 2;
-      c.fillRect(-14, -12, 28, 24); c.strokeRect(-14, -12, 28, 24);
-      c.beginPath(); c.moveTo(-4, -6); c.lineTo(-9, 0); c.lineTo(-4, 6); c.moveTo(4, -6); c.lineTo(9, 0); c.lineTo(4, 6); c.stroke();
-      c.fillStyle = b.age < b.releaseAt ? '#a5f5e6' : '#ffe8a0';
-      c.fillRect(-12, 17, 24 * Math.min(1, b.age / b.releaseAt), 2);
-      c.restore();
-      return;
-    }
-    if (b.motion === 'chappyBloom') {
-      const c = this.ctx;
-      const progress = Math.max(0, Math.min(1, (b.age - CHAPPY_THROW) / (b.releaseAt - CHAPPY_THROW)));
-      this.magic(b.x, b.y, b.age, '#a5f5e6', 10 + progress * 12, 0.7);
-      c.save(); c.fillStyle = '#fff0b4';
-      for (let i = 0; i < 8; i++) {
-        const a = i * Math.PI / 4 + b.age * 0.025;
-        const radius = b.age < b.releaseAt ? 12 + (1 - progress) * 42 : 22 + (b.age - b.releaseAt) * 0.6;
-        c.beginPath(); c.arc(b.x + Math.cos(a) * radius, b.y + Math.sin(a) * radius, 2, 0, Math.PI * 2); c.fill();
-      }
-      c.restore();
       return;
     }
     if (b.motion === 'vanish' && b.age > b.fadeAt - 20 && b.age % 8 < 4) return;
@@ -1073,15 +1052,13 @@ export class Renderer {
       }
     }
     const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
-    if (pattern === 'chappyParallel' && t >= 0 && game.bombFrames <= 0) {
-      const beat = PARALLEL_BEAT[level];
-      const source = Math.floor(t / beat) % 2;
-      for (const [i, [x, y]] of CHAPPY_PORTS.entries()) {
-        const step = t % beat;
-        const afterglow = i === source ? Math.max(0, 1 - step / 18) * 0.5 : 0;
-        const warning = i !== source ? Math.max(0, (step - (beat - 36)) / 36) : 0;
-        const pulse = Math.max(afterglow, warning);
-        this.magic(x, y, game.phaseFrame * (i ? -1 : 1), i ? '#ffe6a1' : '#a5f5e6', 22 + pulse * 8, 0.35 + pulse * 0.45);
+    if (sugarCasting(game) && game.bullets.count > 0) {
+      const [x, y] = game.bossPosition();
+      c.strokeStyle = '#fff1d5'; c.lineWidth = 1.5;
+      for (let i = 0; i < 3; i++) {
+        const a = -Math.PI / 2 + i * Math.PI / 3;
+        c.beginPath(); c.moveTo(x + 24 + Math.cos(a) * 7, y - 15 + Math.sin(a) * 7);
+        c.lineTo(x + 24 + Math.cos(a) * 12, y - 15 + Math.sin(a) * 12); c.stroke();
       }
     }
     if (pattern === 'vim' && t >= 0) {

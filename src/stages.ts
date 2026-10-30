@@ -92,8 +92,8 @@ export const MID_PHASE: Record<BossId, Phase> = {
   neo: phase(5, '「最後」と言ってからが長い', 'midboss', 'neoEncore'),
   obsidia: phase(2, '書棚の呼吸', 'midboss', 'bookshelf'),
   jinrai: phase(4, '宵雷の扇', 'midboss', 'jinraiFan'),
-  // 丸投げは左右へ避ける時間が長い。3技合計を宣言・移動込みで40〜50秒に収める。
-  chappy: { ...phase(3, 'Codexへの丸投げ', 'midboss', 'codex', 28), hp: 405 },
+  // 3技合計を宣言・回避込みで40〜50秒に収める。
+  chappy: { ...phase(3, 'スリーピー・ヨーヨー', 'midboss', 'chappyYoyo', 28), hp: 405 },
   claudine: phase(3, '整列', 'midboss', 'space'),
   minerva: phase(5, '予備の仮説', 'midboss', 'sevenRings'),
 };
@@ -105,8 +105,8 @@ export const ETOKICHI_DAWN_PHASES: Phase[] = [
 ];
 export const CHAPPY_PHASES: Phase[] = [
   MID_PHASE.chappy,
-  { ...phase(3, 'サブエージェント召喚', 'midboss', 'chappyParallel', 28), hp: 583 },
-  { ...phase(3, '完成しました。ご確認ください。', 'midboss', 'chappyDelivery', 34), hp: 778 },
+  { ...phase(3, 'リトル・ステッチ', 'midboss', 'chappyStitch', 28), hp: 583 },
+  { ...phase(3, 'シュガー・スナップ', 'midboss', 'chappySugar', 34), hp: 778 },
 ];
 export function midPhases(boss: BossId, stage = 1): Phase[] {
   if (boss === 'etokichi' && stage === 5) return ETOKICHI_DAWN_PHASES;

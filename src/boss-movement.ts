@@ -1,3 +1,4 @@
+import { SUGAR_PERIOD, SUGAR_WARNING } from './patterns/chappy';
 import { FINALE_START } from './patterns/claudine-finale';
 import { thunderPosition } from './patterns/jinrai-thunder';
 import type { Phase } from './stages';
@@ -54,10 +55,10 @@ const MOVEMENTS: Record<string, Movement> = {
   dotfiles: curve(82, 24, 660, 'eight'),
   enter: patrol([[112, -24], [272, -24]], 84, 180),
   neoEncore: patrol([[108, -12], [276, -12], [192, 16]], 96, 160),
-  // チャッピーは長めに止まる。クロディーヌは整列・格子・対称の軌道を使う。
-  codex: patrol([[116, -18], [116, 18], [268, 18], [268, -18]], 84, 180),
-  chappyParallel: patrol([[126, -16], [258, 16]], 84, 138),
-  chappyDelivery: curve(72, 18, 620, 'ellipse'),
+  // ヨーヨーはその場で回収する。ステッチも中央付近だけで縫い、撃ち込みを途切れさせない。
+  chappyYoyo: () => CENTER,
+  chappyStitch: curve(24, 5, 420, 'eight'),
+  chappySugar: () => CENTER,
   claudinePetalArc: curve(70, 12, 600, 'arc'),
   claudineQuietRings: curve(58, 12, 600, 'ellipse'),
   trim: patrol([[128, -24], [256, -24], [256, 12], [128, 12]], 72, 120),
@@ -102,12 +103,17 @@ function finale(time: number): Point {
 
 export function hasBossMovement(pattern: string): boolean { return pattern === 'final' || Object.hasOwn(MOVEMENTS, pattern); }
 
-export function patternPosition(phase: Phase, frame: number, entry: Point, encoreCount = 0): [number, number] | undefined {
+export function patternPosition(phase: Phase, frame: number, entry: Point, encoreCount = 0, level = 1): [number, number] | undefined {
   if (!hasBossMovement(phase.pattern)) return undefined;
   const baseY = phase.spell ? 132 : 77;
   if (frame < 105 && encoreCount === 0) return moveBetween(entry, [192, baseY], frame / 90);
   // ネオの延長では射撃時計だけが巻き戻る。移動時計は通算し、延長のたびに本体が飛ぶのを防ぐ。
   const time = Math.max(0, frame - 105) + (encoreCount > 0 ? encoreCount * (phase.duration * 60 - 105) : 0);
+  if (phase.pattern === 'chappySugar') {
+    const step = time % SUGAR_PERIOD[level], snap = SUGAR_WARNING[level] - 1;
+    // 一歩前へ出て決め、斉射後に同じ速さで戻る。周期の境目では中央に収まる。
+    return [192, baseY + 16 * Math.max(0, Math.min(1, (step - snap + 28) / 28, (snap + 54 - step) / 36))];
+  }
   const [x, y] = phase.pattern === 'final' ? finale(time) : MOVEMENTS[phase.pattern](time);
   return [x, baseY + y];
 }

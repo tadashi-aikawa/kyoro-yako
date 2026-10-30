@@ -8,7 +8,7 @@ import { ENEMY_ROOMS, enemyFireFrames } from './enemy-design';
 import { ENDING_MOVIES, MOVIES, type MovieName, MoviePlayer } from './movies';
 import { obsidiaPosition } from './obsidia-movement';
 import { emitBossNormal } from './patterns/boss-normal';
-import { emitChappy, updateChappySource } from './patterns/chappy';
+import { emitChappy, hasSugarWave, updateChappyBullet } from './patterns/chappy';
 import { claudineScene, complementBoundary, emitClaudine, whiteSpaceCircle } from './patterns/claudine';
 import { reflectEnterShot } from './patterns/enter-reflect';
 import { emitEtokichi, emitGalaxyFlash, type GalaxyFlash, updateGalaxyFlash } from './patterns/etokichi';
@@ -34,7 +34,7 @@ import { readRecords } from './story';
 
 export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'letter' | 'stage' | 'arrival' | 'transition' | 'dialogue' | 'gift' | 'departure' | 'clear' | 'pause' | 'gameover' | 'movie' | 'ending' | 'credits';
 type AfterBossMovie = 'jinrai-gift' | 'minerva-finale';
-export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'starOwl' | 'starTrail' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSpark' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'tagPull' | 'sweepRadial' | 'codexBox' | 'chappyBloom' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
+export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'starOwl' | 'starTrail' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSpark' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'tagPull' | 'sweepRadial' | 'chappyYoyo' | 'chappyStitch' | 'chappySugar' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'farewellRose' | 'farewellLance'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
 export interface JinraiLaser { x: number; y: number; angle: number; age: number; warning: number; life: number; speed: number; }
 export interface Shot { active: boolean; x: number; y: number; vx: number; vy: number; damage: number; radius: number; homing: boolean; }
 export type WaveKind = 'arc' | 'ring' | 'cross' | 'threeWay' | 'return' | 'sweep' | 'pincer' | 'serpent' | 'orbit' | 'chevron';
@@ -1134,7 +1134,8 @@ export class Game {
     }
     if (this.phase?.pattern === 'flash') return [192 + Math.sin(this.phaseFrame * 0.052) * 120, 132];
     if (this.phase) {
-      const position = patternPosition(this.phase, this.phaseFrame, this.bossEntry, this.encoreCount);
+      if (this.phase.pattern === 'chappySugar' && this.phaseFrame >= 105 && !hasSugarWave(this)) return [192, 132];
+      const position = patternPosition(this.phase, this.phaseFrame, this.bossEntry, this.encoreCount, ['easy', 'normal', 'hard', 'lunatic'].indexOf(this.difficulty));
       if (position) return position;
     }
     const baseY = this.phase?.spell ? 132 : 77;
@@ -1218,7 +1219,8 @@ export class Game {
           if (b.gridColumn === 0 && b.gridRow === 0) { this.triggerBossCast(); this.audio.play('laser'); }
         }
       }
-      if (updateChappySource(this, b)) return;
+      const chappyMotion = updateChappyBullet(this, b);
+      if (chappyMotion === 'harmless') return;
       if (updateStarFlightSource(this, b)) return;
       if (b.delay > 0) { b.delay--; return; }
       if (b.fadeAt > 0 && b.age >= b.fadeAt) {
@@ -1322,7 +1324,7 @@ export class Game {
           b.y += Math.sin(angle) * 0.9 + b.vy * 0.25;
           b.rotation += 0.1;
         } else b.y += b.vy;
-      } else if (b.motion !== 'etoileOrbit') {
+      } else if (b.motion !== 'etoileOrbit' && chappyMotion !== 'moving') {
         const bog = this.phase?.pattern === 'dotfiles' || (this.phase?.pattern === 'neoEncore' && this.encoreCount === 3);
         const bogTime = this.phase?.pattern === 'neoEncore' ? encoreBogTime(this) : this.phaseFrame - 105;
         const slow = bog && inBog(b.x, b.y, bogTime) ? 0.28 : 1;

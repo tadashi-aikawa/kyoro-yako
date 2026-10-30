@@ -41,13 +41,16 @@ it('新しい全軌道は画面上部に収まり、周期をまたいでも位�
     expect(Math.min(...ys), phase.pattern).toBeGreaterThanOrEqual(54);
     expect(Math.max(...ys), phase.pattern).toBeLessThanOrEqual(172);
     expect(Math.max(...speeds), phase.pattern).toBeLessThan(4);
-    expect(Math.max(...xs) - Math.min(...xs), phase.pattern).toBeGreaterThan(60);
-    expect(Math.max(...ys) - Math.min(...ys), phase.pattern).toBeGreaterThan(12);
+    // チャッピーは省エネと撃ち込み時間を優先し、静止・小幅移動を使う。
+    if (!phase.pattern.startsWith('chappy')) {
+      expect(Math.max(...xs) - Math.min(...xs), phase.pattern).toBeGreaterThan(60);
+      expect(Math.max(...ys) - Math.min(...ys), phase.pattern).toBeGreaterThan(12);
+    }
   }
 });
 
 it('移動と停止を各面の中ボスと巡回系の通常攻撃で使い分ける', () => {
-  for (const pattern of ['etoile', 'codex', 'jinraiFan', 'neoEncore', 'neoTripleTap', 'minervaStarFan', 'grid']) {
+  for (const pattern of ['etoile', 'jinraiFan', 'neoEncore', 'neoTripleTap', 'minervaStarFan', 'grid']) {
     const phase = Object.values(MID_PHASE).find((p) => p.pattern === pattern)
       ?? STAGES.flatMap((stage) => stage.phases).find((p) => p.pattern === pattern)!;
     let previous = patternPosition(phase, 105, [192, 132])!;

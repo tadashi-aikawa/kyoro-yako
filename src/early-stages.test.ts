@@ -110,17 +110,13 @@ it('3面のボスは通常4回とスペル6枚を順に出す', () => {
   expect(STAGES[2].phases.filter((phase) => phase.spell)).toHaveLength(6);
 });
 
-it('投げた箱は順に下向きの扇を連射し、Easyの予告は長い', () => {
+it('ヨーヨーはEasyの予告が長く、Normalは先に投げ始める', () => {
   const easy = start(3, 0, true, 'easy');
   const normal = start(3, 0, true);
-  const easyBox = easy.bullets.objects.find((b) => b.active && b.motion === 'codexBox')!;
-  const box = normal.bullets.objects.find((b) => b.active && b.motion === 'codexBox')!;
-  expect(easyBox.releaseAt).toBeGreaterThan(box.releaseAt);
-  for (let i = 0; i < 185; i++) normal.update();
-  expect(box.active).toBe(false);
-  const orbs = normal.bullets.objects.filter((b) => b.active && b.kind === 'orb');
-  expect(orbs.length).toBeGreaterThanOrEqual(28);
-  expect(orbs.every((b) => b.vy > 0)).toBe(true);
+  const easyYoyo = easy.bullets.objects.find((b) => b.active && b.motion === 'chappyYoyo')!;
+  const yoyo = normal.bullets.objects.find((b) => b.active && b.motion === 'chappyYoyo')!;
+  for (let i = 0; i < 60; i++) { easy.update(); normal.update(); }
+  expect(easyYoyo.y).toBe(132); expect(yoyo.y).toBeGreaterThan(132);
 });
 
 it('削ぎ落としの壁は予告された列が消えてから降る', () => {
