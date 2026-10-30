@@ -10,7 +10,7 @@ import { obsidiaPosition } from './obsidia-movement';
 import { emitBossNormal } from './patterns/boss-normal';
 import { emitChappy, hasSugarWave, updateChappyBullet } from './patterns/chappy';
 import { claudineScene, complementBoundary, emitClaudine, whiteSpaceCircle } from './patterns/claudine';
-import { reflowPlayer, updateBloomBullet } from './patterns/claudine-finale';
+import { BLOOM_ATTACK, BLOOM_CUTIN, reflowPlayer, updateBloomBullet } from './patterns/claudine-finale';
 import { reflectEnterShot } from './patterns/enter-reflect';
 import { emitEtokichi, emitGalaxyFlash, type GalaxyFlash, updateGalaxyFlash } from './patterns/etokichi';
 import { emitEtokichiDawn } from './patterns/etokichi-dawn';
@@ -201,7 +201,7 @@ export class Game {
       sprite.src = `${import.meta.env.BASE_URL}assets/sprites/${id}.webp`;
       this.images[`${id}-sprite`] = sprite;
     }
-    for (const id of [...MOTION_SPRITES, ...MINERVA_SOLO_SPRITES, ...MINERVA_OWL_SPRITES, 'claudine-finale']) {
+    for (const id of [...MOTION_SPRITES, ...MINERVA_SOLO_SPRITES, ...MINERVA_OWL_SPRITES, 'claudine-bloom-closed']) {
       const sprite = new Image();
       sprite.src = `${import.meta.env.BASE_URL}assets/sprites/${id}.webp`;
       this.images[`${id}-sprite`] = sprite;
@@ -307,7 +307,6 @@ export class Game {
     this.frame++;
     if (this.flash > 0) this.flash--;
     if (this.messageFrames > 0) this.messageFrames--;
-    if (this.cutin > 0) this.cutin--;
     if (this.scene === 'stage') this.updateStage();
     else if (this.scene === 'arrival') this.updateArrival();
     else if (this.scene === 'transition') this.updateTransition();
@@ -578,6 +577,7 @@ export class Game {
   endingLineAlpha(index: number): number { return Math.max(0, Math.min(1, (this.endingFrame - index * ENDING_LINE_GAP) / ENDING_LINE_FADE)); }
 
   startStage(stage: number): void {
+    this.cutin = 0;
     this.phaseIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
     this.movies.stop();
     this.movieName = undefined;
@@ -982,9 +982,10 @@ export class Game {
     const phase = this.phase!;
     if (phase.spell) {
       this.spellBonus = 1_000_000 + this.stage * 500_000;
-      this.cutin = phase.pattern === 'jinraiDash' ? 0 : 100;
-      this.flash = phase.pattern === 'jinraiDash' ? 0 : 12;
-      if (phase.pattern !== 'jinraiDash') this.audio.play('declare');
+      const delayed = phase.pattern === 'jinraiDash' || phase.pattern === 'final';
+      this.cutin = delayed ? 0 : 100;
+      this.flash = delayed ? 0 : 12;
+      if (!delayed) this.audio.play('declare');
     }
   }
 
@@ -1029,6 +1030,7 @@ export class Game {
       // 会話へ進む前に手で拾う時間を残す。近づいて拾うまで補充を直接加算しない。
       this.phase = undefined;
       this.collectionFrames = 180;
+      this.cutin = 0;
       this.jinraiLasers.length = 0;
       this.jinraiBolts.length = 0; this.jinraiThunderstorm = undefined;
       this.enemies.clear(); this.shots.clear();
@@ -1076,7 +1078,9 @@ export class Game {
 
   private updateBoss(): void {
     const phase = this.phase!;
+    if (this.cutin > 0) this.cutin--;
     this.phaseFrame++;
+    if (phase.pattern === 'final' && this.phaseFrame === BLOOM_CUTIN) { this.cutin = 100; this.flash = 12; this.audio.play('declare'); }
     if (phase.pattern === 'jinraiDash') {
       if (this.phaseFrame === DASH_CHARGE_START) this.audio.play('jinraiCharge');
       if (this.phaseFrame === DASH_CUTIN) { this.cutin = 100; this.flash = 12; this.audio.play('declare'); }
@@ -1087,7 +1091,7 @@ export class Game {
     if (this.phaseFrame >= 105) this.emitPattern(phase.pattern);
     updateJinraiHazards(this.attackContext());
     updateGalaxyFlash(this);
-    if (phase.pattern !== 'final' && this.phaseHp <= 0) { this.finishPhase(true); return; }
+    if (this.phaseHp <= 0) { this.finishPhase(true); return; }
     if (Number.isFinite(phase.duration) && this.phaseFrame >= phase.duration * 60) {
       if (phase.pattern === 'neoEncore' && this.encoreCount < 3) {
         this.encoreCount++;
@@ -1096,7 +1100,7 @@ export class Game {
         this.clearBullets();
         this.message = '最後にもう一つだけ！';
         this.messageFrames = 100;
-      } else this.finishPhase(phase.pattern === 'final');
+      } else this.finishPhase(false);
     }
   }
 
@@ -1390,6 +1394,7 @@ export class Game {
 
   private damageBoss(damage: number): void {
     if (this.phaseIntro) return;
+    if (this.phase?.pattern === 'final' && this.phaseFrame < BLOOM_ATTACK) return;
     // 印とカットインを撃ち込みで飛ばせないよう、導入中はダメージを受けない。
     if (this.phase?.pattern === 'jinraiDash' && this.phaseFrame < DASH_ATTACK) return;
     if (this.phase?.pattern === 'owlDawn' && this.minervaReprise && !this.minervaReprise.prayer && repriseLocal(this.phaseFrame, this.minervaReprise) < reprisePrepare(this.minervaReprise)) return;
@@ -1417,7 +1422,7 @@ export class Game {
       if (s.y < -10 || s.x < -15 || s.x > FIELD.w + 15) { s.active = false; return; }
       if (this.phase && !(this.phase.pattern === 'jinraiDash' && burstVisibility(dashBurstStep(this)) < 1)) {
         if (this.bossTargets().some(([bx, by]) => circlesHit(s.x, s.y, s.radius, bx, by, 20))) {
-          if (this.phase.pattern !== 'final') this.damageBoss(s.damage);
+          this.damageBoss(s.damage);
           s.active = false; this.spark(s.x, s.y, '#ffe2ac', 1); return;
         }
       }

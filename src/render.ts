@@ -8,7 +8,7 @@ import { BATTLE_COMMENT_FADE_FRAMES, BATTLE_COMMENT_FRAMES, BATTLE_COMMENT_REVEA
 import { notebookBomb, notebookBookmark, notebookFeather, notebookOwl, notebookPage, notebookStar } from './notebook-icons';
 import { sugarCasting } from './patterns/chappy';
 import { claudineScene, complementBoundary, whiteSpaceCircle } from './patterns/claudine';
-import { bloomPose } from './patterns/claudine-finale';
+import { BLOOM_CUTIN, bloomPose } from './patterns/claudine-finale';
 import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, gridLayoutAt, gridPoint, gridRows, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_NAMES, WEATHER_PERIOD, weatherAt } from './patterns/claudine-weather-grid';
 import { BURST_MOVE, BURST_RETURN, burstVisibility, DASH_ATTACK, DASH_CHARGE, DASH_CHARGE_START, DASH_CHARGED, DASH_CUTIN, DASH_TRAIL_LIFE, dashBurstStep, dashMotion } from './patterns/jinrai';
 import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
@@ -420,6 +420,15 @@ export class Renderer {
         const soloSprite = minervaSoloSprite(channeling ? 'prayer' : casting ? 'cast' : pose, game.frame, game.phaseFrame);
         if (game.phase.pattern === 'jinraiDash') this.jinraiDashTrail(game);
         this.fieldCharacter(game, solo ? this.readySprite(game, soloSprite) : channeling ? 'minerva-prayer' : seal || thunder?.charging ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || thunder?.charging || sweepCharging || kissing || bloom ? 0 : Math.sin(game.frame * 0.045) * 2), bossSize, tilt, burstVisibility(burst));
+        if (bloom && bloom.closed > 0) {
+          // 閉眼差分は目の部分だけ重ね、元絵の身体と手・髪の輪郭は動かさない。
+          c.save(); c.beginPath();
+          c.ellipse(x - 7, y - 21, 4.5, 2.5, -0.16, 0, Math.PI * 2);
+          c.ellipse(x + 3, y - 23, 4.7, 2.5, -0.16, 0, Math.PI * 2);
+          c.clip();
+          this.fieldCharacter(game, this.readySprite(game, 'claudine-bloom-closed'), x, y - 1.5, bossSize, 0, bloom.closed);
+          c.restore();
+        }
         if (game.boss === 'jinrai' && game.phase.pattern === 'jinraiDash' && game.phaseFrame >= DASH_CHARGED) {
           const direction = dash?.moving ? game.jinraiDashDirection : 0;
           this.jinraiLightningAura(x, y + (seal ? 0 : Math.sin(game.frame * 0.045) * 2), tilt, game.frame, burstVisibility(burst), direction);
@@ -466,7 +475,7 @@ export class Renderer {
     this.jinraiThunderbolts(game);
     if (game.bombFrames > 0) this.bombEffect(game);
     if (game.cutin > 0 && game.boss) this.cutin(game);
-    if (game.phase?.spell && !game.phaseIntro && game.cutin <= 20 && !(game.phase.pattern === 'jinraiDash' && game.phaseFrame < DASH_CUTIN)) {
+    if (game.phase?.spell && !game.phaseIntro && game.cutin <= 20 && !(game.phase.pattern === 'jinraiDash' && game.phaseFrame < DASH_CUTIN) && !(game.phase.pattern === 'final' && game.phaseFrame < BLOOM_CUTIN)) {
       c.save();
       // 頭上を召喚の舞台に使う終符では、技名を読ませた後に帯を退ける。
       if (game.phase.pattern === 'owlDawn') c.globalAlpha = Math.max(0, Math.min(1, (150 - game.phaseFrame) / 45));
@@ -1449,7 +1458,7 @@ export class Renderer {
     c.restore();
     c.fillStyle = '#070b20dd'; c.fillRect(0, 297, FIELD.w, 88);
     c.fillStyle = accent; c.fillRect(0, 297, 5, 88);
-    this.text(game.phase?.kind === 'survival' ? '最後の手合わせ / 耐久' : '必殺技 / 発動', 17, 313, 10, accent);
+    this.text('必殺技 / 発動', 17, 313, 10, accent);
     c.shadowColor = '#040616'; c.shadowBlur = 8;
     this.text(NAMES[game.boss!], 17, 339, 32, '#fff5db');
     c.shadowBlur = 0;

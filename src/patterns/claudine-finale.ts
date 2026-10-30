@@ -1,6 +1,9 @@
 import type { Bullet, Game } from '../game';
 
-export const FINALE_CHARGE = 120;
+export const FINALE_CHARGE = 180;
+export const BLOOM_CUTIN = 120;
+export const BLOOM_OPEN = BLOOM_CUTIN + 100;
+export const BLOOM_ATTACK = BLOOM_OPEN + FINALE_CHARGE;
 export const BLOOM_PERIOD = [156, 132, 114, 96] as const;
 export const BLOOM_COUNT = [20, 26, 32, 38] as const;
 export const LAYOUT_PERIOD = 600;
@@ -31,21 +34,21 @@ const LAYOUTS: readonly BloomArena[] = [
 ];
 
 export function finaleTime(game: Game): number {
-  return game.boss === 'claudine' && game.phase?.pattern === 'final' && !game.phaseIntro ? game.phaseFrame - 105 : -1;
+  return game.boss === 'claudine' && game.phase?.pattern === 'final' && !game.phaseIntro ? game.phaseFrame - BLOOM_OPEN : -1;
 }
 
 export function bloomLayout(t: number): { target: BloomArena; warning: boolean; progress: number } {
   const local = Math.max(0, t - FINALE_CHARGE) % LAYOUT_PERIOD;
-  const index = Math.min(LAYOUTS.length - 1, Math.floor(Math.max(0, t - FINALE_CHARGE) / LAYOUT_PERIOD));
+  const index = Math.floor(Math.max(0, t - FINALE_CHARGE) / LAYOUT_PERIOD) % LAYOUTS.length;
   return { target: LAYOUTS[index], warning: t >= FINALE_CHARGE && local < LAYOUT_WARNING, progress: smooth((local - LAYOUT_WARNING) / LAYOUT_MORPH) };
 }
 
 export function bloomArena(t: number): BloomArena {
-  let from = { x: 0, y: 0, w: 384, h: 448 }, to = FULL, progress = smooth(t / FINALE_CHARGE);
-  if (t >= FINALE_CHARGE) {
-    const index = Math.min(LAYOUTS.length - 1, Math.floor((t - FINALE_CHARGE) / LAYOUT_PERIOD));
-    from = index === 0 ? FULL : LAYOUTS[index - 1]; to = LAYOUTS[index]; progress = bloomLayout(t).progress;
-  }
+  const full = { x: 0, y: 0, w: 384, h: 448 };
+  if (t < FINALE_CHARGE) return full;
+  const step = Math.floor((t - FINALE_CHARGE) / LAYOUT_PERIOD), index = step % LAYOUTS.length;
+  const from = step === 0 ? full : LAYOUTS[(index + LAYOUTS.length - 1) % LAYOUTS.length];
+  const to = LAYOUTS[index], progress = bloomLayout(t).progress;
   return { x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress, w: from.w + (to.w - from.w) * progress, h: from.h + (to.h - from.h) * progress };
 }
 
@@ -65,25 +68,17 @@ export function reflowPlayer(game: Game): void {
 }
 
 export function bloomBossPosition(frame: number): [number, number] {
-  const t = frame - 105;
-  const arena = bloomArena(t);
-  if (t >= 0 && t < FINALE_CHARGE) {
-    // 構えの間は発射しない。枠の上端が動いても、浮上の頂点を指先のポーズへそろえる。
-    const first = t < FINALE_CHARGE / 2;
-    const from = first ? [192, 132] : [204, 116];
-    const to = first ? [204, 116] : bloomPoint(bloomArena(FINALE_CHARGE), 192, 132);
-    const p = smooth((first ? t : t - FINALE_CHARGE / 2) / (FINALE_CHARGE / 2));
-    return [from[0] + (to[0] - from[0]) * p, from[1] + (to[1] - from[1]) * p];
-  }
-  return bloomPoint(arena, 192, 132);
+  const t = frame - BLOOM_OPEN;
+  if (frame < BLOOM_ATTACK) return [192, 132];
+  const [x, y] = bloomPoint(bloomArena(t), 192, 132);
+  return [x + Math.sin((frame - BLOOM_ATTACK) * 0.012) * 32, y];
 }
 
-export function bloomPose(game: Game): { sprite: string; size: number; tilt: number } | undefined {
-  if (game.boss !== 'claudine' || game.phase?.pattern !== 'final' || game.phaseIntro) return;
-  const t = game.phaseFrame - 105;
-  const opening = smooth(t / FINALE_CHARGE);
-  const flourish = Math.sin(opening * Math.PI);
-  return { sprite: t < 0 ? 'claudine-idle' : t < FINALE_CHARGE / 2 ? 'claudine-cast' : 'claudine-finale', size: 64 + opening * 10 + flourish * 4, tilt: -flourish * 0.12 };
+export function bloomPose(game: Game): { sprite: string; size: number; tilt: number; closed: number } | undefined {
+  if (game.boss !== 'claudine' || game.phase?.pattern !== 'final' || game.phaseIntro || game.phaseFrame >= BLOOM_ATTACK) return;
+  const frame = game.phaseFrame;
+  const closed = frame < BLOOM_CUTIN ? smooth(frame / BLOOM_CUTIN) : frame < BLOOM_OPEN ? 1 : 1 - smooth((frame - BLOOM_OPEN) / FINALE_CHARGE);
+  return { sprite: 'claudine', size: 64, tilt: 0, closed };
 }
 
 export function emitClaudineFinale(game: Game, t: number): void {

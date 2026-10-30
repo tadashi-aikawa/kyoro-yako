@@ -1,0 +1,8 @@
+レスポンシブ・ブルーム開始時の閉眼差分
+生成: 内蔵imagegen、transparent_background=true。
+編集対象: public/assets/sprites/claudine.webp。承認済みゲームスプライト。
+出力: 384x384へ縮小、非可逆WebP q90、アルファq100。
+保存先: public/assets/sprites/claudine-bloom-closed.webp
+表示: 元絵の目の部分だけをクリップして重ねる。身体と髪・手の輪郭は元絵を維持する。
+プロンプト:
+Use case: precise-object-edit. Asset type: transparent existing game sprite, 384x384. EDIT TARGET: the attached approved game sprite claudine.webp. Change ONLY her two eyes from open to gently fully closed, delicate relaxed eyelids, keeping her calm closed-mouth smile. Preserve EXACTLY the original hand positions, chest hand, other lowered arm, body posture, head angle, face location, hair, clothes, skirt, legs, proportions, exact full-body scale, pixel framing and transparent background. This closed-eye sprite will be crossfaded over the original at identical coordinates, so absolute registration is critical. Do NOT add a new pose, move the hands, enlarge the head, restyle, add props, change expression other than eyes, add text or background. Keep actual transparency.

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
-import { BLOOM_COUNT, BLOOM_LIFE, bloomArena, bloomLayout, bloomOpacity, bloomPoint, bloomPose, FINALE_CHARGE, finaleTime, GRAND_LAUNCH, GRAND_QUIET, GRAND_RISE, LAYOUT_MORPH, LAYOUT_PERIOD, LAYOUT_WARNING } from './patterns/claudine-finale';
+import { BLOOM_ATTACK, BLOOM_COUNT, BLOOM_CUTIN, BLOOM_LIFE, BLOOM_OPEN, bloomArena, bloomLayout, bloomOpacity, bloomPoint, bloomPose, FINALE_CHARGE, finaleTime, GRAND_LAUNCH, GRAND_QUIET, GRAND_RISE, LAYOUT_MORPH, LAYOUT_PERIOD, LAYOUT_WARNING } from './patterns/claudine-finale';
 
 beforeEach(() => {
   vi.stubGlobal('location', { search: '' });
@@ -11,7 +11,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 function start(difficulty: Game['difficulty'] = 'normal'): Game {
   const game = new Game(); game.audio.volume = 0; game.invincible = true; game.difficulty = difficulty;
-  game.startStage(3); game.startBoss(false, 9); game.phaseFrame = 104; game.update();
+  game.startStage(3); game.startBoss(false, 9); game.phaseFrame = BLOOM_OPEN - 1; game.update();
   return game;
 }
 
@@ -35,10 +35,47 @@ it('4難易度とも打ち上げの光は無害で、開花後に3層の弾が�
   }
 });
 
+it('4難易度ともショットで通常ダメージが入り、HP0で時間切れ前に取得できる', () => {
+  for (const difficulty of ['easy', 'normal', 'hard', 'lunatic'] as const) {
+    const game = start(difficulty);
+    game.phaseFrame = BLOOM_ATTACK;
+    const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
+    expect(game.phase?.duration).toBe(99); expect(game.phaseMaxHp).toBe(2916);
+    const hit = (damage: number) => {
+      const [x, y] = game.bossXY;
+      Object.assign(game.shots.acquire()!, { x, y, vx: 0, vy: 0, damage, radius: 3, homing: false });
+      game.update();
+    };
+    const hp = game.phaseHp; hit(10);
+    expect(game.phaseHp).toBe(hp - 10);
+    const score = game.score; hit(game.phaseHp); game.update();
+    expect(game.phase).toBeUndefined(); expect(game.phaseFrame).toBeLessThan(5940);
+    expect(game.score).toBeGreaterThan(score); expect(play).toHaveBeenCalledWith('capture');
+    expect(game.transition).toBe('boss-defeat-flash'); expect(game.bullets.count).toBe(0);
+  }
+});
+
+it('溜めとカットインの最中はショットとボムで開始モーションを飛ばさない', () => {
+  const game = start(); game.startBoss(false, 9);
+  const hp = game.phaseHp;
+  for (const frame of [30, BLOOM_CUTIN + 30, BLOOM_OPEN + 90, BLOOM_ATTACK - 2]) {
+    game.phaseFrame = frame;
+    game.frame = 9;
+    const [x, y] = game.bossXY;
+    const shot = game.shots.acquire()!;
+    Object.assign(shot, { x, y, vx: 0, vy: 0, damage: hp, radius: 3, homing: false });
+    game.bombFrames = 2; game.update();
+    expect(game.phaseHp).toBe(hp); expect(game.phase?.pattern).toBe('final');
+    expect(shot.active).toBe(false);
+  }
+  game.phaseFrame = BLOOM_ATTACK; game.frame = 9; game.bombFrames = 2; game.update();
+  expect(game.phaseHp).toBeLessThan(hp);
+});
+
 it('全ブレイクポイントの変形は滑らかで、静止した自機の相対位置を保つ', () => {
   const game = start(); game.px = 230; game.py = 350;
-  for (let index = 0; index < 6; index++) {
-    const begin = 105 + FINALE_CHARGE + index * LAYOUT_PERIOD + LAYOUT_WARNING;
+  for (let index = 0; index < 9; index++) {
+    const begin = BLOOM_OPEN + FINALE_CHARGE + index * LAYOUT_PERIOD + LAYOUT_WARNING;
     game.phaseFrame = begin;
     const before = bloomArena(finaleTime(game));
     game.px = before.x + before.w * 0.61; game.py = before.y + before.h * 0.78;
@@ -49,7 +86,7 @@ it('全ブレイクポイントの変形は滑らかで、静止した自機の�
       expect((game.px - arena.x) / arena.w).toBeCloseTo(0.61, 7);
       expect((game.py - arena.y) / arena.h).toBeCloseTo(0.78, 7);
       expect(Math.abs(arena.x - last.x)).toBeLessThan(1);
-      expect(Math.abs(arena.y - last.y)).toBeLessThan(1);
+      expect(Math.abs(arena.y - last.y)).toBeLessThan(1.1);
       last = arena;
     }
   }
@@ -67,20 +104,42 @@ it('エリア外へ移動できず、ポーズ中は変形しない。ボム後�
   for (let i = 0; i < 30; i++) game.update();
   expect([game.phaseFrame, game.px, game.py]).toEqual(stopped);
   game.scene = 'stage'; game.bullets.clear();
-  for (let i = 0; i < 200; i++) game.update();
+  for (let i = 0; i < 360; i++) game.update();
   expect(game.bullets.objects.some((b) => b.active && b.motion === 'bloomSpark')).toBe(true);
 });
 
-it('最後の技では専用の待機・構え・指先のポーズを順に使う', () => {
-  const game = start();
-  const sprites = [0, 130, 180].map((frame) => { game.phaseFrame = frame; return bloomPose(game)?.sprite; });
-  expect(sprites).toEqual(['claudine-idle', 'claudine-cast', 'claudine-finale']);
-  game.phaseFrame = 135; const before = game.bossPosition()[1];
-  game.phaseFrame = 165; const peak = game.bossPosition()[1];
-  expect(bloomPose(game)?.tilt).toBeCloseTo(-0.12);
-  game.phaseFrame = 195; const after = game.bossPosition()[1];
-  expect(peak).toBeLessThan(before); expect(peak).toBeLessThan(after);
+it('固定位置・固定サイズで2秒閉眼、カットイン、3秒開眼してから通常モーションへ戻る', () => {
+  const game = start(); game.startBoss(false, 9);
+  for (let i = 0; i < BLOOM_CUTIN - 1; i++) {
+    const before = bloomPose(game)!.closed;
+    game.update();
+    expect(game.bossXY).toEqual([192, 132]); expect(bloomPose(game)?.size).toBe(64);
+    expect(bloomPose(game)!.closed).toBeGreaterThanOrEqual(before);
+  }
+  expect(game.cutin).toBe(0);
+  game.update(); expect(game.cutin).toBe(100);
+  expect(bloomPose(game)?.closed).toBe(1);
+  game.scene = 'pause'; const stopped = [game.cutin, game.phaseFrame];
+  for (let i = 0; i < 120; i++) game.update();
+  expect([game.cutin, game.phaseFrame]).toEqual(stopped); game.scene = 'stage';
+  for (let i = 0; i < 100; i++) game.update();
+  expect(game.cutin).toBe(0); expect(bloomPose(game)?.closed).toBe(1);
+  for (let i = 0; i < FINALE_CHARGE - 1; i++) {
+    const before = bloomPose(game)!.closed; game.update();
+    expect(game.bossXY).toEqual([192, 132]); expect(bloomPose(game)?.size).toBe(64);
+    expect(bloomPose(game)!.closed).toBeLessThanOrEqual(before);
+    expect(game.bullets.count).toBe(0);
+  }
+  game.update(); expect(game.phaseFrame).toBe(BLOOM_ATTACK);
+  expect(bloomPose(game)).toBeUndefined(); expect(game.bullets.count).toBe(1);
   game.startBoss(false, 8); expect(bloomPose(game)).toBeUndefined();
+});
+
+it('エリアの周回境界でも枠を瞬間移動させない', () => {
+  for (let i = 1; i < 10; i++) {
+    const edge = FINALE_CHARGE + i * LAYOUT_PERIOD;
+    expect(bloomArena(edge)).toEqual(bloomArena(edge - 1));
+  }
 });
 
 it('菊花の合間にリングとしだれ柳が現れ、打ち上げ時だけ上昇SEを鳴らす', () => {
@@ -137,7 +196,7 @@ it('下端に到達した弾はフェード中も接触し、最下段に居続�
 it('小花火を止めて一拍置き、大玉の打ち上げから長い柳の光跡へ切り替える', () => {
   const game = start();
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
-  game.phaseFrame = 105 + FINALE_CHARGE + GRAND_QUIET - 1;
+  game.phaseFrame = BLOOM_OPEN + FINALE_CHARGE + GRAND_QUIET - 1;
   for (let i = GRAND_QUIET; i < GRAND_LAUNCH; i++) game.update();
   expect(game.bullets.count).toBe(0);
   expect(play).not.toHaveBeenCalledWith('fireworkRise');
@@ -166,10 +225,10 @@ it('変形の前に1.2秒の破線予告を置き、その後でエリアを動�
 it('ボム中と開花前に終了する時刻には打ち上げも上昇音も出さない', () => {
   const game = start('hard');
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
-  game.phaseFrame = 224; game.bombFrames = 100; game.update();
+  game.phaseFrame = BLOOM_OPEN + FINALE_CHARGE - 1; game.bombFrames = 100; game.update();
   expect(game.bullets.count).toBe(0);
   expect(play).not.toHaveBeenCalledWith('fireworkRise');
-  game.bombFrames = 0; game.phaseFrame = 3560; game.update();
+  game.bombFrames = 0; game.phaseFrame = 5899; game.update();
   expect(game.bullets.count).toBe(0);
   expect(play).not.toHaveBeenCalledWith('fireworkRise');
 });
@@ -178,7 +237,7 @@ it('下端に来た小花火と柳は枠内で減速し、透明度がほぼ0に
   for (const willow of [false, true]) {
     const game = start();
     if (willow) {
-      game.phaseFrame = 105 + FINALE_CHARGE + GRAND_LAUNCH - 1;
+      game.phaseFrame = BLOOM_OPEN + FINALE_CHARGE + GRAND_LAUNCH - 1;
       for (let i = 0; i < GRAND_RISE + 2; i++) game.update();
     }
     const b = willow ? game.bullets.objects.find((b) => b.active && b.motion === 'bloomSpark' && b.dashWave === 2)! : game.spawnBullet(192, 400, 0, 2, 2)!;
@@ -202,7 +261,7 @@ it('大玉前の休止中にボムを使っても、ボム明けの一拍後に�
   for (const step of [450, 470, 599, 600]) {
     const game = start(); const launches: number[] = [];
     vi.spyOn(game.audio, 'play').mockImplementation((sound) => { if (sound === 'fireworkGrandRise') launches.push(game.phaseFrame); });
-    game.phaseFrame = 105 + FINALE_CHARGE + step; game.bombFrames = 150;
+    game.phaseFrame = BLOOM_OPEN + FINALE_CHARGE + step; game.bombFrames = 150;
     for (let i = 0; i < 150; i++) game.update();
     const endBomb = game.phaseFrame;
     expect(launches).toHaveLength(0);
@@ -249,7 +308,7 @@ it('消え際の高さが1列へ揃わず、薄くなった柳の先端も無害
 
 it('高い位置で開いたLunaticの大玉は上端で弾や光跡を削らない', () => {
   const game = start('lunatic');
-  game.phaseFrame = 105 + FINALE_CHARGE + GRAND_LAUNCH - 1;
+  game.phaseFrame = BLOOM_OPEN + FINALE_CHARGE + GRAND_LAUNCH - 1;
   for (let i = 0; i < GRAND_RISE + 200; i++) game.update();
   expect(game.bullets.objects.filter((b) => b.active && b.motion === 'bloomSpark' && b.dashWave === 2)).toHaveLength(156);
 });

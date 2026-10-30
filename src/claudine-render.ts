@@ -1,5 +1,5 @@
 import type { Bullet, Game } from './game';
-import { bloomArena, bloomLayout, bloomOpacity, bloomPoint, bloomTrail, FINALE_CHARGE, finaleTime } from './patterns/claudine-finale';
+import { bloomArena, bloomLayout, bloomOpacity, bloomPoint, bloomTrail, finaleTime } from './patterns/claudine-finale';
 import { FIELD } from './rules';
 
 const COLORS = ['#ff8f9e', '#8ddce9', '#ffe3a1', '#f5ad77', '#e9a7da', '#eee6cd'];
@@ -30,17 +30,6 @@ export function drawBloomBackdrop(c: CanvasRenderingContext2D, game: Game): void
     const a = layout.target;
     c.globalAlpha = 0.25 + Math.sin(t * 0.1) * 0.08;
     c.setLineDash([3, 7]); c.strokeRect(a.x, a.y, a.w, a.h); c.setLineDash([]);
-  }
-  if (t < FINALE_CHARGE) {
-    const [bx, by] = game.bossXY;
-    const x = bx - 22, y = by - 10;
-    const p = t / FINALE_CHARGE;
-    c.globalAlpha = Math.sin(p * Math.PI) * 0.6;
-    c.beginPath(); c.ellipse(x, y + 2, 30 + p * 110, 12 + p * 30, -0.2, 0, Math.PI * 2); c.stroke();
-    for (let i = 0; i < 8; i++) {
-      const a = i * Math.PI / 4 + p * 2;
-      c.fillStyle = '#ffe2ab'; c.beginPath(); c.arc(x + Math.cos(a) * (18 + p * 90), y + Math.sin(a) * (12 + p * 30), 1.5, 0, Math.PI * 2); c.fill();
-    }
   }
   c.restore();
 }

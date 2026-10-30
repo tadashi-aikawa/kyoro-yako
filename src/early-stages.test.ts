@@ -22,8 +22,8 @@ it('全フェーズは面と種類の共通式から体力と制限時間を得�
   for (const [index, stage] of STAGES.entries()) {
     for (const phase of stage.phases) {
       expect(phase.hp).toBe(phaseHp(index + 1, phase.kind));
-      expect(phase.duration).toBe(phase.pattern === 'jinraiDash' ? Infinity : phase.kind === 'survival' ? 60 : PHASE_LIMIT[phase.kind]);
-      if (phase.kind !== 'survival') expect(phase.hp / STAGE_DPS[index]).toBeCloseTo(phase.kind === 'normal' ? 14 : phase.kind === 'finale' ? 60 : 25, 0);
+      expect(phase.duration).toBe(phase.pattern === 'jinraiDash' ? Infinity : phase.pattern === 'final' ? 99 : PHASE_LIMIT[phase.kind]);
+      expect(phase.hp / STAGE_DPS[index]).toBeCloseTo(phase.kind === 'normal' ? 14 : phase.kind === 'finale' ? 60 : 25, 0);
     }
     const mid = midPhases(stage.mid, index + 1)[0];
     if (stage.mid === 'chappy') expect([mid.hp, mid.duration]).toEqual([405, 28]);
@@ -154,21 +154,23 @@ it('補色の境界で弾の色と速さが変わり、余白の円から弾が�
   expect(bullet.active).toBe(false);
 });
 
-it('最終耐久は再演を使わず、60秒で残弾を消して戦闘後会話へ進む', () => {
+it('最終技は再演を使わず、99秒の時間切れで取得失敗として戦闘後会話へ進む', () => {
   for (const difficulty of ['easy', 'normal', 'hard', 'lunatic'] as const) {
     const game = start(3, 9, false, difficulty);
+    const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
     expect(claudineScene(game)).toBe('responsiveBloom');
     expect(game.phase?.name).toBe('レスポンシブ・ブルーム');
     let maxCount = 0;
-    while (game.phaseFrame < 3599) {
+    while (game.phaseFrame < 5939) {
       game.update(); maxCount = Math.max(maxCount, game.bullets.count);
       expect(game.bullets.objects.every((b) => !b.active || b.motion === 'bloomRocket' || b.motion === 'bloomSpark')).toBe(true);
     }
     expect(maxCount).toBeGreaterThan(50);
     expect(maxCount).toBeLessThan(700);
     expect(game.phase?.pattern).toBe('final');
-    game.update();
+    const score = game.score; game.update();
     expect(game.phase).toBeUndefined();
+    expect(game.score).toBe(score); expect(play).not.toHaveBeenCalledWith('capture');
     expect(game.collectionFrames).toBe(0);
     expect(game.transition).toBe('boss-defeat-flash');
     expect(game.bullets.count).toBe(0);

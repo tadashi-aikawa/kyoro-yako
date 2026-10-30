@@ -1,7 +1,7 @@
 import type { BgmCue } from './bgm';
 
 export type BossId = 'etokichi' | 'neo' | 'obsidia' | 'jinrai' | 'claudine' | 'chappy' | 'minerva';
-export type PhaseKind = 'normal' | 'spell' | 'midboss' | 'survival' | 'finale';
+export type PhaseKind = 'normal' | 'spell' | 'midboss' | 'finale';
 export interface Phase { name: string; spell: boolean; duration: number; hp: number; pattern: string; kind: PhaseKind; }
 export interface Stage { title: string; boss: BossId; mid: BossId; bgm: BgmCue; colors: [string, string, string]; phases: Phase[]; }
 
@@ -9,9 +9,9 @@ export const STAGE_DPS = [32.4, 48.6, 48.6, 64.8, 64.8] as const;
 export const PHASE_SECONDS = { normal: 14, spell: 25, midboss: 18, finale: 60 } as const;
 export const PHASE_LIMIT = { normal: 40, spell: 60, midboss: 45, finale: Infinity } as const;
 export function phaseHp(stage: number, kind: PhaseKind): number {
-  return kind === 'survival' ? 1 : Math.round(STAGE_DPS[stage - 1] * PHASE_SECONDS[kind]);
+  return Math.round(STAGE_DPS[stage - 1] * PHASE_SECONDS[kind]);
 }
-function phase(stage: number, name: string, kind: PhaseKind, pattern: string, duration: number = kind === 'survival' ? 60 : PHASE_LIMIT[kind]): Phase {
+function phase(stage: number, name: string, kind: PhaseKind, pattern: string, duration: number = PHASE_LIMIT[kind]): Phase {
   return { name, spell: kind !== 'normal', duration, hp: phaseHp(stage, kind), pattern, kind };
 }
 export const STAGES: Stage[] = [
@@ -51,7 +51,7 @@ export const STAGES: Stage[] = [
       phase(3, '通常攻撃・配色の準備', 'normal', 'claudineQuietRings'),
       phase(3, '補色の対比', 'spell', 'complement'),
       phase(3, '余白は語る', 'spell', 'whiteSpace'),
-      phase(3, 'レスポンシブ・ブルーム', 'survival', 'final'),
+      phase(3, 'レスポンシブ・ブルーム', 'finale', 'final', 99),
     ],
   },
   {

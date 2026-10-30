@@ -79,6 +79,7 @@ it('中ボス・ボスの全員が待機・左右・構えの絵を持ち、配�
   }
   const placed = Object.keys(import.meta.glob('/public/assets/sprites/*.webp'));
   for (const id of MOTION_SPRITES) expect(placed, id).toContain(`/public/assets/sprites/${id}.webp`);
+  expect(placed).toContain('/public/assets/sprites/claudine-bloom-closed.webp');
 });
 
 it('スペルは開始時に長く構え、途中の発射でも構える', () => {

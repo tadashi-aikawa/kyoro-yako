@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { createBossMotion, updateBossMotion } from './boss-motion';
 import { hasBossMovement, patternPosition } from './boss-movement';
 import { Game } from './game';
+import { BLOOM_ATTACK, bloomBossPosition, LAYOUT_MORPH, LAYOUT_PERIOD, LAYOUT_WARNING } from './patterns/claudine-finale';
 import { MID_PHASE, midPhases, STAGES } from './stages';
 
 const SPECIAL = new Set(['sweep', 'jinraiClone', 'jinraiDash', 'interview', 'owlDawn']);
@@ -116,12 +118,27 @@ it('クロディーヌはエリア変形と同じ座標で動き、境目でも�
   const before = game.bossPosition();
   game.update();
   expect(Math.hypot(game.bossXY[0] - before[0], game.bossXY[1] - before[1])).toBeLessThan(1);
-  game.phaseFrame = 500;
+  game.phaseFrame = 800;
   const wide = game.bossPosition();
-  game.phaseFrame = 1100;
+  game.phaseFrame = 1400;
   const tall = game.bossPosition();
-  expect(wide[0]).toBeCloseTo(192); expect(tall[0]).toBeCloseTo(192);
+  expect(Math.abs(wide[0] - 192)).toBeLessThanOrEqual(32);
+  expect(Math.abs(tall[0] - 192)).toBeLessThanOrEqual(32);
+  expect(wide[0]).not.toBe(tall[0]);
   expect(wide[1]).toBeGreaterThan(tall[1]);
+});
+
+it('クロディーヌは縦長を含むどのエリアでも左右移動のスプライトへ切り替わる', () => {
+  for (let step = 0; step < 9; step++) {
+    const motion = createBossMotion(), poses = new Set<string>();
+    const begin = BLOOM_ATTACK + step * LAYOUT_PERIOD;
+    for (let frame = begin; frame < Math.min(5940, begin + LAYOUT_PERIOD); frame++) {
+      const [x] = bloomBossPosition(frame);
+      const pose = updateBossMotion(motion, 'bloom', frame, x);
+      if (frame > begin + LAYOUT_WARNING + LAYOUT_MORPH) poses.add(pose);
+    }
+    expect(poses.has('left') || poses.has('right'), `layout ${step}`).toBe(true);
+  }
 });
 
 it('5面エトキチは光線の予告から発射終了まで止まる', () => {

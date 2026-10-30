@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { BATTLE_COMMENTS, dialogue, FINAL_COMMENTS } from './dialogue';
 import { CREDITS_ROLL_FRAMES } from './ending';
 import { BATTLE_COMMENT_DELAY_FRAMES, BATTLE_COMMENT_FRAMES, Game, PHASE_MOVE_FRAMES } from './game';
+import { BLOOM_CUTIN, BLOOM_OPEN } from './patterns/claudine-finale';
 import { DASH_CUTIN } from './patterns/jinrai';
 import { STAGES } from './stages';
 import { INVITATION, RECORDS } from './story';
@@ -48,8 +49,12 @@ it.each([1, 2, 3, 4, 5])('%s階は前の技を終えてから吹き出しを読�
   expect(game.phaseHp).toBe(game.phaseMaxHp);
   game.keys.delete('KeyZ'); game.update();
   expect(game.phaseIntro).toBeUndefined(); expect(game.battleComment).toBeUndefined(); expect(game.phaseFrame).toBe(0);
-  expect(game.cutin).toBe(stage === 4 ? 0 : 100);
-  if (stage === 4) { run(game, DASH_CUTIN); expect(game.cutin).toBe(100); }
+  expect(game.cutin).toBe(stage === 3 || stage === 4 ? 0 : 100);
+  if (stage === 3) {
+    run(game, BLOOM_CUTIN - 1); expect(game.cutin).toBe(0);
+    game.update(); expect(game.cutin).toBe(100);
+    run(game, BLOOM_OPEN - BLOOM_CUTIN); expect(game.cutin).toBe(0);
+  } else if (stage === 4) { run(game, DASH_CUTIN); expect(game.cutin).toBe(100); }
   else { run(game, 105); expect(game.phaseFrame).toBe(105); expect(game.cutin).toBe(0); }
 });
 
@@ -57,6 +62,23 @@ it('最終技前のリトライで演出とコメントを持ち越さない', (
   const game = new Game(); game.startStage(1); game.startBoss(false, 5); game.skipPhase(); run(game, 70);
   expect(game.battleComment).toBeDefined(); game.startStage(2);
   expect(game.phaseIntro).toBeUndefined(); expect(game.battleComment).toBeUndefined(); expect(game.battleCommentFrames).toBe(0);
+});
+
+it('カットイン中のポーズからリトライしても道中と次の通常攻撃へ持ち越さない', () => {
+  for (const stage of [1, 2, 3, 4, 5]) {
+    const game = new Game(); game.startStage(stage); game.startBoss(false, 1); run(game, 10);
+    expect(game.cutin).toBe(90);
+    press(game, 'Escape'); expect(game.scene).toBe('pause');
+    press(game, 'ArrowDown'); press(game, 'ArrowDown'); press(game, 'KeyZ');
+    expect(game.scene).toBe('stage'); expect(game.cutin).toBe(0);
+    game.startBoss(false, 0); expect(game.cutin).toBe(0);
+  }
+});
+
+it('中ボスのカットイン中に最終技を終えても道中へ持ち越さない', () => {
+  const game = new Game(); game.startStage(2); game.startBoss(true, 0); run(game, 10);
+  expect(game.cutin).toBe(90); game.skipPhase();
+  expect(game.phase).toBeUndefined(); expect(game.cutin).toBe(0);
 });
 
 it('通常の掛け声は指定した7戦の技の間だけに出す', () => {

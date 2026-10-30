@@ -94,8 +94,8 @@ export function hasBossMovement(pattern: string): boolean { return pattern === '
 export function patternPosition(phase: Phase, frame: number, entry: Point, encoreCount = 0, level = 1): [number, number] | undefined {
   if (!hasBossMovement(phase.pattern)) return undefined;
   const baseY = phase.spell ? 132 : 77;
-  if (frame < 105 && encoreCount === 0) return moveBetween(entry, [192, baseY], frame / 90);
   if (phase.pattern === 'final') return bloomBossPosition(frame);
+  if (frame < 105 && encoreCount === 0) return moveBetween(entry, [192, baseY], frame / 90);
   // ネオの延長では射撃時計だけが巻き戻る。移動時計は通算し、延長のたびに本体が飛ぶのを防ぐ。
   const time = Math.max(0, frame - 105) + (encoreCount > 0 ? encoreCount * (phase.duration * 60 - 105) : 0);
   if (phase.pattern === 'chappyYoyo') return yoyoPosition(time, level);
