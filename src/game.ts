@@ -51,7 +51,8 @@ export const SAKURA_PERIOD = 300;
 export const SAKURA_WARNING = [84, 60, 48, 36] as const;
 export const SAKURA_GUST = 90;
 export const SAKURA_SWIRL = 24;
-export const BATTLE_COMMENT_DELAY_FRAMES = 60;
+export const BATTLE_COMMENT_COLLECTION_FRAMES = 240;
+export const BATTLE_COMMENT_DELAY_FRAMES = 30;
 export const BATTLE_COMMENT_REVEAL_FRAMES = 24;
 export const BATTLE_COMMENT_HOLD_FRAMES = 120;
 export const BATTLE_COMMENT_FADE_FRAMES = 18;
@@ -140,7 +141,7 @@ export class Game {
   messageFrames = 0;
   battleComment?: Line;
   battleCommentFrames = 0;
-  phaseIntro?: { frame: number; from: [number, number]; target: [number, number]; text: string };
+  phaseIntro?: { frame: number; commentAt?: number; from: [number, number]; target: [number, number]; text: string };
   lines: Line[] = [];
   lineIndex = 0;
   afterDialogue: 'boss' | 'mid' | 'stage' | 'clear' | 'gift' | 'intro' = 'stage';
@@ -632,8 +633,13 @@ export class Game {
       const intro = this.phaseIntro;
       if (this.pendingHit >= 0 && ++this.pendingHit >= 8) this.commitHit();
       if (this.scene !== 'stage') return;
-      if (++intro.frame === BATTLE_COMMENT_DELAY_FRAMES) this.showBattleComment(intro.text);
-      if (intro.frame >= BATTLE_COMMENT_DELAY_FRAMES + BATTLE_COMMENT_FRAMES) {
+      intro.frame++;
+      // 回収への視線が落ち着いてから話す。吸い寄せで滞空が延びても、4秒で待機を切り上げる。
+      if (intro.commentAt === undefined && (this.items.count === 0 || intro.frame >= BATTLE_COMMENT_COLLECTION_FRAMES)) {
+        intro.commentAt = intro.frame + BATTLE_COMMENT_DELAY_FRAMES;
+      }
+      if (intro.frame === intro.commentAt) this.showBattleComment(intro.text);
+      if (intro.commentAt !== undefined && intro.frame >= intro.commentAt + BATTLE_COMMENT_FRAMES) {
         this.phaseIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
         this.bossEntry = intro.target; this.startPhasePresentation();
       }
@@ -987,7 +993,7 @@ export class Game {
     if (introduce && comment) {
       const from = this.bossEntry;
       this.bossEntry = [192, phase.spell ? 132 : 77];
-      this.phaseIntro = { frame: 0, from, target: this.bossPosition(), text: comment };
+      this.phaseIntro = { frame: 0, commentAt: this.items.count === 0 ? BATTLE_COMMENT_DELAY_FRAMES : undefined, from, target: this.bossPosition(), text: comment };
       this.cutin = 0; this.ultimateFrame = -1; this.flash = 0;
       if (phase.spell) this.spellBonus = 1_000_000 + this.stage * 500_000;
       return;

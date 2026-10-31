@@ -182,7 +182,7 @@ it('最終技は再演を使わず、99秒の時間切れで取得失敗とし�
 it('5面中ボスはエトキチの3技を使い、ネオのキーやVimを再演しない', () => {
   const game = start(5, 0, true);
   for (let index = 0; index < 3; index++) {
-    for (let frame = 0; game.phaseIntro && frame < 300; frame++) game.update();
+    for (let frame = 0; game.phaseIntro && frame < 480; frame++) game.update();
     expect(game.phaseIntro).toBeUndefined();
     expect(game.remainingSpells).toBe(3 - index);
     game.phaseFrame = 104;
