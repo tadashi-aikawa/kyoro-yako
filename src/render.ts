@@ -105,6 +105,7 @@ export class Renderer {
     if (game.scene === 'ending' || game.scene === 'credits') { this.drawEnding(game); return; }
     this.drawField(game);
     this.drawPanel(game);
+    if (game.vimMovementActive) this.vimMovementHint(game);
     const ultimate = ultimateCutin(game.boss, game.phase?.pattern);
     if (ultimate && game.cutin > 0) drawUltimateCutin(c, game.images[`${game.boss}-ultimate`], game.cutin, ultimate, game.ultimateFrame);
     if (game.scene === 'letter' || (game.scene === 'pause' && game.resumeScene === 'letter')) this.drawLetter();
@@ -1371,6 +1372,24 @@ export class Renderer {
       this.image(game, `${id}-sprite`, -height / 2, -height * 0.7, height, height, alpha);
     } else {
       this.image(game, `${id}-stand`, -height / 2, -height * 0.7, height, height, alpha);
+    }
+    c.restore();
+  }
+
+  private vimMovementHint(game: Game): void {
+    const c = this.ctx;
+    // フィールド外周の余白まで使い、端でも自機との上下左右を保つ。
+    const x = FIELD.x + game.px, y = FIELD.y + game.py;
+    c.save();
+    c.font = 'bold 12px ui-monospace, monospace'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.lineWidth = 3; c.lineJoin = 'round'; c.strokeStyle = '#080817';
+    for (const [key, label, dx, dy] of [
+      ['K', 'K ↑', 0, -40], ['J', 'J ↓', 0, 28], ['H', 'H ←', -34, 0], ['L', 'L →', 34, 0],
+    ] as const) {
+      c.fillStyle = game.keys.has(`Key${key}`) ? '#fff4b7' : '#e8dfca';
+      const labelX = Math.max(12, Math.min(FIELD.x + FIELD.w + 14, x + dx));
+      const labelY = Math.max(9, Math.min(471, y + dy));
+      c.strokeText(label, labelX, labelY); c.fillText(label, labelX, labelY);
     }
     c.restore();
   }
