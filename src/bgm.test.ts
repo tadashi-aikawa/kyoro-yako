@@ -80,7 +80,7 @@ it('場面に合わせて道中・中ボス・ボス会話・終幕の曲を選�
   expect(game.bgm.cue).toBe('ending');
 });
 
-it('未配置の曲は一度だけ取得を試み、無音で進める', async () => {
+it('一時的に取得できなかった曲を次の切替で再試行できる', async () => {
   const fetchMock = vi.fn(async () => ({ ok: false }));
   vi.stubGlobal('fetch', fetchMock);
   vi.stubGlobal('AudioContext', class {
@@ -92,11 +92,12 @@ it('未配置の曲は一度だけ取得を試み、無音で進める', async (
   bgm.sync('title', false);
   bgm.unlock();
   await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+  await vi.waitFor(() => expect(bgm.diagnostics.decoding).toBe(0));
   bgm.sync('stage-gate', false);
   await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  await vi.waitFor(() => expect(bgm.diagnostics.decoding).toBe(0));
   bgm.sync('title', false);
-  await Promise.resolve();
-  expect(fetchMock).toHaveBeenCalledTimes(2);
+  await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
 });
 
 it.each(['title', 'ending'] as const)('%sは2秒重ねてループし、endingは2周目の余韻を使い切ってから次へつなぐ', async cue => {
@@ -135,7 +136,7 @@ it.each(['title', 'ending'] as const)('%sは2秒重ねてループし、ending�
     const bgm = new BgmPlayer(false, 60);
     bgm.sync(cue, false);
     bgm.unlock();
-    for (let i = 0; i < 8; i++) await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
     expect(starts).toEqual([[0.02, 1, 11]]);
     context.currentTime = 5;
     await vi.advanceTimersByTimeAsync(500);

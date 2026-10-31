@@ -1,10 +1,11 @@
 import './style.css';
 import { Game } from './game';
+import { GameMedia } from './game-media';
 import { Renderer } from './render';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const ctx = canvas.getContext('2d', { alpha: false })!;
-const game = new Game();
+const game = new Game(true, new GameMedia());
 const renderer = new Renderer(ctx);
 let currentDpr = window.devicePixelRatio;
 

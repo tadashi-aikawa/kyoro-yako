@@ -85,6 +85,11 @@ export class Renderer {
     // 本編の初期ロードを増やさず、動画・本文を読んでいる間に背景を先読みする。
     if (game.scene === 'ending' || game.scene === 'credits' || (game.scene === 'movie' && game.movieName === 'ending')) this.preloadCreditsArt();
     c.fillStyle = '#080817'; c.fillRect(0, 0, 640, 480);
+    if (game.media?.loading) {
+      if (!game.media.failed && game.whiteAlpha > 0 && game.media.elapsedMs < 150) this.fade(game.whiteAlpha, '#fff');
+      else this.drawMediaLoading(game);
+      return;
+    }
     if (game.scene === 'movie' || (game.scene === 'transition' && (game.transition === 'lastboss-out' || game.transition === 'jinrai-gift-out' || game.transition === 'minerva-finale-out'))) {
       c.fillStyle = '#000'; c.fillRect(0, 0, 640, 480);
       const video = game.movies.current;
@@ -113,6 +118,35 @@ export class Renderer {
     if (alpha <= 0) return;
     const c = this.ctx;
     c.save(); c.globalAlpha = alpha; c.fillStyle = color; c.fillRect(0, 0, 640, 480); c.restore();
+  }
+
+  private drawMediaLoading(game: Game): void {
+    const media = game.media!;
+    const state = media.state!;
+    const c = this.ctx;
+    c.save();
+    c.fillStyle = '#10162b'; c.fillRect(0, 0, 640, 480);
+    c.strokeStyle = '#4a5266'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(84, 98); c.lineTo(556, 98); c.moveTo(84, 405); c.lineTo(556, 405); c.stroke();
+    this.text(media.failed ? '読み込みできませんでした' : '読み込み中', 320, 134, 25, '#f0dfb1', 'center');
+    if (media.failed) {
+      const failures = state.failures.slice(0, 3);
+      failures.forEach((label, index) => { this.uiText(label, 320, 179 + index * 21, 12, '#c0c6d2', 'center'); });
+      const entries = ['読み込み直す', '未取得の音声・映像を省略して続ける', 'タイトルへ戻る'];
+      entries.forEach((label, index) => {
+        const selected = index === media.menu;
+        this.uiText(`${selected ? '▶  ' : '    '}${label}`, 320, 268 + index * 32, 14, selected ? '#ffe3a2' : '#9da5b9', 'center');
+      });
+      this.uiText('タイトルへ戻ると、このプレイの途中から再開できません', 320, 375, 11, '#9da5b9', 'center');
+    } else {
+      this.uiText(state.phase === 'video' ? '映像の再生を準備しています' : state.phase === 'audio' ? '音楽を準備しています' : '音楽と映像を準備しています', 320, 213, 15, '#d6d9e3', 'center');
+      c.fillStyle = '#252e44'; c.fillRect(156, 250, 328, 4);
+      c.fillStyle = '#dec38b'; c.fillRect(156, 250, 328 * (state.total ? state.complete / state.total : 0), 4);
+      this.uiText(`${state.complete} / ${state.total}`, 320, 283, 13, '#c0c6d2', 'center');
+      this.uiText('Esc：タイトルへ戻る', 320, 373, 12, '#9da5b9', 'center');
+    }
+    if (media.failed) this.uiText('↑↓ 選択　Z 決定　Esc タイトルへ', 320, 432, 11, '#9da5b9', 'center');
+    c.restore();
   }
 
   private text(value: string, x: number, y: number, size = 14, color = '#fff', align: CanvasTextAlign = 'left', shadowBlur = 4): void {

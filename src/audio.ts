@@ -1,3 +1,5 @@
+import type { MediaAssets } from './media-assets';
+
 export type Sound = 'shot' | 'hit' | 'graze' | 'kill' | 'bomb' | 'declare' | 'ultimateStamp' | 'ultimateShine' | 'capture' | 'item' | 'extend'
   | 'enemyShot' | 'jinraiShot' | 'jinraiCharge' | 'jinraiRecharge' | 'jinraiCrackle' | 'jinraiWarp' | 'laser' | 'thunder' | 'thunderBurst' | 'ninpo' | 'slash' | 'wind' | 'turn' | 'split' | 'sweepCharge' | 'sweepBurst' | 'prayerCharge' | 'owlRelease' | 'roseCharge' | 'roseBloom' | 'chappySnap' | 'caromTap' | 'fireworkRise' | 'fireworkGrandRise' | 'fireworkBoom';
 export const ULTIMATE_SHINE_DURATION = 1.05;
@@ -44,6 +46,13 @@ export class AudioBank {
   private warpRequested = false;
   private warpBuffer?: AudioBuffer;
   private warpLoading?: Promise<void>;
+  private warpGeneration = 0;
+
+  constructor(private readonly assets?: MediaAssets) {}
+
+  get stageSoundReady(): boolean { return !this.warpRequested || !this.context || !!this.warpBuffer || !!this.assets?.isSkipped('sound:jinrai-warp'); }
+  async prepareStageSound(): Promise<void> { if (this.warpRequested && this.context) await this.loadJinraiWarp(); }
+  releaseStageSound(): void { this.warpRequested = false; this.warpGeneration++; this.warpBuffer = undefined; this.warpLoading = undefined; }
 
   prepareUltimate(): void {
     this.ultimateRequested = true;
@@ -53,19 +62,27 @@ export class AudioBank {
 
   prepareJinraiWarp(): void {
     this.warpRequested = true;
-    if (this.context) void this.loadJinraiWarp();
+    if (this.context && !this.assets) void this.loadJinraiWarp();
   }
 
   private loadJinraiWarp(): Promise<void> {
     const context = this.context;
     if (!context || this.warpBuffer) return Promise.resolve();
+    if (this.assets?.isSkipped('sound:jinrai-warp')) return Promise.resolve();
     if (this.warpLoading) return this.warpLoading;
+    const generation = this.warpGeneration;
     this.warpLoading = (async () => {
-      const response = await fetch(`${import.meta.env.BASE_URL}assets/audio/jinrai-warp.mp3`);
-      if (!response.ok) throw new Error('Unable to load jinrai warp sound');
-      this.warpBuffer = await context.decodeAudioData(await response.arrayBuffer());
-    })().catch(() => { /* 読み込みに失敗しても進行を止めず、後の先読み・音声解除で再試行する */ })
-      .finally(() => { this.warpLoading = undefined; });
+      let data: ArrayBuffer;
+      if (this.assets) data = await (await this.assets.load('sound:jinrai-warp')).arrayBuffer();
+      else {
+        const response = await fetch(`${import.meta.env.BASE_URL}assets/audio/jinrai-warp.mp3`);
+        if (!response.ok) throw new Error('Unable to load jinrai warp sound');
+        data = await response.arrayBuffer();
+      }
+      const buffer = await context.decodeAudioData(data);
+      if (generation === this.warpGeneration) this.warpBuffer = buffer;
+    })().catch(error => { if (this.assets) throw error; })
+      .finally(() => { if (generation === this.warpGeneration) this.warpLoading = undefined; });
     return this.warpLoading;
   }
 
@@ -91,7 +108,7 @@ export class AudioBank {
       this.context ??= new AudioContext();
       if (this.context.state === 'suspended') void this.context.resume().catch(() => {});
       if (this.ultimateRequested) this.prepareShineBuffer();
-      if (this.warpRequested) void this.loadJinraiWarp();
+      if (this.warpRequested && !this.assets) void this.loadJinraiWarp();
     } catch { /* 音声を使えない環境でもゲームを続ける */ }
   }
 
@@ -324,3 +341,4 @@ export class AudioBank {
     if (rising || sound === 'fireworkBoom') this.fireworkSources.add(source);
   }
 }
+

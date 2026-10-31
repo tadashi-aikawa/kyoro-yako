@@ -5,6 +5,7 @@ import { patternPosition } from './boss-movement';
 import { BATTLE_COMMENTS, dialogue, ENDINGS, FINAL_COMMENTS, INTRO_LINES, type Line, midDialogue } from './dialogue';
 import { CREDITS_FADE_FRAMES, CREDITS_FIN_FRAME, CREDITS_ROLL_FRAMES, creditsFade, ENDING_EXIT_FRAMES, ENDING_LINE_FADE, ENDING_LINE_GAP, ENDING_READ_FRAMES } from './ending';
 import { ENEMY_ROOMS, enemyFireFrames } from './enemy-design';
+import type { GameMedia } from './game-media';
 import { ENDING_MOVIES, MOVIES, type MovieName, MoviePlayer } from './movies';
 import { obsidiaPosition } from './obsidia-movement';
 import { emitBossNormal } from './patterns/boss-normal';
@@ -168,7 +169,7 @@ export class Game {
   vimAttack?: VimAttack;
   jinraiIssen?: Issen;
   jinraiWindDirection = 0;
-  readonly audio = new AudioBank();
+  readonly audio: AudioBank;
   readonly bgm: BgmPlayer;
   readonly keys = new Set<string>();
   readonly images: Record<string, HTMLImageElement> = {};
@@ -179,13 +180,15 @@ export class Game {
   get unlockedStages(): number { return this.unlocked; }
 
   // 道中の単体テストは題字と暗幕を省略し、waveの時計を直接検証できる。
-  constructor(private readonly presentation = true) {
-    this.movies = new MoviePlayer(this.params.get('bgm') === '0');
+  constructor(private readonly presentation = true, readonly media?: GameMedia) {
+    this.audio = new AudioBank(media?.assets);
+    this.movies = new MoviePlayer(this.params.get('bgm') === '0', media?.assets);
     this.optionVolume = safeLoad('owlery-volume', 50, (s) => Math.max(0, Math.min(100, Number(s) || 0)));
     this.audio.volume = this.optionVolume / 100;
     this.optionBgmVolume = safeLoad('owlery-bgm-volume', 60, (s) => Number.isFinite(Number(s)) ? Math.max(0, Math.min(100, Number(s))) : 60);
     this.movies.setVolume(this.optionBgmVolume);
-    this.bgm = new BgmPlayer(this.params.get('bgm') === '0', this.optionBgmVolume);
+    this.bgm = new BgmPlayer(this.params.get('bgm') === '0', this.optionBgmVolume, media?.assets);
+    media?.attach(this.bgm, this.movies, this.audio);
     for (const id of new Set([...PLAYERS, ...Object.keys(NAMES)])) {
       for (const form of ['face', 'stand']) {
         const image = new Image();
@@ -219,6 +222,8 @@ export class Game {
       this.images[`enemy-${room}`] = image;
     }
     this.initQuery();
+    if (this.scene === 'title') media?.enterTitle();
+    else if (media && media.stage === undefined) media.enterStage(this.scene === 'ending' || this.scene === 'credits' ? 5 : this.stage);
     if (this.scene === 'title') this.movies.preload(['opening']);
     this.syncBgm();
     window.addEventListener('keydown', (event) => {
@@ -298,6 +303,21 @@ export class Game {
   private accept(): boolean { return this.just('KeyZ') || this.just('Enter'); }
 
   update(): void {
+    if (this.media?.loading) {
+      this.audio.stopEnergy();
+      if (this.just('Escape')) this.returnToTitle();
+      else if (this.media.failed) {
+        if (this.just('ArrowDown')) this.media.menu = (this.media.menu + 1) % 3;
+        if (this.just('ArrowUp')) this.media.menu = (this.media.menu + 2) % 3;
+        if (this.accept()) {
+          if (this.media.menu === 0) this.media.retry();
+          else if (this.media.menu === 1) this.media.skip();
+          else this.returnToTitle();
+        }
+      }
+      this.pressed.clear();
+      return;
+    }
     if (this.scene !== 'stage') this.audio.stopEnergy();
     this.frame++;
     if (this.flash > 0) this.flash--;
@@ -313,12 +333,12 @@ export class Game {
     this.pressed.clear();
   }
 
-  private syncBgm(): void {
+  private syncBgm(): BgmCue | null {
     this.movies.setVolume(this.optionBgmVolume);
     if (this.scene === 'title') this.movies.preload(['opening']);
     if (this.scene === 'pause' || this.scene === 'gameover') {
       this.bgm.sync(this.bgm.cue, true, this.bgm.sceneVolumeMultiplier);
-      return;
+      return this.bgm.cue;
     }
     let cue: BgmCue | null;
     const lastbossQuiet = (this.scene === 'movie' && this.movieName === 'lastboss') || (this.scene === 'transition' && !!this.transition?.startsWith('lastboss'));
@@ -340,7 +360,8 @@ export class Game {
     const titleFrame = ultimate ? ultimateCueFrame(ultimate, ULTIMATE_TITLE) : 0;
     const titleQuiet = ultimate && this.cutin > 0 && this.ultimateFrame >= titleFrame - 8 && this.ultimateFrame < titleFrame + Math.round(ULTIMATE_SHINE_DURATION * 60);
     const multiplier = this.scene === 'credits' ? 1 - creditsFade(this.creditsFrame) : ultimateQuiet ? 0.1 : titleQuiet || lastbossQuiet || postBossQuiet ? 0.35 : 1;
-    this.bgm.sync(cue, false, multiplier, this.scene === 'credits' ? 1 / 60 : ultimate ? 0.18 : 1);
+    if (!this.media || this.media.ensure(cue, this.scene === 'movie' ? this.movieName : undefined)) this.bgm.sync(cue, false, multiplier, this.scene === 'credits' ? 1 / 60 : ultimate ? 0.18 : 1);
+    return cue;
   }
 
   private updateMenu(): void {
@@ -429,8 +450,10 @@ export class Game {
   }
 
   private returnToTitle(): void {
+    this.movies.stop(); this.movieName = undefined; this.movieDone = undefined;
     this.resetBossPresentation();
     this.scene = 'title'; this.menu = 0;
+    this.media?.enterTitle();
   }
 
   private startMovies(names: readonly MovieName[], done: () => void): void {
@@ -444,8 +467,12 @@ export class Game {
       }
       this.scene = 'movie';
       this.movieName = names[index];
-      this.syncBgm();
-      this.movies.play(names[index], () => next(index + 1), names[index] === 'lastboss' || names[index] === 'jinrai-gift' || names[index] === 'minerva-finale');
+      const movie = names[index];
+      const mediaStage = movie === 'opening' ? 1 : movie === 'jinrai-gift' ? 4 : 5;
+      if (this.media && (this.media.stage !== mediaStage || movie === 'opening')) this.media.enterStage(mediaStage, movie === 'opening');
+      const cue = this.syncBgm();
+      const play = () => { this.syncBgm(); this.movies.play(movie, () => next(index + 1), movie === 'lastboss' || movie === 'jinrai-gift' || movie === 'minerva-finale'); };
+      if (!this.media || this.media.ensure(cue, movie, play)) play();
     };
     next(0);
   }
@@ -492,6 +519,7 @@ export class Game {
         this.movies.stop(); this.movieName = undefined;
         this.transition = 'lastboss-hold'; this.transitionFrame = 0;
         this.bgm.preload('boss-minerva');
+        this.media?.warmCue('boss-minerva');
       }
     } else if (this.transition === 'lastboss-hold') {
       if (this.transitionFrame >= 60) {
@@ -587,6 +615,7 @@ export class Game {
     this.postBoss = false; this.departureFrame = 0; this.giftFrame = 0;
     this.arrivalFrame = 0; this.arrivalFromWhite = false;
     this.stage = stage;
+    this.media?.enterStage(stage);
     this.stageFrame = 0;
     this.stageIntroFrame = this.presentation ? 0 : 180;
     const boss = STAGES[stage - 1].boss;
@@ -619,6 +648,7 @@ export class Game {
     this.clearBullets(); this.shots.clear(); this.enemies.clear(); this.items.clear(); this.particles.clear(); this.clones.clear();
     this.highScore = safeLoad(`owlery-high-${this.difficulty}`, 0, (s) => Number(s) || 0);
     this.messageFrames = 0;
+    if (this.media) this.syncBgm();
   }
 
   private updateStage(): void {
@@ -1693,7 +1723,7 @@ export class Game {
   }
 
   get debugState(): Record<string, string | number | null> {
-    const audio = { bgmVolume: this.bgm.effectiveVolume };
+    const audio = { bgmVolume: this.bgm.effectiveVolume, mediaLoading: Number(!!this.media?.loading), mediaFailed: Number(!!this.media?.failed), mediaFiles: this.media?.assets.diagnostics.files ?? 0, mediaBytes: this.media?.assets.diagnostics.bytes ?? 0, bgmBuffers: this.bgm.diagnostics.tracks, bgmBytes: this.bgm.diagnostics.bytes };
     const effects = { ...audio, bgmMultiplier: this.bgm.sceneVolumeMultiplier, movie: this.movieName ?? null, stageFrame: this.stageFrame, stageIntroFrame: this.stageIntroFrame, arrivalFrame: this.arrivalFrame, transition: this.transition ?? null, transitionFrame: this.transitionFrame, whiteAlpha: this.whiteAlpha, departureFrame: this.departureFrame, items: this.items.count, giftFrame: this.giftFrame, giftItems: this.items.objects.filter((item) => item.active && item.gift).length, phaseFrame: this.phaseFrame, endingFrame: this.endingFrame, creditsFrame: this.creditsFrame };
     return { ...effects, scene: this.scene, stage: this.stage, boss: this.boss ? NAMES[this.boss] : null, bossRole: this.boss ? this.midboss ? 'midboss' : 'boss' : null, phase: this.phase ? this.phaseIndex : -1, spell: this.phase?.spell ? this.phase.name : null, phaseRemainingSeconds: this.phase ? Number.isFinite(this.phase.duration) ? Math.max(0, (this.phase.duration * 60 - this.phaseFrame) / 60) : '∞' : null, phaseHpRatio: this.phase ? Math.max(0, this.phaseHp / this.phaseMaxHp) : null, bullets: this.bullets.count, graphNodes: this.graphNodes.length, graphEdges: this.graphEdges.length, reprise: this.minervaReprise ? REPRISES[this.minervaReprise.index].phase.name : null, score: this.score, power: this.power, maxform: Number(this.awakened), lives: this.lives, bombs: this.bombs, fps: this.fps, bgm: this.bgm.cue };
   }
