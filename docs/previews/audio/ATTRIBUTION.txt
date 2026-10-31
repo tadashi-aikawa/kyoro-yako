@@ -1,0 +1,23 @@
+Sound effects by OtoLogic (https://otologic.jp/)
+License: Creative Commons Attribution 4.0 International
+https://creativecommons.org/licenses/by/4.0/
+Source collection: https://otologic.jp/free/se/motion-agility01.html
+License information: https://otologic.jp/free/license.html
+
+Motion-Agility13-2(Short)
+File: otologic-motion-agility13-2-short.mp3
+Source: https://otologic.jp/sounds/se/pre2/Motion-Agility13-2%28Short%29.mp3
+SHA-256: 23e6084687a87378a996edc42ce2d601c1c428fe4966a0d11fcca3a86389f298
+
+Motion-Agility09-1
+File: otologic-motion-agility09-1.mp3
+Source: https://otologic.jp/sounds/se/pre2/Motion-Agility09-1.mp3
+SHA-256: d525caa6a2753b880ec6f15b97d87c93dcce3742ac18602aba1dace120256997
+
+Motion-Agility13-1(Mid)
+File: otologic-motion-agility13-1-mid.mp3
+Source: https://otologic.jp/sounds/se/pre2/Motion-Agility13-1%28Mid%29.mp3
+SHA-256: 23cc132a4da1e11b383265503dab4850d3d88cc1188de17f5e61a9ec6af3125e
+
+No modifications to the downloaded files.
+These files are audition candidates and are not loaded by the game.
