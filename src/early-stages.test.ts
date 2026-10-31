@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { claudineScene } from './patterns/claudine';
-import { vimScene } from './patterns/neo';
+import { VIM_PREPARE } from './patterns/neo';
 import { midPhases, PHASE_LIMIT, phaseHp, STAGE_DPS, STAGES } from './stages';
 
 beforeEach(() => {
@@ -60,7 +60,7 @@ it('エトワールの星は予告後に楕円軌道から重力でこぼれる'
   expect(star.vy).toBeGreaterThan(vy);
 });
 
-it('キーバインドは光るキーだけが予告後に落ち、Vimは予告中に弾を出さない', () => {
+it('キーバインドは光るキーだけが予告後に落ち、HJKLへの切替直後は弾を出さない', () => {
   const rain = start(1, 1);
   const keys = rain.bullets.objects.filter((b) => b.active && b.motion === 'keyDrop');
   expect(keys).toHaveLength(6);
@@ -68,7 +68,7 @@ it('キーバインドは光るキーだけが予告後に落ち、Vimは予告�
   for (let i = 0; i < 74; i++) rain.update();
   expect(keys[0].y).toBeGreaterThan(y);
   const vim = start(1, 3);
-  expect(vim.vimAttack).toBeDefined(); expect(vim.bullets.count).toBe(0);
+  expect(vim.vimMovementActive).toBe(true); expect(vim.bullets.count).toBe(0);
 });
 
 it('沼では弾と自機が減速し、Enterの列は予告中に止まる', () => {
@@ -188,7 +188,7 @@ it('5面中ボスはエトキチの3技を使い、ネオのキーやVimを再�
     game.phaseFrame = 104;
     game.update();
     expect(game.bullets.count).toBeGreaterThan(0);
-    expect(game.vimAttack).toBeUndefined();
+    expect(game.vimMovementActive).toBe(false);
     expect(game.keyboardWord).toBe('');
     expect(game.bullets.objects.some((b) => b.active && b.keyLabel)).toBe(false);
     game.skipPhase();
@@ -222,7 +222,7 @@ it('一掃は移動と溜めの後に四方へ広がる', () => {
   }
 });
 
-it('Easyほど各スペルの予告が長い', () => {
+it('Easyの各スペルの予告・猶予はLunaticより長い', () => {
   for (const [stage, phase, motion, mid] of [
     [1, 0, 'etoileOrbit', true],
     [1, 1, 'keyDrop', false],
@@ -234,5 +234,5 @@ it('Easyほど各スペルの予告が長い', () => {
     expect(easy.delay || easy.releaseAt, motion).toBeGreaterThan(lunatic.delay || lunatic.releaseAt);
   }
   expect(start(2, 3, false, 'easy').graphNodes[0].warning).toBeGreaterThan(start(2, 3, false, 'lunatic').graphNodes[0].warning);
-  expect(vimScene(0, 0).warning).toBeGreaterThan(vimScene(0, 3).warning);
+  expect(VIM_PREPARE[0]).toBeGreaterThan(VIM_PREPARE[3]);
 });

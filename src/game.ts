@@ -26,7 +26,7 @@ import { gravityScene } from './patterns/minerva-inquiry';
 import { REPRISES, type Reprise, repriseLocal, repriseView } from './patterns/minerva-reprise';
 import { type InterviewRing, interviewRingBlocksShot, updateInterviewRings } from './patterns/minerva-ring';
 import { MINERVA_OWL_SPRITES, MINERVA_SOLO_SPRITES, reprisePrepare } from './patterns/minerva-summon';
-import { emitNeo, inBog, updateVimBullet, type VimAttack } from './patterns/neo';
+import { emitNeo, inBog } from './patterns/neo';
 import { emitNeoEncore, encoreBogTime } from './patterns/neo-encore';
 import { emitObsidia, sweepPosition, tags } from './patterns/obsidia';
 import { type GraphEdge, type GraphNode, updateObsidiaGraph } from './patterns/obsidia-graph';
@@ -38,7 +38,7 @@ import { ULTIMATE_CUTINS, ULTIMATE_SECOND_STAMP, ULTIMATE_TITLE, ultimateCueFram
 
 export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'letter' | 'stage' | 'arrival' | 'transition' | 'dialogue' | 'gift' | 'departure' | 'clear' | 'pause' | 'gameover' | 'movie' | 'ending' | 'credits';
 type AfterBossMovie = 'jinrai-gift' | 'minerva-finale';
-export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'kunai' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'starOwl' | 'starTrail' | 'jinraiHeart' | 'jinraiSpark' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'tagPull' | 'sweepRadial' | 'chappyYoyo' | 'chappyStitch' | 'chappySugar' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'bloomRocket' | 'bloomSpark'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
+export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'kunai' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'starOwl' | 'starTrail' | 'jinraiHeart' | 'jinraiSpark' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'enterLine' | 'bookshelf' | 'vanish' | 'tagPull' | 'sweepRadial' | 'chappyYoyo' | 'chappyStitch' | 'chappySugar' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'bloomRocket' | 'bloomSpark'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
 export interface JinraiLaser { x: number; y: number; angle: number; age: number; warning: number; life: number; speed: number; }
 export interface Shot { active: boolean; x: number; y: number; vx: number; vy: number; damage: number; radius: number; homing: boolean; }
 export type WaveKind = 'arc' | 'ring' | 'cross' | 'threeWay' | 'return' | 'sweep' | 'pincer' | 'serpent' | 'orbit' | 'chevron';
@@ -166,7 +166,6 @@ export class Game {
   graphFrame = 0;
   galaxyFlash?: GalaxyFlash;
   keyboardWord = '';
-  vimAttack?: VimAttack;
   jinraiIssen?: Issen;
   jinraiWindDirection = 0;
   readonly audio: AudioBank;
@@ -711,9 +710,14 @@ export class Game {
     if (collecting && this.scene === 'stage' && --this.collectionFrames === 0) this.leaveBossFight();
   }
 
+  get vimMovementActive(): boolean {
+    return !this.phaseIntro && (this.phase?.pattern === 'vim' || this.phase?.pattern === 'neoEncore' && this.encoreCount === 2);
+  }
+
   private updatePlayer(canAttack = true): void {
-    let dx = Number(this.held('ArrowRight')) - Number(this.held('ArrowLeft'));
-    let dy = Number(this.held('ArrowDown')) - Number(this.held('ArrowUp'));
+    const vim = this.vimMovementActive;
+    let dx = Number(this.held(vim ? 'KeyL' : 'ArrowRight')) - Number(this.held(vim ? 'KeyH' : 'ArrowLeft'));
+    let dy = Number(this.held(vim ? 'KeyJ' : 'ArrowDown')) - Number(this.held(vim ? 'KeyK' : 'ArrowUp'));
     const focus = this.held('ShiftLeft') || this.held('ShiftRight');
     const length = Math.hypot(dx, dy) || 1;
     const bogTime = this.phase?.pattern === 'neoEncore' && this.encoreCount === 3 ? encoreBogTime(this) : this.phaseFrame - 105;
@@ -790,7 +794,6 @@ export class Game {
     this.pendingLifeLoss = 1;
     this.pendingHit = -1;
     if (this.invincible) return;
-    this.vimAttack = undefined;
     this.lives -= lifeLoss;
     this.bombs = Math.max(3, this.bombs);
     const lostPower = Math.min(1, this.power);
@@ -1290,7 +1293,6 @@ export class Game {
     this.audio.stopFireworks();
     this.bullets.clear();
     this.jinraiBolts.length = 0; this.jinraiThunderstorm = undefined;
-    this.vimAttack = undefined;
     this.interviewRings.length = 0;
     this.graphNodes.length = 0; this.graphEdges.length = 0; this.graphFrame = 0;
     this.galaxyFlash = undefined;
@@ -1339,7 +1341,6 @@ export class Game {
         b.active = false; return;
       }
       if (b.motion === 'jinraiHeart') updateJinraiHeart(b, this.px, this.py);
-      if (b.motion === 'vim') updateVimBullet(b);
       if (b.motion === 'starTrail' && b.age === b.releaseAt + 1 && b.gridRow % 8 === 0 && b.sway > 0) this.audio.play('turn');
       if (b.launchSoundPending) {
         b.launchSoundPending = false;

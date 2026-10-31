@@ -1,5 +1,6 @@
 import { enterBossX } from '../boss-movement';
-import type { Bullet, Game } from '../game';
+import type { Game } from '../game';
+import { FIELD } from '../rules';
 
 const levelOf = (game: Game) => ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
 export const KEY_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'] as const;
@@ -12,74 +13,31 @@ export const KEY_WORDS = [
 export function keyPosition(row: number, column: number): [number, number] {
   return [39 + row * 12 + column * 32, 98 + row * 26];
 }
-const VIM_ATTACKS = [
-  { command: '3j', rounds: 3, shift: 0, copies: 0, erase: false },
-  { command: '3j2hyyp', rounds: 3, shift: -1, copies: 1, erase: false },
-  { command: '2h', rounds: 1, shift: -1, copies: 0, erase: false },
-  { command: '2lyy2p', rounds: 1, shift: 1, copies: 2, erase: false },
-  { command: 'yy3p', rounds: 1, shift: 0, copies: 3, erase: false },
-  { command: '2hyy3p', rounds: 1, shift: -1, copies: 3, erase: false },
-  { command: '2l', rounds: 1, shift: 1, copies: 0, erase: false },
-  { command: '3jdd', rounds: 3, shift: 0, copies: 0, erase: true },
-  { command: 'dd', rounds: 2, shift: 0, copies: 0, erase: true },
-] as const;
-export const VIM_COMMANDS = VIM_ATTACKS.map((attack) => attack.command);
-export const VIM_PERIOD = 210;
-export interface VimAttack { wave: number; x: number; y: number; angle: number; }
-export function vimScene(t: number, level: number) {
-  const wave = Math.floor(Math.max(0, t) / VIM_PERIOD);
-  const attack = VIM_ATTACKS[wave % VIM_ATTACKS.length];
-  const step = Math.max(0, t) % VIM_PERIOD;
-  return { wave, ...attack, step, warning: [72, 60, 48, 40][level] };
-}
-export function updateVimBullet(b: Bullet): void {
-  // h/l は弾道を左/右へ2段ずらす。扇の速度は保ち、上下の進みを止めない。
-  const step = b.age - b.releaseAt;
-  if (step >= 0 && step < 12 || step >= 24 && step < 36) b.x += b.sway;
-  if (step >= 36) b.motion = 'normal';
-}
-
+export const VIM_PREPARE = [150, 150, 120, 105] as const;
 function emitVim(game: Game, t: number, level: number): void {
-  const scene = vimScene(t, level);
-  if (game.bombFrames > 0) return;
-  if (scene.step === 0) {
-    const [x, y] = game.bossPosition();
-    game.vimAttack = { wave: scene.wave, x, y, angle: Math.PI / 2 };
-  }
-  // 予告と後続射撃を同じ状態へ束ねる。ボム・被弾・技切替の消去でコピー射撃も中止する。
-  const attack = game.vimAttack;
-  if (!attack || attack.wave !== scene.wave) return;
-  const elapsed = scene.step - scene.warning;
-  if (elapsed === 0) {
-    [attack.x, attack.y] = game.bossPosition();
-    attack.angle = scene.command.startsWith('3j') ? Math.PI / 2 : Math.max(0.7, Math.min(Math.PI - 0.7, Math.atan2(game.py - attack.y, game.px - attack.x)));
-  }
-  let volley = -1;
-  let copied = false;
-  const lastRound = (scene.rounds - 1) * 20;
-  if (elapsed >= 0 && elapsed <= lastRound && elapsed % 20 === 0) volley = elapsed / 20;
-  // 複合コマンドは元の扇を横へ動かし終えてから、移動後の発射位置をコピーする。
-  // 最長の複合もEasyの予告72fを含め210f内に収める。
-  const copyAt = scene.shift ? lastRound + 56 : 36;
-  const copyGap = Math.max(scene.shift ? 24 : 36, scene.rounds * 20);
-  for (let copy = 0; copy < scene.copies; copy++) for (let round = 0; round < scene.rounds; round++) {
-    if (elapsed === copyAt + copy * copyGap + round * 20) { volley = (copy + 1) * scene.rounds + round; copied = true; }
-  }
-  if (volley >= 0) {
-    const n = [7, 9, 11, 13][level], spread = [0.15, 0.13, 0.115, 0.105][level];
-    const speed = [1.25, 1.45, 1.7, 1.9][level];
-    for (let i = 0; i < n; i++) {
-      const angle = attack.angle + (i - (n - 1) / 2) * spread;
-      const b = game.spawnBullet(attack.x + (copied ? scene.shift * 43.2 : 0), attack.y, Math.cos(angle) * speed, Math.sin(angle) * speed, scene.erase ? 3 : copied ? 2 : 1);
-      if (!b) continue;
-      b.dashWave = scene.wave; b.dashOrder = volley;
-      if (scene.shift && !copied) { b.motion = 'vim'; b.sway = scene.shift * 1.8; b.releaseAt = lastRound + 19 - elapsed; }
+  const elapsed = t - VIM_PREPARE[level];
+  if (elapsed < 0 || game.bombFrames > 0) return;
+  const period = [126, 114, 102, 90][level];
+  const wave = Math.floor(elapsed / period), step = elapsed % period;
+  // 横列の抜け道がゆっくり往復する。慣れないキーでも追える幅と速度を保つ。
+  if (step === 0) {
+    const gapX = 192 + Math.sin(wave * 0.85) * 116;
+    const gap = [112, 100, 88, 78][level], spacing = [24, 22, 20, 18][level];
+    const offset = wave % 2 * spacing / 2;
+    for (let bx = 8 + offset; bx <= FIELD.w; bx += spacing) {
+      if (Math.abs(bx - gapX) < gap / 2) continue;
+      game.spawnBullet(bx, -12, 0, [1.1, 1.25, 1.45, 1.65][level], wave % 2 ? 0 : 1);
     }
   }
-  if (scene.erase && elapsed === lastRound + 30) game.bullets.forEach((b) => {
-    if (b.dashWave !== scene.wave || b.dashOrder !== 0) return;
-    game.spark(b.x, b.y, '#ffb3cc', 2); b.active = false;
-  });
+  // 横列の合間に疎らな自機狙いを挟み、左右移動だけの反復にしない。
+  if (wave % 2 === 1 && step === Math.floor(period / 2)) {
+    const [x, y] = game.bossPosition();
+    const aim = Math.atan2(game.py - y, game.px - x), n = [3, 3, 5, 5][level];
+    for (let i = 0; i < n; i++) {
+      const angle = aim + (i - (n - 1) / 2) * 0.24;
+      game.spawnBullet(x, y, Math.cos(angle) * 1.35, Math.sin(angle) * 1.35, 2);
+    }
+  }
 }
 export function enterScene(t: number, level: number) {
   const period = [260, 240, 220, 200][level];

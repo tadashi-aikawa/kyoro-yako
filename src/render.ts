@@ -22,7 +22,7 @@ import { gravityScene } from './patterns/minerva-inquiry';
 import { REPRISES, repriseLocal } from './patterns/minerva-reprise';
 import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-ring';
 import { minervaSoloSprite, OWL_RELEASE_FRAMES, reprisePrepare, summonOwl } from './patterns/minerva-summon';
-import { bogs, enterScene, KEY_ROWS, keyPosition, vimScene } from './patterns/neo';
+import { bogs, enterScene, KEY_ROWS, keyPosition, VIM_PREPARE } from './patterns/neo';
 import { encoreBogTime } from './patterns/neo-encore';
 import { SWEEP_CHARGE, SWEEP_MOVE, SWEEP_PERIOD, SWEEP_SHOTS, sweepStep, sweepTarget, tags } from './patterns/obsidia';
 import { GRAPH_FADE, GRAPH_LINE_WIDTH, graphEdgeState, graphNodeState } from './patterns/obsidia-graph';
@@ -1011,14 +1011,10 @@ export class Renderer {
         c.lineTo(x + 24 + Math.cos(a) * 12, y - 15 + Math.sin(a) * 12); c.stroke();
       }
     }
-    if (pattern === 'vim' && t >= 0) {
-      const scene = vimScene(t, level);
-      if (game.vimAttack?.wave === scene.wave && scene.step < scene.warning) {
-        // 文字は予告の1か所だけ。弾は通常のキャッシュ済みスプライトで描く。
-        c.font = 'bold 26px ui-monospace, monospace'; c.textAlign = 'center'; c.fillStyle = '#fff0b7';
-        c.fillText(scene.command, 192, 225);
-        c.fillRect(152, 234, 80 * (1 - scene.step / scene.warning), 2);
-      }
+    if (pattern === 'vim' && game.vimMovementActive && t >= 0 && t < VIM_PREPARE[level]) {
+      this.text('移動は H J K L', 192, 218, 23, '#fff0b7', 'center');
+      this.text('H ←    J ↓    K ↑    L →', 192, 248, 16, '#fff4dd', 'center');
+      this.text('矢印キーは使えない！', 192, 274, 12, '#e1caed', 'center');
     }
     if (pattern === 'dotfiles' && t >= -[120, 95, 75, 60][level]) {
       const bogTime = game.phase?.pattern === 'neoEncore' ? encoreBogTime(game) : t;
@@ -1556,10 +1552,21 @@ export class Renderer {
       c.restore();
     }
     rule(382, 0.3);
-    this.image(game, `${game.player}-face`, 444, 390, 52, 52);
-    this.text('集めた記録', 504, 401, 11, '#d9c5a0');
-    for (let i = 0; i < RECORDS.length; i++) notebookPage(c, 512 + i * 21, 424, i < game.collectedRecords.length);
-    this.uiText(`${game.collectedRecords.length} / ${RECORDS.length}`, 608, 448, 9, '#a1b6ad', 'right');
+    if (game.vimMovementActive) {
+      this.text('HJKLで移動', 448, 400, 13, '#f0dfbb');
+      this.uiText('矢印キー無効', 608, 400, 9, '#d9b9c9', 'right');
+      for (const [i, key] of ['H', 'J', 'K', 'L'].entries()) {
+        const x = 462 + i * 44;
+        const held = game.keys.has(`Key${key}`);
+        this.uiText(key, x, 425, 18, held ? '#fff4b7' : '#f0dfbb', 'center');
+        this.uiText(['←', '↓', '↑', '→'][i], x, 447, 17, held ? '#fff4b7' : '#bdccc5', 'center');
+      }
+    } else {
+      this.image(game, `${game.player}-face`, 444, 390, 52, 52);
+      this.text('集めた記録', 504, 401, 11, '#d9c5a0');
+      for (let i = 0; i < RECORDS.length; i++) notebookPage(c, 512 + i * 21, 424, i < game.collectedRecords.length);
+      this.uiText(`${game.collectedRecords.length} / ${RECORDS.length}`, 608, 448, 9, '#a1b6ad', 'right');
+    }
     c.restore();
   }
 

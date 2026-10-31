@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { GALAXY_FIRE } from './patterns/etokichi';
-import { enterScene, KEY_ROWS, KEY_WORDS, keyPosition, VIM_COMMANDS, VIM_PERIOD, vimScene } from './patterns/neo';
+import { enterScene, KEY_ROWS, KEY_WORDS, keyPosition, VIM_PREPARE } from './patterns/neo';
+import { bulletContact } from './rules';
 import { ETOKICHI_FLASH, midPhases } from './stages';
 
 beforeEach(() => {
@@ -109,109 +110,91 @@ it('キーは乱数の異なる候補から選び、次の技へ単語を持ち�
   first.skipPhase(); expect(first.keyboardWord).toBe('');
 });
 
-it.each(VIM_COMMANDS)('Vimの%sはコマンド予告が終わってから通常弾を発射する', (command) => {
+it.each([
+  ['KeyH', -1, 0], ['KeyJ', 0, 1], ['KeyK', 0, -1], ['KeyL', 1, 0],
+] as const)('技の開始直後から%sで移動する', (key, dx, dy) => {
+  const game = start(3); game.px = 192; game.py = 300;
+  game.keys.add(key); game.update();
+  expect(game.vimMovementActive).toBe(true);
+  expect(game.px).toBeCloseTo(192 + dx * 3.65);
+  expect(game.py).toBeCloseTo(300 + dy * 3.65);
+});
+
+it.each(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyW', 'KeyA', 'KeyS', 'KeyD'])('技の間は%sで動けない', (key) => {
+  const game = start(3); game.keys.add(key);
+  const origin = [game.px, game.py]; run(game, 5);
+  expect([game.px, game.py]).toEqual(origin);
+});
+
+it('HJKLの斜め移動も等速で、Shiftと逆向きの矢印を同時押しできる', () => {
+  const game = start(3); game.px = 192; game.py = 300;
+  for (const key of ['KeyH', 'KeyK', 'ShiftLeft', 'ArrowRight', 'ArrowDown']) game.keys.add(key);
+  game.update();
+  expect(192 - game.px).toBeCloseTo(1.65 / Math.SQRT2);
+  expect(300 - game.py).toBeCloseTo(1.65 / Math.SQRT2);
+});
+
+it('ボムと被弾でHJKL制限は解けず、ポーズ中は移動と弾幕が止まる', () => {
+  const game = start(3); game.phaseFrame = 104 + VIM_PREPARE[1]; game.update();
+  expect(active(game).length).toBeGreaterThan(0);
+  game.scene = 'pause'; game.keys.add('KeyH');
+  const origin = [game.px, game.py, game.phaseFrame, active(game)[0].y]; run(game, 30);
+  expect([game.px, game.py, game.phaseFrame, active(game)[0].y]).toEqual(origin);
+  game.scene = 'stage'; game.bombFrames = 90; game.update();
+  expect(active(game)).toHaveLength(0); expect(game.vimMovementActive).toBe(true);
+  game.bombFrames = 0; game.invincible = false; game.invulnFrames = 0; game.pendingHit = 7;
+  game.update(); expect(game.lives).toBe(1); expect(game.vimMovementActive).toBe(true);
+});
+
+it.each(['skip', 'defeat', 'timeout'] as const)('%sで技が終わると矢印移動へ戻り、HJKLでは動かない', (end) => {
   const game = start(3);
-  const wave = VIM_COMMANDS.indexOf(command);
-  game.phaseFrame = 104 + wave * VIM_PERIOD; game.update();
-  const scene = vimScene(wave * VIM_PERIOD, 1);
-  expect(scene.command).toBe(command); expect(game.vimAttack?.wave).toBe(wave);
-  run(game, scene.warning - 1); expect(active(game)).toHaveLength(0);
-  game.update(); expect(active(game)).toHaveLength(9);
-  expect(active(game).every((b) => b.kind === 'orb' && !b.keyLabel && b.vy > 0)).toBe(true);
-});
-
-it('3jは下向きの扇を3回発射する', () => {
-  const game = start(3); game.phaseFrame = 104; game.update(); run(game, vimScene(0, 1).warning + 40);
-  expect(active(game)).toHaveLength(27);
-  expect(new Set(active(game).map((b) => b.dashOrder))).toEqual(new Set([0, 1, 2]));
-  expect(active(game).every((b) => b.vy > 0)).toBe(true);
-});
-
-it.each([['2h', -1], ['2l', 1]] as const)('%sは自然な弾道を保って横へ2段ずらす', (command, sign) => {
-  const game = start(3), wave = VIM_COMMANDS.indexOf(command);
-  game.phaseFrame = 104 + wave * VIM_PERIOD; game.update(); run(game, vimScene(wave * VIM_PERIOD, 1).warning);
-  const b = active(game)[4], x = b.x;
-  const shift = () => b.x - x - b.vx * (b.age - 1);
-  run(game, 17); expect(shift()).toBeCloseTo(0);
-  run(game, 12); expect(shift()).toBeCloseTo(sign * 21.6);
-  run(game, 12); expect(shift()).toBeCloseTo(sign * 21.6);
-  run(game, 12); expect(shift()).toBeCloseTo(sign * 43.2);
-  game.update(); expect(b.motion).toBe('normal');
-});
-
-it('yy3pは発射元と速度をコピーし、照準を引き直さず3回追加する', () => {
-  const game = start(3), wave = VIM_COMMANDS.indexOf('yy3p'); game.phaseFrame = 104 + wave * VIM_PERIOD; game.update();
-  run(game, vimScene(wave * VIM_PERIOD, 1).warning);
-  const origin = { ...game.vimAttack! };
-  const velocities = active(game).map((b) => [b.vx, b.vy]);
-  game.px = 350; run(game, 108);
-  expect(active(game)).toHaveLength(36);
-  for (let volley = 1; volley <= 3; volley++) {
-    const copies = active(game).filter((b) => b.dashOrder === volley);
-    expect(copies.map((b) => [b.vx, b.vy])).toEqual(velocities);
-    for (const b of copies) { expect(b.x - b.vx * b.age).toBeCloseTo(origin.x); expect(b.y - b.vy * b.age).toBeCloseTo(origin.y); }
+  if (end === 'skip') game.skipPhase();
+  else {
+    if (end === 'defeat') game.phaseHp = 0;
+    else game.phaseFrame = game.phase!.duration * 60 - 1;
+    game.update();
   }
+  expect(game.vimMovementActive).toBe(false); expect(active(game)).toHaveLength(0);
+  game.px = 192; game.py = 300; game.keys.add('KeyH'); game.update();
+  expect(game.px).toBe(192);
+  game.keys.add('ArrowRight'); game.update(); expect(game.px).toBeCloseTo(195.65);
 });
 
-it('ddは先行する扇だけを消し、後続の扇を残す', () => {
-  const game = start(3), wave = VIM_COMMANDS.indexOf('dd'); game.phaseFrame = 104 + wave * VIM_PERIOD; game.update();
-  run(game, vimScene(wave * VIM_PERIOD, 1).warning);
-  const first = active(game).slice(); run(game, 49);
-  expect(active(game)).toHaveLength(18); game.update();
-  expect(first.every((b) => !b.active)).toBe(true);
-  expect(active(game)).toHaveLength(9); expect(active(game).every((b) => b.dashOrder === 1)).toBe(true);
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sでは操作に慣れる猶予の後、抜け道付きの横列と扇弾が出る', (difficulty) => {
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
+  const game = start(3, false, difficulty); game.phaseFrame = 104; game.update();
+  run(game, VIM_PREPARE[level] - 1); expect(active(game)).toHaveLength(0);
+  game.update(); const row = active(game);
+  expect(row.length).toBeGreaterThan(8);
+  expect(row.every(b => b.vx === 0 && b.vy > 0 && b.motion === 'normal' && !b.keyLabel)).toBe(true);
+  expect(row.some(b => Math.abs(b.x - 192) < 36)).toBe(false);
+  const period = [126, 114, 102, 90][level];
+  run(game, period + Math.floor(period / 2));
+  expect(active(game).some(b => b.vx !== 0 && b.color === 2)).toBe(true);
 });
 
-it('3j2hyypは3連射を2段左へずらしてから、移動後の扇を一組コピーする', () => {
-  const game = start(3), wave = VIM_COMMANDS.indexOf('3j2hyyp');
-  game.phaseFrame = 104 + wave * VIM_PERIOD; game.update(); run(game, vimScene(wave * VIM_PERIOD, 1).warning);
-  const origin = { ...game.vimAttack! };
-  run(game, 95); expect(active(game).every((b) => b.dashOrder < 3)).toBe(true);
-  run(game, 41);
-  const copies = active(game).filter((b) => b.dashOrder >= 3);
-  expect(copies).toHaveLength(27);
-  expect(new Set(copies.map((b) => b.dashOrder))).toEqual(new Set([3, 4, 5]));
-  for (const b of copies) { expect(b.motion).toBe('normal'); expect(b.x - b.vx * b.age).toBeCloseTo(origin.x - 43.2); }
-});
-
-it.each([['2lyy2p', 1, 3], ['2hyy3p', -1, 4]] as const)('%sは横移動した射撃を指定回数コピーする', (command, sign, volleys) => {
-  const game = start(3), wave = VIM_COMMANDS.indexOf(command);
-  game.phaseFrame = 104 + wave * VIM_PERIOD; game.update(); run(game, vimScene(wave * VIM_PERIOD, 1).warning);
-  const origin = { ...game.vimAttack! };
-  run(game, 56 + (volleys - 2) * 24);
-  expect(new Set(active(game).map((b) => b.dashOrder)).size).toBe(volleys);
-  for (const b of active(game).filter((b) => b.dashOrder > 0)) expect(b.x - b.vx * b.age).toBeCloseTo(origin.x + sign * 43.2);
-});
-
-it('Vimはポーズで止まり、ボム後のコピー射撃を中止して次の予告から再開する', () => {
-  const game = start(3), wave = VIM_COMMANDS.indexOf('yy3p'); game.phaseFrame = 104 + wave * VIM_PERIOD; game.update();
-  const frame = game.phaseFrame;
-  game.scene = 'pause'; run(game, 40);
-  expect(game.phaseFrame).toBe(frame); expect(game.vimAttack?.wave).toBe(wave);
-  game.scene = 'stage'; run(game, vimScene(wave * VIM_PERIOD, 1).warning + 36);
-  game.bombFrames = 2; game.update(); game.bombFrames = 0; expect(game.vimAttack).toBeUndefined();
-  while (game.phaseFrame < 104 + (wave + 1) * VIM_PERIOD) game.update();
-  expect(active(game)).toHaveLength(0);
-  game.update(); expect(game.vimAttack?.wave).toBe(wave + 1);
-  game.skipPhase(); expect(active(game)).toHaveLength(0); expect(game.vimAttack).toBeUndefined();
-});
-
-it('被弾が確定したらコピー射撃を中止する', () => {
-  const game = start(3), wave = VIM_COMMANDS.indexOf('yy3p');
-  game.phaseFrame = 104 + wave * VIM_PERIOD; game.update(); run(game, vimScene(wave * VIM_PERIOD, 1).warning);
-  game.invincible = false; game.invulnFrames = 0; game.pendingHit = 7;
-  game.update(); expect(game.lives).toBe(1); expect(game.vimAttack).toBeUndefined();
-  run(game, 108); expect(active(game).every((b) => b.dashOrder === 0)).toBe(true);
-});
-
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sでも全コマンドの最後のコピーまで次の予告前に出る', (difficulty) => {
-  const volleys = [3, 6, 1, 3, 4, 4, 1, 3, 2];
-  for (const [wave, count] of volleys.entries()) {
-    const game = start(3, false, difficulty); game.phaseFrame = 104 + wave * VIM_PERIOD;
-    const seen = new Set<number>();
-    for (let i = 0; i < VIM_PERIOD; i++) { game.update(); for (const b of active(game)) seen.add(b.dashOrder); }
-    expect([...seen].sort((a, b) => a - b), `${difficulty} ${VIM_COMMANDS[wave]}`).toEqual(Array.from({ length: count }, (_, i) => i));
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの横列に端まで固定の安全列が残らない', (difficulty) => {
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
+  const game = start(3, false, difficulty), unsafe = new Set<number>();
+  const period = [126, 114, 102, 90][level];
+  for (let wave = 0; wave < 16; wave++) {
+    game.bullets.clear(); game.phaseFrame = 104 + VIM_PREPARE[level] + wave * period; game.update();
+    const row = active(game);
+    for (let x = 9; x <= 375; x++) {
+      if (row.some(b => bulletContact(x, 320, b.x, 320, b.radius, false) === 'hit')) unsafe.add(x);
+    }
   }
+  expect(unsafe.size).toBe(367);
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sでも上端の自機へ横列を直接重ねず、画面外から降らせる', (difficulty) => {
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
+  const game = start(3, false, difficulty); game.invincible = false; game.invulnFrames = 0;
+  game.px = 96; game.py = 12; game.phaseFrame = 104 + VIM_PREPARE[level]; game.update();
+  const row = active(game);
+  expect(row.length).toBeGreaterThan(8);
+  expect(row.every(b => b.y < 0 && b.vy > 0)).toBe(true);
+  expect(game.pendingHit).toBe(-1); expect(game.lives).toBe(2);
 });
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('Enterは%sでも行の穴を残して一斉に落ち、同じX座標に居続けられない', (difficulty) => {
