@@ -3,6 +3,7 @@ import { Game } from './game';
 import { DASH_ATTACK, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
 import { PRAYER_PERIOD } from './patterns/minerva-dawn';
 import { STAGES } from './stages';
+import { ULTIMATE_CUTINS, ULTIMATE_FADE_EXTRA, ULTIMATE_HOLD, ultimateCueFrame } from './ultimate-cutin';
 
 beforeEach(() => {
   vi.stubGlobal('location', { search: '' });
@@ -10,6 +11,31 @@ beforeEach(() => {
   vi.stubGlobal('Image', class { src = ''; complete = true; naturalWidth = 0; });
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+it.each([[3, 9, 120, 'claudine'], [4, 10, 150, 'jinrai'], [5, 10, 0, 'minerva']] as const)('%s面は絵と技名を72フレーム保持し、その間は攻撃とボーナスの時計を止める', (stage, phase, start, boss) => {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true;
+  game.startStage(stage); game.startBoss(false, phase);
+  while (game.phaseFrame < start) game.update();
+  const spec = ULTIMATE_CUTINS[boss], begin = game.frame;
+  for (let i = 0; i < ultimateCueFrame(spec, 96); i++) game.update();
+  const stopped = [game.phaseFrame, game.cutin, game.spellBonus];
+  const portraitFrame = game.ultimateFrame;
+  const item = game.spawnItem(90, 300, 'point', false)!;
+  const world = [game.px, game.py, item.x, item.y, item.vx, item.vy]; game.keys.add('ArrowRight');
+  for (let i = 0; i < ULTIMATE_HOLD; i++) game.update();
+  expect([game.phaseFrame, game.cutin, game.spellBonus]).toEqual(stopped);
+  expect([game.px, game.py, item.x, item.y, item.vx, item.vy]).toEqual(world); game.keys.clear();
+  expect(game.ultimateFrame).toBe(portraitFrame + ULTIMATE_HOLD);
+  expect(game.bullets.count).toBe(0);
+  game.scene = 'pause'; game.resumeScene = 'stage';
+  for (let i = 0; i < 30; i++) game.update();
+  expect(game.ultimateFrame).toBe(portraitFrame + ULTIMATE_HOLD); game.scene = 'stage';
+  while (game.cutin > 0) game.update();
+  expect(game.phaseFrame).toBe(start + spec.duration);
+  expect(game.frame - begin - 30).toBe(spec.duration + ULTIMATE_HOLD + ULTIMATE_FADE_EXTRA);
+  expect(game.ultimateFrame).toBe(-1);
+  game.startStage(stage); expect(game.ultimateFrame).toBe(-1); expect(game.cutin).toBe(0);
+});
 
 it.each([[3, 9, 120, 'roseBloom'], [5, 10, 0, 'capture']] as const)('%s面の最終宣言は専用絵を読み、二拍と技名を既存の100フレームへ収める', (stage, phase, start, titleSound) => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;

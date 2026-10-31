@@ -274,8 +274,9 @@ it('一閃はゆっくり移動し、印から1秒後にカットインを挟ん
   expect(play).not.toHaveBeenCalledWith('jinraiCharge');
   const hp = game.phaseHp;
   game.autoshot = true; game.power = 5;
-  for (let frame = 1; frame < DASH_ATTACK; frame++) {
+  for (let tick = 1; game.phaseFrame < DASH_ATTACK - 1 && tick < DASH_ATTACK + 100; tick++) {
     game.px = game.bossXY[0]; game.update();
+    const frame = game.phaseFrame;
     expect(game.bullets.count).toBe(0);
     expect(game.jinraiDashTick).toBe(-1);
     expect(game.phaseHp).toBe(hp);
@@ -288,7 +289,7 @@ it('一閃はゆっくり移動し、印から1秒後にカットインを挟ん
     if (frame < DASH_CHARGE_START) expect(play).not.toHaveBeenCalledWith('jinraiCharge');
     if (frame === DASH_CHARGE_START) expect(play).toHaveBeenCalledWith('jinraiCharge');
   }
-  game.update();
+  expect(game.phaseFrame).toBe(DASH_ATTACK - 1); game.update();
   expect(game.jinraiDashTick).toBe(0);
   expect(game.bossXY).toEqual([24, 115]);
   expect(game.cutin).toBe(0);
@@ -373,6 +374,7 @@ it('一閃のボーナスはミネルヴァ最終技と同じ速度で減衰し�
   for (const stage of [4, 5]) {
     const game = new Game(); game.audio.volume = 0; game.invincible = true;
     game.startStage(stage); game.startBoss(false, 10);
+    while (game.phaseFrame < (stage === 4 ? DASH_ATTACK : 105)) game.update();
     const bonus = game.spellBonus;
     for (let frame = 0; frame < 120; frame++) game.update();
     expect(game.spellBonus).toBe(bonus - 22 * 120);
@@ -618,8 +620,10 @@ it('一閃はNormalの斜め移動中に画面内へ39〜90発を維持する', 
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   game.startStage(4); game.startBoss(false, 10);
   while (game.phaseFrame < DASH_ATTACK - 105) game.update();
-  for (let frame = 1; frame <= 720; frame++) {
+  const begin = game.phaseFrame;
+  for (let tick = 1; game.phaseFrame < begin + 720 && tick < 820; tick++) {
     game.update();
+    const frame = game.phaseFrame - begin;
     if (frame < 240 || frame % 60 !== 0) continue;
     const visible = game.bullets.objects.filter((b) => b.active && b.x >= 0 && b.x <= 384 && b.y >= 0 && b.y <= 448).length;
     expect(visible, `frame ${frame}`).toBeGreaterThanOrEqual(39);

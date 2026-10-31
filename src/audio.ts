@@ -10,7 +10,7 @@ const tones: Record<Sound, [number, number, OscillatorType, number, number, numb
   capture: [880, 0.6, 'triangle', 1188, 0.12, 0.025], item: [950, 0.06, 'sine', 1283, 0.12, 0.025],
   extend: [660, 0.5, 'triangle', 891, 0.12, 0.025], enemyShot: [520, 0.08, 'triangle', 190, 0.2, 0.11],
   jinraiShot: [1700, 0.055, 'sawtooth', 130, 0.28, 0.055],
-  jinraiCharge: [65, 4, 'sine', 145, 0.38, 3.8],
+  jinraiCharge: [65, 5.5, 'sine', 145, 0.38, 5.3],
   jinraiCrackle: [120, 1.8, 'sawtooth', 120, 0.48, 1.5],
   jinraiWarp: [180, 0.55, 'sine', 85, 0.42, 0.35],
   laser: [180, 0.45, 'sawtooth', 960, 0.18, 0.3], thunder: [90, 0.5, 'sawtooth', 40, 0.24, 0.25],

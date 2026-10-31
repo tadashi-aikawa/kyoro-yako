@@ -48,7 +48,7 @@ it('ミネルヴァ最終技は指定HPから再演の難易度とHP切替の基
   const game = start('?boss=5&phase=10&hp=0.05&invincible=1');
   expect(game.phaseFrame).toBe(0);
   expect(game.debugState.phaseHpRatio).toBeCloseTo(0.05);
-  for (let frame = 0; frame < 105; frame++) game.update();
+  while (game.phaseFrame < 105) game.update();
   expect(game.minervaReprise).toMatchObject({ cycle: 0, startHp: game.phaseMaxHp * 0.05, difficulty: 'hard' });
   expect(game.debugState.phaseHpRatio).toBeCloseTo(0.05);
 });

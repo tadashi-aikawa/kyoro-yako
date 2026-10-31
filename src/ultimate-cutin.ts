@@ -1,7 +1,9 @@
-// 描画は150フレームに正規化し、各ボスの既存の導入時間へ収める。
+// 戦闘時計から演出の実時間を分離し、読むための静止と退場の余韻を挿入する。
 export const ULTIMATE_CUTIN_FRAMES = 150;
 export const ULTIMATE_SECOND_STAMP = 12;
 export const ULTIMATE_TITLE = 64;
+export const ULTIMATE_HOLD = 72;
+export const ULTIMATE_FADE_EXTRA = 18;
 
 export const ULTIMATE_CUTINS = {
   jinrai: { id: 'jinrai-issen', pattern: 'jinraiDash', declaration: '奥義', title: '迅雷一閃', duration: 150, ink: '#f5d994', light: '#9b6c1d', dark: '#16100a', end: '#292014', streak: '#f6ce65', brightStreak: '#fff2b9', edge: '#d5a946' },
@@ -14,6 +16,16 @@ export function ultimateCutin(boss: string | undefined, pattern: string | undefi
   return spec?.pattern === pattern ? spec : undefined;
 }
 export function ultimateCueFrame(spec: UltimateCutin, frame: number): number { return Math.round(frame * spec.duration / ULTIMATE_CUTIN_FRAMES); }
+export function ultimateTimeline(spec: UltimateCutin, frame: number): { age: number; battleFrame: number } {
+  const hold = ultimateCueFrame(spec, 96), fade = ultimateCueFrame(spec, 120);
+  const total = spec.duration + ULTIMATE_HOLD + ULTIMATE_FADE_EXTRA;
+  let progress = frame;
+  if (frame >= hold) progress = frame <= hold + ULTIMATE_HOLD ? hold : frame - ULTIMATE_HOLD;
+  if (frame >= fade + ULTIMATE_HOLD) progress = fade + (frame - fade - ULTIMATE_HOLD) * (spec.duration - fade) / (spec.duration - fade + ULTIMATE_FADE_EXTRA);
+  if (frame >= total) progress = spec.duration;
+  progress = Math.max(0, Math.min(spec.duration, progress));
+  return { age: progress * ULTIMATE_CUTIN_FRAMES / spec.duration, battleFrame: Math.floor(progress + 1e-6) };
+}
 
 const FONT = '"YuMincho", "Yu Mincho", "Hiragino Mincho ProN", serif';
 const clamp = (value: number): number => Math.max(0, Math.min(1, value));
@@ -34,18 +46,20 @@ function glyph(c: CanvasRenderingContext2D, text: string, age: number, x: number
   c.restore();
 }
 
-export function drawUltimateCutin(c: CanvasRenderingContext2D, image: HTMLImageElement | undefined, remaining: number, spec: UltimateCutin): void {
-  const age = (spec.duration - remaining) * ULTIMATE_CUTIN_FRAMES / spec.duration;
+export function drawUltimateCutin(c: CanvasRenderingContext2D, image: HTMLImageElement | undefined, remaining: number, spec: UltimateCutin, presentationFrame = -1): void {
+  const age = presentationFrame >= 0 ? ultimateTimeline(spec, presentationFrame).age : (spec.duration - remaining) * ULTIMATE_CUTIN_FRAMES / spec.duration;
+  const motion = presentationFrame >= 0 ? presentationFrame * ULTIMATE_CUTIN_FRAMES / spec.duration : age;
   const reveal = easeOut((age - 28) / 22);
-  const leave = easeOut((age - 130) / 20);
+  const exit = clamp((age - 120) / 30);
+  const leave = exit * exit * (3 - 2 * exit);
   const secondStamp = ULTIMATE_SECOND_STAMP * ULTIMATE_CUTIN_FRAMES / spec.duration;
   const stamp = age >= secondStamp ? age - secondStamp : age;
   const shake = Math.max(0, 5 - stamp) * Math.sin(age * 2.7);
   c.save();
   c.beginPath(); c.rect(0, 0, 640, 480); c.clip();
-  c.globalAlpha = Math.min(1, remaining / 12);
+  c.globalAlpha = 1 - leave;
   c.fillStyle = '#080805'; c.fillRect(0, 0, 640, 480);
-  c.translate(shake - leave * 90, 0);
+  c.translate(shake - leave * 36, 0);
 
   // 斜めの裂け目から人物を見せる。文字と絵は画像へ焼き込まない。
   c.save();
@@ -57,7 +71,7 @@ export function drawUltimateCutin(c: CanvasRenderingContext2D, image: HTMLImageE
   c.fillStyle = light; c.fillRect(0, 22, 820, 436);
   for (let i = 0; i < 19; i++) {
     const y = 28 + (i * 47) % 424;
-    const x = (i * 139 - age * (9 + i % 4) + 4000) % 1000 - 180;
+    const x = ((i * 139 - motion * (9 + i % 4)) % 1000 + 1000) % 1000 - 180;
     c.strokeStyle = i % 3 ? `${spec.streak}4a` : `${spec.brightStreak}aa`; c.lineWidth = i % 4 === 0 ? 2 : 0.7;
     c.beginPath(); c.moveTo(x, y); c.lineTo(x + 160, y - 38); c.stroke();
   }

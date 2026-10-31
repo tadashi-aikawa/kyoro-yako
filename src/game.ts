@@ -32,7 +32,7 @@ import { Pool } from './pool';
 import { autoCollect, bulletContact, bulletSpeed, circlesHit, type Difficulty, deathbomb, density, FIELD, type ItemKind, MAX_BOMBS, MAX_POWER, newExtends, type PlayerId, pointValue, safeLoad, safeSave } from './rules';
 import { type BossId, midPhases, NAMES, type Phase, STAGES } from './stages';
 import { readRecords } from './story';
-import { ULTIMATE_CUTINS, ULTIMATE_SECOND_STAMP, ULTIMATE_TITLE, ultimateCueFrame, ultimateCutin } from './ultimate-cutin';
+import { ULTIMATE_CUTINS, ULTIMATE_SECOND_STAMP, ULTIMATE_TITLE, ultimateCueFrame, ultimateCutin, ultimateTimeline } from './ultimate-cutin';
 
 export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'letter' | 'stage' | 'arrival' | 'transition' | 'dialogue' | 'gift' | 'departure' | 'clear' | 'pause' | 'gameover' | 'movie' | 'ending' | 'credits';
 type AfterBossMovie = 'jinrai-gift' | 'minerva-finale';
@@ -132,6 +132,7 @@ export class Game {
   encoreCount = 0;
   spellBonus = 0;
   cutin = 0;
+  ultimateFrame = -1;
   flash = 0;
   message = '';
   messageFrames = 0;
@@ -341,7 +342,7 @@ export class Game {
     else if (this.phase && !this.midboss) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else cue = STAGES[this.stage - 1].bgm;
     const ultimate = !this.phaseIntro && ultimateCutin(this.boss, this.phase?.pattern);
-    const cutinStart = this.phase?.pattern === 'jinraiDash' ? DASH_CUTIN : this.phase?.pattern === 'final' ? BLOOM_CUTIN : 0;
+    const cutinStart = this.cutinStartFrame();
     const ultimateQuiet = ultimate && this.phaseFrame >= cutinStart - 12 && this.phaseFrame < cutinStart + ULTIMATE_SECOND_STAMP + 24;
     const multiplier = this.scene === 'credits' ? 1 - creditsFade(this.creditsFrame) : ultimateQuiet ? 0.1 : lastbossQuiet || postBossQuiet ? 0.35 : 1;
     this.bgm.sync(cue, false, multiplier, this.scene === 'credits' ? 1 / 60 : ultimate ? 0.18 : 1);
@@ -582,7 +583,7 @@ export class Game {
   endingLineAlpha(index: number): number { return Math.max(0, Math.min(1, (this.endingFrame - index * ENDING_LINE_GAP) / ENDING_LINE_FADE)); }
 
   startStage(stage: number): void {
-    this.cutin = 0;
+    this.cutin = 0; this.ultimateFrame = -1;
     this.phaseIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
     this.movies.stop();
     this.movieName = undefined;
@@ -641,6 +642,7 @@ export class Game {
       }
       return;
     }
+    if (this.holdUltimate()) return;
     // 中ボスで道中の時計が止まっても、世界のスクロールは続ける。
     this.sceneryDistance += this.phase ? 0.65 : 1.8;
     if (this.stageIntroFrame < 180) {
@@ -697,7 +699,7 @@ export class Game {
     this.px = Math.max(9, Math.min(FIELD.w - 9, this.px + dx));
     this.py = Math.max(12, Math.min(FIELD.h - 9, this.py + dy));
     reflowPlayer(this);
-    const cutinStart = this.phase?.pattern === 'jinraiDash' ? DASH_CUTIN : this.phase?.pattern === 'final' ? BLOOM_CUTIN : -1;
+    const cutinStart = this.cutinStartFrame();
     if (!canAttack || (ultimateCutin(this.boss, this.phase?.pattern) && (this.cutin > 0 || this.phaseFrame === cutinStart - 1))) return;
     if ((this.held('KeyZ') || this.autoshot) && this.frame % 5 === 0) this.fireShot(focus);
     if (this.just('KeyX') && this.bombs > 0 && this.bombFrames <= 0) this.useBomb();
@@ -979,7 +981,7 @@ export class Game {
       const from = this.bossEntry;
       this.bossEntry = [192, phase.spell ? 132 : 77];
       this.phaseIntro = { frame: 0, from, target: this.bossPosition(), text: comment };
-      this.cutin = 0; this.flash = 0;
+      this.cutin = 0; this.ultimateFrame = -1; this.flash = 0;
       if (phase.spell) this.spellBonus = 1_000_000 + this.stage * 500_000;
       return;
     }
@@ -998,13 +1000,18 @@ export class Game {
       this.spellBonus = 1_000_000 + this.stage * 500_000;
       const delayed = phase.pattern === 'jinraiDash' || phase.pattern === 'final';
       if (!delayed) this.startCutin();
-      else { this.cutin = 0; this.flash = 0; }
+      else { this.cutin = 0; this.ultimateFrame = -1; this.flash = 0; }
     }
+  }
+
+  private cutinStartFrame(): number {
+    return this.phase?.pattern === 'jinraiDash' ? DASH_CUTIN : this.phase?.pattern === 'final' ? BLOOM_CUTIN : 0;
   }
 
   private startCutin(): void {
     const ultimate = ultimateCutin(this.boss, this.phase?.pattern);
     this.cutin = ultimate?.duration ?? 100; this.flash = ultimate ? 0 : 12;
+    this.ultimateFrame = ultimate ? 0 : -1;
     if (ultimate) { this.bgm.sync(this.bgm.cue, false, 0.1, 0); this.audio.play('ultimateStamp'); }
     this.audio.play('declare');
   }
@@ -1027,7 +1034,7 @@ export class Game {
       this.bossDefeatOrigin = position;
       this.phase = undefined; this.phaseIndex++;
       this.clearEncounter(); this.jinraiLasers.length = 0; this.items.clear();
-      this.postBoss = true; this.collectionFrames = 0; this.cutin = 0;
+      this.postBoss = true; this.collectionFrames = 0; this.cutin = 0; this.ultimateFrame = -1;
       this.flash = 8; this.messageFrames = 0;
       this.transition = 'boss-defeat-flash'; this.transitionFrame = 0; this.scene = 'transition';
       this.spark(position[0], position[1], '#fff0bc', 45);
@@ -1050,7 +1057,7 @@ export class Game {
       // 会話へ進む前に手で拾う時間を残す。近づいて拾うまで補充を直接加算しない。
       this.phase = undefined;
       this.collectionFrames = 180;
-      this.cutin = 0;
+      this.cutin = 0; this.ultimateFrame = -1;
       this.jinraiLasers.length = 0;
       this.jinraiBolts.length = 0; this.jinraiThunderstorm = undefined;
       this.enemies.clear(); this.shots.clear();
@@ -1096,10 +1103,37 @@ export class Game {
     }
   }
 
+  private holdUltimate(): boolean {
+    const spec = this.cutin > 0 && ultimateCutin(this.boss, this.phase?.pattern);
+    if (!spec || this.ultimateFrame < 0) return false;
+    const hold = ultimateCueFrame(spec, 96);
+    if (this.ultimateFrame < hold || this.ultimateFrame >= hold + 72) return false;
+    const start = this.cutinStartFrame();
+    const previous = ultimateTimeline(spec, this.ultimateFrame);
+    if (this.phaseFrame !== start + previous.battleFrame) return false;
+    if (ultimateTimeline(spec, this.ultimateFrame + 1).battleFrame !== previous.battleFrame) return false;
+    this.ultimateFrame++;
+    return true;
+  }
+
   private updateBoss(): void {
     const phase = this.phase!;
     const activeCutin = this.cutin > 0;
-    if (activeCutin) this.cutin--;
+    const spec = activeCutin && ultimateCutin(this.boss, phase.pattern);
+    let extended = false;
+    if (spec && this.ultimateFrame >= 0) {
+      const start = this.cutinStartFrame();
+      const previous = ultimateTimeline(spec, this.ultimateFrame);
+      // デバッグで攻撃の時計を先へ飛ばしたときは、導入を持ち越さない。
+      if (this.phaseFrame !== start + previous.battleFrame) this.ultimateFrame = -1;
+      else {
+        const timeline = ultimateTimeline(spec, ++this.ultimateFrame);
+        this.cutin = spec.duration - timeline.battleFrame; extended = true;
+        if (timeline.battleFrame === previous.battleFrame) return;
+      }
+    }
+    if (activeCutin && !extended) this.cutin--;
+    if (this.cutin === 0) this.ultimateFrame = -1;
     this.phaseFrame++;
     const ultimate = activeCutin && ultimateCutin(this.boss, phase.pattern);
     if (ultimate) {

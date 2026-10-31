@@ -99,7 +99,7 @@ export class Renderer {
     this.drawField(game);
     this.drawPanel(game);
     const ultimate = ultimateCutin(game.boss, game.phase?.pattern);
-    if (ultimate && game.cutin > 0) drawUltimateCutin(c, game.images[`${game.boss}-ultimate`], game.cutin, ultimate);
+    if (ultimate && game.cutin > 0) drawUltimateCutin(c, game.images[`${game.boss}-ultimate`], game.cutin, ultimate, game.ultimateFrame);
     if (game.scene === 'letter' || (game.scene === 'pause' && game.resumeScene === 'letter')) this.drawLetter();
     if (game.scene === 'dialogue') this.drawDialogue(game);
     if (game.scene === 'pause') this.fade(game.whiteAlpha, '#fff');
