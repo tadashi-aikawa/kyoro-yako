@@ -37,7 +37,7 @@ it('手を差し出す姿は離陸中だけ使い、頭上に着いた後の待�
 });
 
 it('最終技は離陸の2秒間と召喚の1秒間を待ってから初弾を撃ち、次回は召喚だけを待つ', () => {
-  vi.spyOn(Math, 'random').mockReturnValue(0.999);
+  vi.spyOn(Math, 'random').mockReturnValue(0.9999999);
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   game.startStage(5); game.startBoss(false, 10);
   while (game.phaseFrame < 284) { game.update(); expect(game.bullets.count).toBe(0); }

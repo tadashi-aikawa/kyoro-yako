@@ -35,7 +35,7 @@ export function emitDawn(game: Game): void {
     game.clearAttackEffects();
     const seen = previous?.seen ?? [];
     const index = prayer ? previous!.index : repriseIndex(seen);
-    game.minervaReprise = { cycle, index, seen: prayer || seen.includes(index) ? seen : [...seen, index], entry,
+    game.minervaReprise = { cycle, index, seen: prayer ? seen : [...seen, index], entry,
       startFrame: game.phaseFrame, startHp: game.phaseHp, prayer, supplied: false,
       difficulty: repriseDifficulty(game.difficulty, game.phaseHp / game.phaseMaxHp) };
     game.jinraiWindDirection = Math.random() < 0.5 ? -1 : 1;
@@ -50,7 +50,7 @@ export function emitDawn(game: Game): void {
     return;
   }
   if (prayer < 0) { emitReprise(game); return; }
-  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.minervaReprise!.difficulty);
   const fireTime = prayer - PRAYER_CHARGE;
   if (fireTime < 0 || fireTime >= PRAYER_FIRE || fireTime % [4, 3, 2, 2][level] !== 0) return;
   if (game.bombFrames <= 0 && fireTime === 0) game.audio.play('laser');

@@ -6,6 +6,7 @@ import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
 import { BATTLE_COMMENT_FADE_FRAMES, BATTLE_COMMENT_FRAMES, BATTLE_COMMENT_REVEAL_FRAMES, PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
 import { drawIssen } from './jinrai-issen-render';
+import { drawMinervaAura } from './minerva-aura-render';
 import { notebookBomb, notebookBookmark, notebookFeather, notebookOwl, notebookPage, notebookStar } from './notebook-icons';
 import { sugarCasting } from './patterns/chappy';
 import { claudineScene, complementBoundary, whiteSpaceCircle } from './patterns/claudine';
@@ -357,7 +358,7 @@ export class Renderer {
       c.fillStyle = '#06031977'; c.fillRect(0, 0, FIELD.w, FIELD.h);
       this.magic(192, 80, game.frame, stage.colors[2], 130, 0.25);
     }
-    if (!game.phaseIntro) { drawBloomBackdrop(c, game); this.minervaEcho(game); }
+    if (!game.phaseIntro) { drawBloomBackdrop(c, game); drawMinervaAura(c, game); this.minervaEcho(game); }
     if (game.phaseIntro && game.boss) {
       const [x, y] = game.bossXY;
       this.fieldCharacter(game, this.readySprite(game, bossSpriteId(game.boss, 'idle', game.frame)), x, y + Math.sin(game.frame * 0.045) * 2, 64, 0);

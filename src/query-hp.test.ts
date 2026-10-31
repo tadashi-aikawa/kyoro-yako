@@ -49,7 +49,7 @@ it('ミネルヴァ最終技は指定HPから再演の難易度とHP切替の基
   expect(game.phaseFrame).toBe(0);
   expect(game.debugState.phaseHpRatio).toBeCloseTo(0.05);
   while (game.phaseFrame < 105) game.update();
-  expect(game.minervaReprise).toMatchObject({ cycle: 0, startHp: game.phaseMaxHp * 0.05, difficulty: 'hard' });
+  expect(game.minervaReprise).toMatchObject({ cycle: 0, startHp: game.phaseMaxHp * 0.05, difficulty: 'lunatic' });
   expect(game.debugState.phaseHpRatio).toBeCloseTo(0.05);
 });
 
