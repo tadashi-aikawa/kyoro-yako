@@ -6,7 +6,7 @@ import { CLONE_HOP, CLONE_SHOOT, CLONE_STAGGER, HOP_OUT, jinraiCloneScene } from
 import { issenScene } from './patterns/jinrai-issen';
 import { KISS_CHARGE, KISS_FADE, KISS_LIFE, KISS_PERIOD, kissEdgeWarning, updateJinraiHeart } from './patterns/jinrai-kiss';
 import { MID_PHASE, STAGES } from './stages';
-import { ULTIMATE_CUTIN_FRAMES, ULTIMATE_SECOND_STAMP, ULTIMATE_TITLE } from './ultimate-cutin';
+import { ULTIMATE_CUTIN_FRAMES, ULTIMATE_CUTINS, ULTIMATE_SECOND_STAMP, ULTIMATE_TITLE, ultimateDuration } from './ultimate-cutin';
 
 const listeners: Record<string, (event: { code: string; repeat: boolean; preventDefault: () => void }) => void> = {};
 beforeEach(() => {
@@ -321,13 +321,16 @@ it('全画面カットインの開始・終了境界もショットとボムを�
     listeners.keyup({ code: 'KeyX', repeat: false, preventDefault: () => {} });
   };
   const bombs = game.bombs;
-  for (const frame of [DASH_CUTIN - 1, DASH_CUTIN, DASH_CUTIN + 80, DASH_CUTIN + ULTIMATE_CUTIN_FRAMES - 1]) {
+  for (const frame of [DASH_CUTIN - 1, DASH_CUTIN, DASH_CUTIN + 80]) {
     while (game.phaseFrame < frame) game.update();
     game.autoshot = true;
     press();
     expect(game.bombs).toBe(bombs); expect(game.bombUsed).toBe(false);
     expect(game.shots.count).toBe(0);
   }
+  while (game.ultimateFrame < ultimateDuration(ULTIMATE_CUTINS.jinrai) - 1) game.update();
+  press();
+  expect(game.bombs).toBe(bombs); expect(game.bombUsed).toBe(false); expect(game.shots.count).toBe(0);
   expect(game.cutin).toBe(0);
   press(); expect(game.bombs).toBe(bombs - 1); expect(game.bombUsed).toBe(true);
 });

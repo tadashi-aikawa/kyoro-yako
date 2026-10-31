@@ -104,15 +104,24 @@ function hitSegment(game: Game, from: Point, to: Point): void {
 
 function ripple(game: Game, state: Issen, level: number, petal: boolean, extra = false): void {
   const [x, y] = issenCenter(state);
-  const n = (petal ? [80, 128, 152, 176] : [48, 72, 96, 120])[level];
-  const gap = (petal ? [9, 7, 7, 6] : [7, 5, 5, 4])[level] * Math.PI * 2 / n;
-  const safe = Math.atan2((state.aim?.[1] ?? game.py) - y, (state.aim?.[0] ?? game.px) - x);
+  const n = (petal ? [80, 128, 152, 176] : [20, 52, 76, 104])[level];
+  const gap = petal ? [9, 7, 7, 6][level] * Math.PI * 2 / n : [0.30, 0.24, 0.18, 0.15][level];
+  // 後続波の穴を片側へ寄せ、3波目は少し戻す。穴の縁の移動量を揃えて難易度間の急な壁を避ける。
+  const shift = !petal ? 0 : extra ? -(gap / 2 - 0.025) : gap / 2 + 0.075;
+  const aim = Math.atan2((state.aim?.[1] ?? game.py) - y, (state.aim?.[0] ?? game.px) - x);
+  const safe = aim + shift * (state.cycle % 2 ? -1 : 1);
   const speed = bulletSpeed(game.difficulty, petal ? extra ? 3.2 : 3 : 5.6);
-  for (let i = 0; i < n; i++) {
-    const angle = i * Math.PI * 2 / n + state.cycle * 0.17 + (extra ? Math.PI / n : 0);
-    // 四つの通路は全波で共有する。後続の花びらで出口を塞がない。
+  // 2波目は最初の通路の中心付近を細かい花びらで覆い、同じ狙いの近くへの静止を防ぐ。
+  const filling = petal && !extra ? 36 : 0;
+  for (let i = 0; i < n + filling; i++) {
+    // 針は穴の両端まで等間隔に並べ、弾の丸めで2波共通の広い穴が残るのを防ぐ。
+    const arm = n / 4;
+    const angle = i >= n ? aim - 0.075 + (i - n) % 9 * 0.15 / 8 + Math.floor((i - n) / 9) * Math.PI / 2
+      : petal ? i * Math.PI * 2 / n + state.cycle * 0.17 + (extra ? Math.PI / n : 0)
+      : safe + Math.floor(i / arm) * Math.PI / 2 + gap / 2 + (i % arm) * (Math.PI / 2 - gap) / (arm - 1);
+    // 四方向の穴は波ごとにずれる。古い穴の中心を弾で埋め、小移動で次の穴へ入れる幅を残す。
     const delta = Math.atan2(Math.sin((angle - safe) * 4), Math.cos((angle - safe) * 4)) / 4;
-    if (Math.abs(delta) < gap / 2) continue;
+    if (petal && i < n && Math.abs(delta) < gap / 2) continue;
     const b = game.spawnBullet(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, petal ? 0 : 2, petal ? 'petal' : 'needle');
     if (b) { b.radius = petal ? 2.2 : 2.4; b.launchSoundPending = false; if (!petal) b.motion = 'jinraiSpark'; }
   }

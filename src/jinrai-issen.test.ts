@@ -96,7 +96,7 @@ it.each([[192, 439], [9, 250], [375, 250], [192, 12], [9, 439], [375, 12]])('画
   expect(game.lives).toBe(lives - 2);
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('HPが半分以上でも軌跡中点から針と低速の花びらが出て、共通の通路を残す: %s', difficulty => {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('HPが半分以上でも軌跡中点から針と低速の花びらが出る: %s', difficulty => {
   const game = start(difficulty);
   advance(game, DASH_ATTACK + ISSEN_BREAK - 1);
   expect(game.bullets.count).toBe(0);
@@ -114,10 +114,41 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('HPが半分以上でも
   expect(petals.length).toBeGreaterThan(20);
   expect(petals.every(b => b.motion === 'normal')).toBe(true);
   expect(Math.hypot(petals[0].vx, petals[0].vy)).toBeLessThan(needleSpeed * 0.6);
-  const state = game.jinraiIssen!, aim = Math.atan2(state.aim![1] - center[1], state.aim![0] - center[0]);
-  for (const b of [...needles, ...petals]) {
-    const angle = Math.atan2(b.vy, b.vx);
-    expect(Math.abs(Math.atan2(Math.sin(4 * (angle - aim)), Math.cos(4 * (angle - aim))) / 4)).toBeGreaterThan(0.08);
+});
+
+it.each((['easy', 'normal', 'hard', 'lunatic'] as const).flatMap(difficulty => [1, 0.5].flatMap(hp => [0, 1].map(cycle => ({ difficulty, hp, cycle })))))('2波でも3波でも中心付近の静止は当たり、小移動で抜けられる: $difficulty HP=$hp 周回=$cycle', ({ difficulty, hp, cycle }) => {
+  const game = start(difficulty); game.phaseHp *= hp; game.jinraiIssen!.cycle = cycle;
+  game.jinraiIssen!.origin = [192, 80]; game.px = 192; game.py = 398;
+  const waves = (hp > 0.5 ? [0, 24] : [0, 24, 48]).map(offset => {
+    advance(game, DASH_ATTACK + ISSEN_BREAK + offset);
+    return game.bullets.objects.filter(b => b.active && b.age === 1).map(b => ({ vx: b.vx, vy: b.vy, radius: b.radius }));
+  });
+  const clearance = (wave: typeof waves[number], x: number, distance: number) => Math.min(...wave.map(b => {
+    const speed = Math.hypot(b.vx, b.vy), ux = b.vx / speed, uy = b.vy / speed;
+    return x * ux + distance * uy > 0 ? Math.abs(x * uy - distance * ux) - b.radius - 2.5 : Infinity;
+  }));
+  for (const distance of [80, 160, 240, 300]) {
+    expect(clearance(waves[0], 0, distance)).toBeGreaterThan(0);
+    expect(clearance(waves[1], 0, distance)).toBeLessThan(0);
+    // 中心付近で少し位置をずらして静止しても、2波共通の通路はない。
+    const halfWidth = Math.tan(0.075) * distance;
+    for (let x = -halfWidth; x <= halfWidth; x += 0.5) {
+      if (clearance(waves[0], x, distance) > 0) expect(clearance(waves[1], x, distance)).toBeLessThan(0);
+    }
+    let previousX = 0;
+    for (let index = 1; index < waves.length; index++) {
+      const candidates = Array.from({ length: 161 }, (_, i) => (i - 80) * 0.5)
+        .filter(x => clearance(waves[index], x, distance) > 0.3)
+        .sort((a, b) => Math.abs(a - previousX) - Math.abs(b - previousX));
+      expect(candidates.length).toBeGreaterThan(0);
+      const x = candidates[0];
+      const speed = Math.hypot(waves[index][0].vx, waves[index][0].vy);
+      const previousSpeed = Math.hypot(waves[index - 1][0].vx, waves[index - 1][0].vy);
+      const between = 24 + distance / speed - distance / previousSpeed;
+      expect(Math.abs(x - previousX)).toBeLessThanOrEqual(1.65 * between);
+      expect(Math.abs(x - previousX)).toBeLessThanOrEqual(32);
+      previousX = x;
+    }
   }
 });
 

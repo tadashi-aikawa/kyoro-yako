@@ -3,7 +3,7 @@ import { Game } from './game';
 import { DASH_ATTACK, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
 import { PRAYER_PERIOD } from './patterns/minerva-dawn';
 import { STAGES } from './stages';
-import { ULTIMATE_CUTINS, ULTIMATE_FADE_EXTRA, ULTIMATE_HOLD, ultimateCueFrame } from './ultimate-cutin';
+import { ULTIMATE_CUTINS, ULTIMATE_HOLD, ultimateCueFrame, ultimateDuration, ultimateTimeline } from './ultimate-cutin';
 
 beforeEach(() => {
   vi.stubGlobal('location', { search: '' });
@@ -11,6 +11,14 @@ beforeEach(() => {
   vi.stubGlobal('Image', class { src = ''; complete = true; naturalWidth = 0; });
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+it.each([['jinrai', 24, 216], ['claudine', 19, 171], ['minerva', 19, 171]] as const)('%sの退場は半分の%sフレームで終わり、保持時間は変えない', (boss, fadeFrames, total) => {
+  const spec = ULTIMATE_CUTINS[boss], fadeStart = ultimateCueFrame(spec, 120) + ULTIMATE_HOLD;
+  expect(spec.fadeFrames).toBe(fadeFrames); expect(ultimateDuration(spec)).toBe(total);
+  expect(ultimateTimeline(spec, fadeStart).age).toBe(120);
+  expect(ultimateTimeline(spec, fadeStart + fadeFrames - 1).battleFrame).toBeLessThan(spec.duration);
+  expect(ultimateTimeline(spec, fadeStart + fadeFrames).battleFrame).toBe(spec.duration);
+});
 
 it.each([[3, 9, 120, 'claudine'], [4, 10, 150, 'jinrai'], [5, 10, 0, 'minerva']] as const)('%s面は絵と技名を72フレーム保持し、その間は攻撃とボーナスの時計を止める', (stage, phase, start, boss) => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
@@ -32,7 +40,7 @@ it.each([[3, 9, 120, 'claudine'], [4, 10, 150, 'jinrai'], [5, 10, 0, 'minerva']]
   expect(game.ultimateFrame).toBe(portraitFrame + ULTIMATE_HOLD); game.scene = 'stage';
   while (game.cutin > 0) game.update();
   expect(game.phaseFrame).toBe(start + spec.duration);
-  expect(game.frame - begin - 30).toBe(spec.duration + ULTIMATE_HOLD + ULTIMATE_FADE_EXTRA);
+  expect(game.frame - begin - 30).toBe(ultimateDuration(spec));
   expect(game.ultimateFrame).toBe(-1);
   game.startStage(stage); expect(game.ultimateFrame).toBe(-1); expect(game.cutin).toBe(0);
 });

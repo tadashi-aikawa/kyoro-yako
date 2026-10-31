@@ -1,14 +1,13 @@
-// 戦闘時計から演出の実時間を分離し、読むための静止と退場の余韻を挿入する。
+// 戦闘時計から演出の実時間を分離し、読むための静止と短い退場を入れる。
 export const ULTIMATE_CUTIN_FRAMES = 150;
 export const ULTIMATE_SECOND_STAMP = 12;
 export const ULTIMATE_TITLE = 64;
 export const ULTIMATE_HOLD = 72;
-export const ULTIMATE_FADE_EXTRA = 18;
 
 export const ULTIMATE_CUTINS = {
-  jinrai: { id: 'jinrai-issen', pattern: 'jinraiDash', declaration: '奥義', title: '迅雷一閃', duration: 150, ink: '#f5d994', light: '#9b6c1d', dark: '#16100a', end: '#292014', streak: '#f6ce65', brightStreak: '#fff2b9', edge: '#d5a946' },
-  claudine: { id: 'claudine-bloom', pattern: 'final', declaration: '開花', title: 'レスポンシブ・ブルーム', duration: 100, ink: '#f1d4be', light: '#92556c', dark: '#20121d', end: '#20121d', streak: '#f1d4be', brightStreak: '#f1d4be', edge: '#efb3bc' },
-  minerva: { id: 'minerva-oracle', pattern: 'owlDawn', declaration: '神託', title: 'オウル・オブ・ミネルヴァ', duration: 100, ink: '#ffe4ab', light: '#9c8a50', dark: '#191a32', end: '#191a32', streak: '#ffe4ab', brightStreak: '#ffe4ab', edge: '#e6cf84' },
+  jinrai: { id: 'jinrai-issen', pattern: 'jinraiDash', declaration: '奥義', title: '迅雷一閃', duration: 150, fadeFrames: 24, ink: '#f5d994', light: '#9b6c1d', dark: '#16100a', end: '#292014', streak: '#f6ce65', brightStreak: '#fff2b9', edge: '#d5a946' },
+  claudine: { id: 'claudine-bloom', pattern: 'final', declaration: '開花', title: 'レスポンシブ・ブルーム', duration: 100, fadeFrames: 19, ink: '#f1d4be', light: '#92556c', dark: '#20121d', end: '#20121d', streak: '#f1d4be', brightStreak: '#f1d4be', edge: '#efb3bc' },
+  minerva: { id: 'minerva-oracle', pattern: 'owlDawn', declaration: '神託', title: 'オウル・オブ・ミネルヴァ', duration: 100, fadeFrames: 19, ink: '#ffe4ab', light: '#9c8a50', dark: '#191a32', end: '#191a32', streak: '#ffe4ab', brightStreak: '#ffe4ab', edge: '#e6cf84' },
 } as const;
 export type UltimateCutin = typeof ULTIMATE_CUTINS[keyof typeof ULTIMATE_CUTINS];
 export function ultimateCutin(boss: string | undefined, pattern: string | undefined): UltimateCutin | undefined {
@@ -16,12 +15,13 @@ export function ultimateCutin(boss: string | undefined, pattern: string | undefi
   return spec?.pattern === pattern ? spec : undefined;
 }
 export function ultimateCueFrame(spec: UltimateCutin, frame: number): number { return Math.round(frame * spec.duration / ULTIMATE_CUTIN_FRAMES); }
+export function ultimateDuration(spec: UltimateCutin): number { return ultimateCueFrame(spec, 120) + ULTIMATE_HOLD + spec.fadeFrames; }
 export function ultimateTimeline(spec: UltimateCutin, frame: number): { age: number; battleFrame: number } {
   const hold = ultimateCueFrame(spec, 96), fade = ultimateCueFrame(spec, 120);
-  const total = spec.duration + ULTIMATE_HOLD + ULTIMATE_FADE_EXTRA;
+  const total = ultimateDuration(spec);
   let progress = frame;
   if (frame >= hold) progress = frame <= hold + ULTIMATE_HOLD ? hold : frame - ULTIMATE_HOLD;
-  if (frame >= fade + ULTIMATE_HOLD) progress = fade + (frame - fade - ULTIMATE_HOLD) * (spec.duration - fade) / (spec.duration - fade + ULTIMATE_FADE_EXTRA);
+  if (frame >= fade + ULTIMATE_HOLD) progress = fade + (frame - fade - ULTIMATE_HOLD) * (spec.duration - fade) / spec.fadeFrames;
   if (frame >= total) progress = spec.duration;
   progress = Math.max(0, Math.min(spec.duration, progress));
   return { age: progress * ULTIMATE_CUTIN_FRAMES / spec.duration, battleFrame: Math.floor(progress + 1e-6) };

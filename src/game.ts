@@ -1127,6 +1127,7 @@ export class Game {
     const activeCutin = this.cutin > 0;
     const spec = activeCutin && ultimateCutin(this.boss, phase.pattern);
     let extended = false;
+    let phaseAdvance = 1;
     if (spec && this.ultimateFrame >= 0) {
       const start = this.cutinStartFrame();
       const previous = ultimateTimeline(spec, this.ultimateFrame);
@@ -1136,11 +1137,12 @@ export class Game {
         const timeline = ultimateTimeline(spec, ++this.ultimateFrame);
         this.cutin = spec.duration - timeline.battleFrame; extended = true;
         if (timeline.battleFrame === previous.battleFrame) return;
+        phaseAdvance = timeline.battleFrame - previous.battleFrame;
       }
     }
     if (activeCutin && !extended) this.cutin--;
     if (this.cutin === 0) this.ultimateFrame = -1;
-    this.phaseFrame++;
+    this.phaseFrame += phaseAdvance;
     const ultimate = activeCutin && ultimateCutin(this.boss, phase.pattern);
     if (ultimate) {
       const age = ultimate.duration - this.cutin;

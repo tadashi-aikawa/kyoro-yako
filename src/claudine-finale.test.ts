@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { BLOOM_ATTACK, BLOOM_COUNT, BLOOM_CUTIN, BLOOM_LIFE, BLOOM_OPEN, bloomArena, bloomLayout, bloomOpacity, bloomPoint, bloomPose, FINALE_CHARGE, finaleTime, GRAND_LAUNCH, GRAND_QUIET, GRAND_RISE, LAYOUT_MORPH, LAYOUT_PERIOD, LAYOUT_WARNING } from './patterns/claudine-finale';
-import { ULTIMATE_FADE_EXTRA, ULTIMATE_HOLD } from './ultimate-cutin';
+import { ULTIMATE_CUTINS, ultimateDuration } from './ultimate-cutin';
 
 beforeEach(() => {
   vi.stubGlobal('location', { search: '' });
@@ -123,7 +123,7 @@ it('固定位置・固定サイズで2秒閉眼、カットイン、3秒開眼�
   game.scene = 'pause'; const stopped = [game.cutin, game.phaseFrame];
   for (let i = 0; i < 120; i++) game.update();
   expect([game.cutin, game.phaseFrame]).toEqual(stopped); game.scene = 'stage';
-  for (let i = 0; i < 100 + ULTIMATE_HOLD + ULTIMATE_FADE_EXTRA; i++) game.update();
+  for (let i = 0; i < ultimateDuration(ULTIMATE_CUTINS.claudine); i++) game.update();
   expect(game.cutin).toBe(0); expect(bloomPose(game)?.closed).toBe(1);
   for (let i = 0; i < FINALE_CHARGE - 1; i++) {
     const before = bloomPose(game)!.closed; game.update();
