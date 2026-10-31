@@ -344,7 +344,9 @@ export class Game {
     const ultimate = !this.phaseIntro && ultimateCutin(this.boss, this.phase?.pattern);
     const cutinStart = this.cutinStartFrame();
     const ultimateQuiet = ultimate && this.phaseFrame >= cutinStart - 12 && this.phaseFrame < cutinStart + ULTIMATE_SECOND_STAMP + 24;
-    const multiplier = this.scene === 'credits' ? 1 - creditsFade(this.creditsFrame) : ultimateQuiet ? 0.1 : lastbossQuiet || postBossQuiet ? 0.35 : 1;
+    const titleFrame = ultimate ? ultimateCueFrame(ultimate, ULTIMATE_TITLE) : 0;
+    const titleQuiet = ultimate && this.cutin > 0 && this.ultimateFrame >= titleFrame - 8 && this.ultimateFrame < titleFrame + 63;
+    const multiplier = this.scene === 'credits' ? 1 - creditsFade(this.creditsFrame) : ultimateQuiet ? 0.1 : titleQuiet || lastbossQuiet || postBossQuiet ? 0.35 : 1;
     this.bgm.sync(cue, false, multiplier, this.scene === 'credits' ? 1 / 60 : ultimate ? 0.18 : 1);
   }
 
@@ -1139,7 +1141,7 @@ export class Game {
     if (ultimate) {
       const age = ultimate.duration - this.cutin;
       if (age === ULTIMATE_SECOND_STAMP) this.audio.play('ultimateStamp');
-      if (age === ultimateCueFrame(ultimate, ULTIMATE_TITLE)) this.audio.play(this.boss === 'jinrai' ? 'slash' : this.boss === 'claudine' ? 'roseBloom' : 'capture');
+      if (age === ultimateCueFrame(ultimate, ULTIMATE_TITLE)) this.audio.play('ultimateShine');
     }
     if (phase.pattern === 'final' && this.phaseFrame === BLOOM_CUTIN) this.startCutin();
     if (phase.pattern === 'jinraiDash') {

@@ -314,7 +314,7 @@ it('専用カットインは二拍と技名に音が同期し、ポーズ中は�
   expect(events.filter(([sound]) => sound === 'ultimateStamp')).toEqual([
     ['ultimateStamp', DASH_CUTIN], ['ultimateStamp', DASH_CUTIN + ULTIMATE_SECOND_STAMP],
   ]);
-  expect(events.filter(([sound]) => sound === 'slash')).toEqual([['slash', DASH_CUTIN + ULTIMATE_TITLE]]);
+  expect(events.filter(([sound]) => sound === 'ultimateShine')).toEqual([['ultimateShine', DASH_CUTIN + ULTIMATE_TITLE]]);
   game.startStage(4); game.startBoss(false, 0);
   expect(game.cutin).toBe(0);
 });

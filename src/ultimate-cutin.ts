@@ -98,10 +98,31 @@ export function drawUltimateCutin(c: CanvasRenderingContext2D, image: HTMLImageE
     c.strokeStyle = spec.edge; c.lineWidth = 1;
     c.beginPath(); c.moveTo(0, 340); c.lineTo(800, 292); c.moveTo(0, 470); c.lineTo(800, 437); c.stroke();
     c.restore();
-    const letters = [...spec.title], size = Math.min(94, 530 / letters.length);
-    const gap = Math.min(113, 530 / letters.length), interval = Math.min(7, 21 / (letters.length - 1));
-    for (const [index, letter] of letters.entries()) {
-      glyph(c, letter, age - ULTIMATE_TITLE - index * interval, 320 + (index - (letters.length - 1) / 2) * gap, 388 - index * Math.min(5, 40 / (letters.length - 1)), size, '#fff4d3');
+    const titleAge = age - ULTIMATE_TITLE;
+    if (titleAge >= 0) {
+      const sweep = clamp(titleAge / 9);
+      const letters = [...spec.title], size = Math.min(94, 530 / letters.length);
+      const gap = Math.min(113, 530 / letters.length);
+      // 拡大して跳ねさせず、斜めの閃光で技名を一気に切り開く。
+      c.save();
+      c.beginPath(); c.rect(0, 292, 640 * sweep, 178); c.clip();
+      c.translate(-(1 - easeOut(titleAge / 9)) * 28, 0);
+      for (const [index, letter] of letters.entries()) {
+        glyph(c, letter, 8, 320 + (index - (letters.length - 1) / 2) * gap, 388 - index * Math.min(5, 40 / (letters.length - 1)), size, '#fff4d3');
+      }
+      c.restore();
+      if (titleAge < 18) {
+        const gleam = 1 - clamp((titleAge - 8) / 10);
+        c.save(); c.globalAlpha *= gleam;
+        c.strokeStyle = '#fff8e5'; c.shadowColor = spec.ink; c.shadowBlur = 14;
+        c.lineWidth = 2 + gleam * 3;
+        c.beginPath(); c.moveTo(-30, 417); c.lineTo(-30 + 740 * sweep, 417 - 64 * sweep); c.stroke();
+        const tip = -30 + 740 * sweep, y = 417 - 64 * sweep;
+        c.lineWidth = 1.5;
+        c.beginPath(); c.moveTo(tip - 32, y); c.lineTo(tip + 32, y);
+        c.moveTo(tip, y - 21); c.lineTo(tip, y + 21); c.stroke();
+        c.restore();
+      }
     }
   }
 

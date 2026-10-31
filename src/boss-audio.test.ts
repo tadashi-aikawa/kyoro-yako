@@ -37,23 +37,35 @@ it.each([[3, 9, 120, 'claudine'], [4, 10, 150, 'jinrai'], [5, 10, 0, 'minerva']]
   game.startStage(stage); expect(game.ultimateFrame).toBe(-1); expect(game.cutin).toBe(0);
 });
 
-it.each([[3, 9, 120, 'roseBloom'], [5, 10, 0, 'capture']] as const)('%s面の最終宣言は専用絵を読み、二拍と技名を既存の100フレームへ収める', (stage, phase, start, titleSound) => {
+it.each([[3, 9, 120, 100], [4, 10, 150, 150], [5, 10, 0, 100]] as const)('%s面の最終宣言は二拍と技名の専用SEをそれぞれ一度だけ鳴らす', (stage, phase, start, duration) => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   const events: [string, number][] = [];
   vi.spyOn(game.audio, 'play').mockImplementation(sound => { events.push([sound, game.phaseFrame]); });
   game.startStage(stage); game.startBoss(false, phase);
   while (game.phaseFrame < start) game.update();
-  expect(game.cutin).toBe(100);
+  expect(game.cutin).toBe(duration);
   expect(game.images[`${game.boss}-ultimate`].src).toContain('/assets/cutins/');
   const bombs = game.bombs;
   game.keys.add('KeyZ');
-  while (game.phaseFrame < start + 100) {
+  while (game.phaseFrame < start + duration) {
     game.update(); expect(game.shots.count).toBe(0); expect(game.bullets.count).toBe(0);
   }
-  expect(game.phaseFrame).toBe(start + 100); expect(game.cutin).toBe(0); expect(game.bombs).toBe(bombs);
+  expect(game.phaseFrame).toBe(start + duration); expect(game.cutin).toBe(0); expect(game.bombs).toBe(bombs);
   expect(events.filter(([sound]) => sound === 'ultimateStamp')).toEqual([['ultimateStamp', start], ['ultimateStamp', start + 12]]);
-  expect(events.filter(([sound]) => sound === titleSound)).toEqual([[titleSound, start + 43]]);
+  expect(events.filter(([sound]) => sound === 'ultimateShine')).toEqual([['ultimateShine', start + ultimateCueFrame(ULTIMATE_CUTINS[game.boss as 'jinrai' | 'claudine' | 'minerva'], 64)]]);
   expect(game.bgm.sceneVolumeMultiplier).toBe(1);
+});
+
+it.each([[3, 9, 120, 43], [4, 10, 150, 64], [5, 10, 0, 43]] as const)('%s面の技名SEの前後だけBGMを下げ、保持中でも実時間で元へ戻す', (stage, phase, start, title) => {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true;
+  game.startStage(stage); game.startBoss(false, phase);
+  while (game.phaseFrame < start) game.update();
+  while (game.ultimateFrame < title) game.update();
+  expect(game.bgm.sceneVolumeMultiplier).toBe(0.35);
+  const phaseFrame = game.phaseFrame;
+  while (game.ultimateFrame < title + 63) game.update();
+  expect(game.bgm.sceneVolumeMultiplier).toBe(1);
+  expect(game.phaseFrame).toBeLessThan(phaseFrame + 63);
 });
 
 it('奥・義の二拍だけBGMを下げ、ポーズ中も維持し、その後とリトライで元へ戻す', () => {
