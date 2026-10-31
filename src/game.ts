@@ -23,9 +23,9 @@ import { type Thunderbolt, type Thunderstorm, thunderPosition } from './patterns
 import { dawnPosition, emitMinerva, eyeX, interviewPosition } from './patterns/minerva';
 import { updateStarFlightSource } from './patterns/minerva-flight';
 import { gravityScene } from './patterns/minerva-inquiry';
-import { REPRISES, type Reprise, repriseLocal, repriseView } from './patterns/minerva-reprise';
+import { REPRISE_FINAL_SECTION_CYCLE, REPRISES, type Reprise, repriseLocal, reprisePrepare, repriseView } from './patterns/minerva-reprise';
 import { type InterviewRing, interviewRingBlocksShot, updateInterviewRings } from './patterns/minerva-ring';
-import { MINERVA_OWL_SPRITES, MINERVA_SOLO_SPRITES, reprisePrepare } from './patterns/minerva-summon';
+import { MINERVA_OWL_SPRITES, MINERVA_SOLO_SPRITES } from './patterns/minerva-summon';
 import { emitNeo, inBog } from './patterns/neo';
 import { emitNeoEncore, encoreBogTime } from './patterns/neo-encore';
 import { emitObsidia, sweepPosition, tags } from './patterns/obsidia';
@@ -819,6 +819,9 @@ export class Game {
 
   private updateBossContact(): void {
     if (!this.phase || this.phaseIntro || this.phaseFrame < 105 || this.cutin > 0 || this.pendingHit >= 0) return;
+    // オーラを見せる間と、その直後の召喚中は本体に触れても被弾しない。
+    if (this.phase.pattern === 'owlDawn' && this.minervaReprise?.cycle === REPRISE_FINAL_SECTION_CYCLE
+      && repriseLocal(this.phaseFrame, this.minervaReprise) < reprisePrepare(this.minervaReprise)) return;
     if ((issenScene(this)?.opacity ?? 1) < 1) return;
     const attack = this.attackContext();
     const targets = attack.phase?.pattern === 'jinraiClone' && (attack === this || attack.phaseFrame >= 105)

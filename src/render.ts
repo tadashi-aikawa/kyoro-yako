@@ -19,9 +19,9 @@ import { THUNDER_FADE, THUNDER_HOLD, thunderGround, thunderPath, thunderScene } 
 import { dawnPrayerStep, eyeX, PRAYER_CHARGE, PRAYER_FIRE, recallReturnWarning } from './patterns/minerva';
 import { STAR_FLIGHT_TIME, STAR_TRAIL_WARNING } from './patterns/minerva-flight';
 import { gravityScene } from './patterns/minerva-inquiry';
-import { REPRISES, repriseLocal } from './patterns/minerva-reprise';
+import { REPRISES, repriseFinalPause, repriseLocal, reprisePrepare, repriseSummonStart } from './patterns/minerva-reprise';
 import { INTERVIEW_RING_WIDTH, type InterviewRing } from './patterns/minerva-ring';
-import { minervaSoloSprite, OWL_RELEASE_FRAMES, reprisePrepare, summonOwl } from './patterns/minerva-summon';
+import { minervaSoloSprite, summonOwl } from './patterns/minerva-summon';
 import { bogs, enterScene, KEY_ROWS, keyPosition, VIM_PREPARE } from './patterns/neo';
 import { encoreBogTime } from './patterns/neo-encore';
 import { SWEEP_CHARGE, SWEEP_MOVE, SWEEP_PERIOD, SWEEP_SHOTS, sweepStep, sweepTarget, tags } from './patterns/obsidia';
@@ -453,15 +453,16 @@ export class Renderer {
         const motionPose = updateBossMotion(this.bossMotion, `${game.boss}:${game.phase.name}`, game.frame, x);
         const pose = dash?.moving || dash?.hopping ? dash.direction > 0 ? 'right' : 'left' : motionPose;
         const solo = game.boss === 'minerva' && game.phase.pattern === 'owlDawn';
+        const finalPause = solo && repriseFinalPause(game.phaseFrame, game.minervaReprise);
         const summoning = solo && game.minervaReprise && !game.minervaReprise.prayer && repriseLocal(game.phaseFrame, game.minervaReprise) < reprisePrepare(game.minervaReprise);
-        const casting = !!summoning || !!game.galaxyFlash || sugarCasting(game) || isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
+        const casting = !finalPause && (!!summoning || !!game.galaxyFlash || sugarCasting(game) || isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame));
         const spriteId = bloom ? bloom.sprite : kissing ? 'jinrai-kiss' : bossSpriteId(game.boss, casting && !dash?.moving ? 'cast' : pose, game.frame);
         const bossSprite = this.readySprite(game, spriteId);
         c.save();
         const bossSize = bloom ? bloom.size : 64;
-        const soloSprite = minervaSoloSprite(channeling || sweepCharging ? 'prayer' : casting ? 'cast' : pose, game.frame, game.phaseFrame);
+        const soloSprite = minervaSoloSprite(finalPause ? 'idle' : channeling || sweepCharging ? 'prayer' : casting ? 'cast' : pose, game.frame, game.phaseFrame);
         if (game.phase.pattern === 'jinraiDash') this.jinraiDashTrail(game);
-        this.fieldCharacter(game, solo ? this.readySprite(game, soloSprite) : channeling ? 'minerva-prayer' : seal || thunder?.charging ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (dash || channeling || seal || thunder?.charging || sweepCharging || kissing || bloom ? 0 : Math.sin(game.frame * 0.045) * 2), bossSize, tilt, bossOpacity);
+        this.fieldCharacter(game, solo ? this.readySprite(game, soloSprite) : channeling ? 'minerva-prayer' : seal || thunder?.charging ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (finalPause || dash || channeling || seal || thunder?.charging || sweepCharging || kissing || bloom ? 0 : Math.sin(game.frame * 0.045) * 2), bossSize, finalPause ? 0 : tilt, bossOpacity);
         if (bloom && bloom.closed > 0) {
           // 閉眼差分は目の部分だけ重ね、元絵の身体と手・髪の輪郭は動かさない。
           c.save(); c.beginPath();
@@ -491,7 +492,7 @@ export class Renderer {
     const attack = game.attackContext();
     if (!game.phaseIntro) {
       this.jinraiSpellTelegraphs(attack);
-      this.stageTelegraphs(attack);
+      if (game.phase?.pattern !== 'owlDawn' || !repriseFinalPause(game.phaseFrame, game.minervaReprise)) this.stageTelegraphs(attack);
       this.galaxyFlash(game);
       this.minervaTelegraphs(game);
       this.minervaSummon(game);
@@ -1124,8 +1125,8 @@ export class Renderer {
     if (game.phase?.pattern !== 'owlDawn' || !game.minervaReprise) return;
     const local = repriseLocal(game.phaseFrame, game.minervaReprise);
     if (dawnPrayerStep(game.phaseFrame, game.minervaReprise) >= 0) return;
-    const release = game.minervaReprise.cycle === 0 ? OWL_RELEASE_FRAMES : 0;
-    const emergence = Math.max(0, Math.min(1, (local - release - 6) / 48));
+    const summonStart = repriseSummonStart(game.minervaReprise);
+    const emergence = Math.max(0, Math.min(1, (local - summonStart - 6) / 48));
     const opacity = Math.min(1, emergence * 3.5) * (0.58 + Math.sin(game.frame * 0.035) * 0.04);
     if (!opacity) return;
     const source = REPRISES[game.minervaReprise.index];
@@ -1155,8 +1156,8 @@ export class Renderer {
     const [x, y] = game.bossXY, c = this.ctx;
     const owl = summonOwl(game.phaseFrame, x, y);
     const local = reprise ? repriseLocal(game.phaseFrame, reprise) : 0;
-    const release = reprise?.cycle === 0 ? OWL_RELEASE_FRAMES : 0;
-    const summoning = reprise && !reprise.prayer && local >= release && local < reprisePrepare(reprise);
+    const summonStart = reprise ? repriseSummonStart(reprise) : 0;
+    const summoning = reprise && !reprise.prayer && local >= summonStart && local < reprisePrepare(reprise);
     c.save();
     if (game.phaseFrame >= 105) {
       // 手元と使い魔を常につなぎ、離陸後も霊を呼ぶ媒体だと分かるようにする。
@@ -1187,7 +1188,7 @@ export class Renderer {
       c.shadowBlur = 0; c.globalAlpha = 1;
     }
     if (summoning) {
-      const progress = (local - release) / 60;
+      const progress = (local - summonStart) / 60;
       const strength = Math.sin(progress * Math.PI);
       this.magic(owl.x, owl.y, game.phaseFrame * 1.4, '#ffe4ad', 17 + progress * 18, strength * 0.65);
       // 羽ばたくフクロウから霊の肩へ、光が降りる。
@@ -1447,7 +1448,7 @@ export class Renderer {
     const reprise = game.minervaReprise;
     if (game.phase?.pattern !== 'owlDawn' || !reprise || reprise.prayer) return;
     // 初回は離陸後、以後は召喚開始と同時に表示する。弾と予告は帯より手前に描く。
-    const age = repriseLocal(game.phaseFrame, reprise) - (reprisePrepare(reprise) - 60);
+    const age = repriseLocal(game.phaseFrame, reprise) - repriseSummonStart(reprise);
     if (age < 0 || age >= 84) return;
     const source = REPRISES[reprise.index];
     const accent = STAGES.find(stage => stage.boss === source.boss)!.colors[2];

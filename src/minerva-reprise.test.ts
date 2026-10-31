@@ -2,8 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { CLONE_CHARGE, CLONE_FIRST_CHARGE, CLONE_SPLIT, jinraiCloneScene } from './patterns/jinrai-clone';
 import { dawnPrayerStep, PRAYER_CHARGE, PRAYER_PERIOD } from './patterns/minerva-dawn';
-import { REPRISE_PREPARE, REPRISES, repriseDifficulty, repriseIndex, repriseView } from './patterns/minerva-reprise';
-import { OWL_RELEASE_FRAMES, reprisePrepare } from './patterns/minerva-summon';
+import { REPRISE_PREPARE, REPRISES, repriseDifficulty, repriseIndex, reprisePrepare, repriseView } from './patterns/minerva-reprise';
+import { OWL_RELEASE_FRAMES } from './patterns/minerva-summon';
 
 const difficulties = ['easy', 'normal', 'hard', 'lunatic'] as const;
 let keydown: (event: { code: string; repeat: boolean; preventDefault: () => void }) => void;
@@ -195,6 +195,67 @@ it('各枠の超過ダメージが最後の祈りへ累積しない', () => {
     expect(game.minervaReprise?.cycle).toBe(cycle);
   }
   expect(game.phaseHp).toBeCloseTo(game.phaseMaxHp * 0.1 - 1);
+});
+
+it.each(REPRISES.map((source, index) => ({ pattern: source.phase.pattern, index })))('第3区間の$patternはオーラを見せる間は静止し、150フレーム待ってから動く', ({ index }) => {
+  const game = fight(); prayer(game, 8);
+  const entry = game.bossXY;
+  game.spawnBullet(100, 200, 0, 1, 0);
+  game.jinraiLasers.push({ x: 192, y: 132, angle: 0, age: 80, warning: 60, life: 260, speed: 0.003 });
+  const node = { x: 100, y: 200, radius: 5, age: 100, warning: 80, fadeAt: 600, color: 0, label: '', grazed: false, announced: true };
+  game.graphNodes.push(node); game.graphEdges.push({ from: node, to: { ...node, x: 300 }, grazed: false });
+  next(game); game.minervaReprise!.index = index; game.cutin = 0;
+  const reprise = game.minervaReprise!, hp = game.phaseHp;
+  expect(reprise.cycle).toBe(9); expect(reprise.difficulty).toBe('lunatic');
+  expect(reprise.entry).toEqual(entry);
+  expect(reprisePrepare(reprise)).toBe(150);
+  for (let local = 0; local < 150; local++) {
+    expect(game.minervaReprise).toBe(reprise);
+    expect(game.bullets.count + game.jinraiLasers.length + game.graphNodes.length + game.graphEdges.length).toBe(0);
+    expect(repriseView(game).phaseFrame).toBeLessThan(105);
+    expect(game.phaseHp).toBe(hp);
+    expect(game.bossTargets()).toEqual([game.bossXY]);
+    if (local < 90) expect(game.bossXY).toEqual(entry);
+    const [x, y] = game.bossXY, shot = game.shots.acquire()!;
+    Object.assign(shot, { x, y, vx: 0, vy: 0, radius: 3, damage: 30, homing: false });
+    game.update();
+  }
+  expect(repriseView(game).phaseFrame).toBeGreaterThanOrEqual(105);
+  let hazards = 0;
+  for (let frame = 0; frame < 600; frame++) {
+    hazards = Math.max(hazards, game.bullets.count + game.jinraiLasers.length + game.graphNodes.length);
+    game.update();
+  }
+  expect(hazards).toBeGreaterThan(0);
+});
+
+it('無言の切替は本体接触でも被弾せず、ポーズで止まり、ボムで飛ばず、次の技では繰り返さない', () => {
+  const game = fight(); prayer(game, 8); next(game);
+  game.minervaReprise!.index = 8; game.cutin = 0; game.invincible = false; game.invulnFrames = 0;
+  const start = game.phaseFrame, hp = game.phaseHp;
+  for (let local = 0; local < 149; local++) {
+    [game.px, game.py] = game.bossXY; game.update();
+    expect(game.pendingHit).toBe(-1); expect(game.phaseHp).toBe(hp);
+  }
+  keydown({ code: 'Escape', repeat: false, preventDefault() {} }); game.update();
+  game.keys.delete('Escape');
+  expect(game.scene).toBe('pause');
+  for (let frame = 0; frame < 30; frame++) game.update();
+  expect(game.phaseFrame).toBe(start + 149);
+  keydown({ code: 'Escape', repeat: false, preventDefault() {} }); game.update();
+  expect(game.scene).toBe('stage');
+  game.update(); expect(game.pendingHit).toBeGreaterThanOrEqual(0);
+
+  const bombed = fight(); prayer(bombed, 8); next(bombed); bombed.cutin = 0;
+  const bombHp = bombed.phaseHp, bombStart = bombed.phaseFrame;
+  keydown({ code: 'KeyX', repeat: false, preventDefault() {} }); bombed.update();
+  expect(bombed.bombFrames).toBeGreaterThan(0);
+  while (bombed.phaseFrame < bombStart + 149) bombed.update();
+  expect(bombed.phaseHp).toBe(bombHp); expect(bombed.minervaReprise?.cycle).toBe(9);
+  next(bombed); expect(reprisePrepare(bombed.minervaReprise!)).toBe(60);
+  bombed.startBoss(false, 10); expect(bombed.minervaReprise).toBeUndefined();
+  prayer(bombed, 8); next(bombed);
+  expect(reprisePrepare(bombed.minervaReprise!)).toBe(150);
 });
 
 it('召喚中はダメージを受けず、最終技のショットとボムのダメージだけ2/3になる', () => {

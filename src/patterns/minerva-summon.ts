@@ -1,5 +1,4 @@
 import { type BossPose, IDLE_STEP } from '../boss-motion';
-import type { Reprise } from './minerva-reprise';
 
 export const OWL_RELEASE_START = 105;
 export const OWL_RELEASE_FRAMES = 120;
@@ -11,9 +10,6 @@ export function minervaSoloSprite(pose: BossPose | 'prayer', frame: number, phas
   if (phaseFrame < OWL_RELEASE_START + OWL_RELEASE_FRAMES) return 'minerva-solo-release';
   return `minerva-solo-${pose === 'idle' && Math.floor(frame / IDLE_STEP) % 2 === 0 ? 'base' : pose}`;
 }
-
-// 初回だけ離陸を待つ。再演の切替では頭上のフクロウがそのまま次の霊を呼ぶ。
-export function reprisePrepare(reprise: Reprise): number { return reprise.cycle === 0 ? OWL_RELEASE_FRAMES + 60 : 60; }
 
 export function summonOwl(frame: number, x: number, y: number): { x: number; y: number; progress: number; sprite: string } {
   const progress = Math.max(0, Math.min(1, (frame - OWL_RELEASE_START) / OWL_RELEASE_FRAMES));
