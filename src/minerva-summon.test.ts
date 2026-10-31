@@ -19,7 +19,7 @@ it('離陸の音はカットイン後に1回だけ鳴り、再演切替では繰
   expect(game.phaseFrame).toBe(105);
   expect(play.mock.calls.filter(([sound]) => sound === 'owlRelease')).toHaveLength(1);
   for (let i = 0; i < 3; i++) {
-    game.phaseHp -= game.phaseMaxHp * 0.081; game.update();
+    game.phaseHp -= game.phaseMaxHp * 0.075 + 0.000001; game.update();
     for (let frame = 0; frame < 300; frame++) game.update();
   }
   expect(play.mock.calls.filter(([sound]) => sound === 'owlRelease')).toHaveLength(1);
@@ -42,7 +42,7 @@ it('最終技は離陸の2秒間と召喚の1秒間を待ってから初弾を�
   game.startStage(5); game.startBoss(false, 10);
   while (game.phaseFrame < 284) { game.update(); expect(game.bullets.count).toBe(0); }
   game.update(); expect(game.bullets.count).toBeGreaterThan(0);
-  game.phaseHp -= game.phaseMaxHp * 0.081; game.update();
+  game.phaseHp -= game.phaseMaxHp * 0.075 + 0.000001; game.update();
   expect(game.minervaReprise?.cycle).toBe(1);
   const nextAttack = game.phaseFrame + 60;
   while (game.phaseFrame < nextAttack - 1) { game.update(); expect(game.bullets.count).toBe(0); }

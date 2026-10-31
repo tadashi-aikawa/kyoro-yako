@@ -44,13 +44,15 @@ it.each([1, 2, 3, 4, 5])('%s面の登場演出と会話の後にも指定HP割�
   expect(game.debugState.phaseHpRatio).toBe(1);
 });
 
-it('ミネルヴァ最終技は指定HPから再演の難易度とHP切替の基準を決める', () => {
+it('ミネルヴァ最終技は指定HPでも借りる最初の技の難易度を変えず、HP境界で終盤へ進む', () => {
   const game = start('?boss=5&phase=10&hp=0.05&invincible=1');
   expect(game.phaseFrame).toBe(0);
   expect(game.debugState.phaseHpRatio).toBeCloseTo(0.05);
   while (game.phaseFrame < 105) game.update();
-  expect(game.minervaReprise).toMatchObject({ cycle: 0, startHp: game.phaseMaxHp * 0.05, difficulty: 'lunatic' });
+  expect(game.minervaReprise).toMatchObject({ cycle: 0, difficulty: 'normal' });
   expect(game.debugState.phaseHpRatio).toBeCloseTo(0.05);
+  for (let i = 0; i < 12; i++) game.update();
+  expect(game.minervaReprise).toMatchObject({ cycle: 12, prayer: true, difficulty: 'lunatic' });
 });
 
 it('道中からの開始にはHP指定を適用しない', () => {

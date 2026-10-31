@@ -235,7 +235,7 @@ it('終符の祈りは元の溜めと発散を保ち、再演3回の後に挟む
   vi.spyOn(Math, 'random').mockReturnValue(0.99);
   const game = phase(10);
   game.phaseFrame = 104; game.update();
-  for (let i = 0; i < 3; i++) { game.phaseHp -= game.phaseMaxHp * 0.08 + 0.000001; game.update(); }
+  for (let i = 1; i <= 3; i++) { game.phaseHp = game.phaseMaxHp * (1 - i * 0.075) - 0.000001; game.update(); }
   const position: [number, number] = [192, 132];
   let bullets = 0;
   for (let i = 1; i < PRAYER_PERIOD; i++) {
@@ -254,7 +254,7 @@ it('終符の祈りは元の溜めと発散を保ち、再演3回の後に挟む
   game.update();
   expect(dawnPrayerStep(game.phaseFrame, game.minervaReprise)).toBe(0);
   expect(game.minervaReprise?.cycle).toBe(3);
-  game.phaseHp -= game.phaseMaxHp * 0.08 + 0.000001; game.update();
+  game.phaseHp = game.phaseMaxHp * 0.7 - 0.000001; game.update();
   expect(dawnPrayerStep(game.phaseFrame, game.minervaReprise)).toBe(-1);
   expect(game.minervaReprise?.cycle).toBe(4);
 });
@@ -274,8 +274,8 @@ it('Lunaticの各スペルを進めても弾プールを飽和させない', () 
 it('全スペルが自機のいる下半分へ届き、下端が常設の安全地帯にならない', () => {
   for (const [index, spell] of STAGES[4].phases.entries()) {
     if (!spell.spell) continue;
-    // グラフなど弾以外の攻撃も抽選されるため、弾の到達を測る再演はVimに固定する。
-    if (spell.pattern === 'owlDawn') vi.spyOn(Math, 'random').mockReturnValue(0.01);
+    // グラフなど弾以外の攻撃も抽選されるため、弾の到達は花吹雪に固定して測る。
+    if (spell.pattern === 'owlDawn') vi.spyOn(Math, 'random').mockReturnValue(0.999);
     const game = phase(index);
     let lowerFrames = 0;
     let bottomFrames = 0;

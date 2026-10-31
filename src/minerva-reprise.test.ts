@@ -22,15 +22,15 @@ function fight(pattern = 'owlDawn', difficulty: Game['difficulty'] = 'normal'): 
   }
   return game;
 }
-function next(game: Game): void { game.phaseHp -= game.phaseMaxHp * 0.08 + 0.000001; game.update(); }
-function prayer(game: Game, ratio = 1): void {
-  game.phaseHp = game.phaseMaxHp * ratio; game.phaseFrame = 104; game.update();
-  for (let i = 0; i < 3; i++) next(game);
+function next(game: Game): void { game.phaseHp = game.phaseMaxHp * (1 - (game.minervaReprise!.cycle + 1) * 0.075) - 0.000001; game.update(); }
+function prayer(game: Game, cycle = 3): void {
+  game.phaseFrame = 104; game.update();
+  for (let i = 0; i < cycle; i++) next(game);
   expect(game.minervaReprise?.prayer).toBe(true);
 }
 
-it.each(difficulties)('再演10種類は%sで元の仕掛けを動かし、8%減少時に全て片付く', difficulty => {
-  expect(REPRISES).toHaveLength(10);
+it.each(difficulties)('借りる9技は%sで元の仕掛けを動かし、HP境界で全て片付く', difficulty => {
+  expect(REPRISES).toHaveLength(9);
   expect(new Set(REPRISES.map(source => source.boss)).size).toBe(4);
   for (const [index, source] of REPRISES.entries()) {
     vi.spyOn(Math, 'random').mockReturnValue((index + 0.5) / REPRISES.length);
@@ -64,30 +64,30 @@ it('抽選はHP切替ごとに行い、ごく低確率の連続も選べる。�
   const random = vi.spyOn(Math, 'random').mockReturnValue(0);
   const game = fight(); game.phaseFrame = 104; game.update();
   const first = game.minervaReprise;
-  game.phaseHp -= game.phaseMaxHp * 0.079; game.bombFrames = 20;
+  game.phaseHp -= game.phaseMaxHp * 0.074; game.bombFrames = 20;
   for (let i = 0; i < 1500; i++) { game.update(); expect(game.minervaReprise).toBe(first); }
   game.phaseHp -= game.phaseMaxHp * 0.002; game.update();
   expect(game.minervaReprise?.cycle).toBe(1); expect(game.minervaReprise?.index).toBe(0);
   random.mockReturnValue(0.999); next(game);
-  expect(game.minervaReprise?.index).toBe(9);
-  expect(game.minervaReprise?.seen).toEqual([0, 0, 9]);
+  expect(game.minervaReprise?.index).toBe(8);
+  expect(game.minervaReprise?.seen).toEqual([0, 0, 8]);
   game.startBoss(false, 9); expect(game.minervaReprise).toBeUndefined();
 });
 
 it.each([
-  { seen: [0, 1], expected: [100, 1, ...Array<number>(8).fill(10000)] },
-  { seen: [3, 7, 3], expected: [10000, 10000, 10000, 1, 10000, 10000, 10000, 100, 10000, 10000] },
+  { seen: [0, 1], expected: [100, 1, ...Array<number>(7).fill(10000)] },
+  { seen: [3, 7, 3], expected: [10000, 10000, 10000, 1, 10000, 10000, 10000, 100, 10000] },
 ])('履歴$seenから未登場・登場済み・直前を10000:100:1で選ぶ', ({ seen, expected }) => {
-  const counts = Array<number>(10).fill(0), total = 80101;
+  const counts = Array<number>(9).fill(0), total = 70101;
   for (let sample = 0; sample < total; sample++) counts[repriseIndex(seen, (sample + 0.5) / total)]++;
   expect(counts).toEqual(expected);
 });
 
-it('初回は均等に選び、全10技が登場した後も直前の技だけを100分の1に抑える', () => {
-  expect(Array.from({ length: 10 }, (_, i) => repriseIndex([], (i + 0.5) / 10))).toEqual(Array.from({ length: 10 }, (_, i) => i));
-  const seen = Array.from({ length: 10 }, (_, i) => i), counts = Array<number>(10).fill(0);
-  for (let sample = 0; sample < 901; sample++) counts[repriseIndex(seen, (sample + 0.5) / 901)]++;
-  expect(counts).toEqual([...Array<number>(9).fill(100), 1]);
+it('初回は均等に選び、全9技が登場した後も直前の技だけを100分の1に抑える', () => {
+  expect(Array.from({ length: 9 }, (_, i) => repriseIndex([], (i + 0.5) / 9))).toEqual(Array.from({ length: 9 }, (_, i) => i));
+  const seen = Array.from({ length: 9 }, (_, i) => i), counts = Array<number>(9).fill(0);
+  for (let sample = 0; sample < 801; sample++) counts[repriseIndex(seen, (sample + 0.5) / 801)]++;
+  expect(counts).toEqual([...Array<number>(8).fill(100), 1]);
 });
 
 it('祈りでは登場履歴を増やさず、最終技やステージのやり直しで履歴を消す', () => {
@@ -95,21 +95,21 @@ it('祈りでは登場履歴を増やさず、最終技やステージのやり�
   const choose = (roll: number) => { random.mockReturnValueOnce(roll).mockReturnValueOnce(0.5); };
   const game = fight(); game.phaseFrame = 104;
   choose(0); game.update(); choose(0.999); next(game); choose(0); next(game);
-  expect(game.minervaReprise?.seen).toEqual([0, 9, 0]);
+  expect(game.minervaReprise?.seen).toEqual([0, 8, 0]);
   next(game);
   expect(game.minervaReprise?.prayer).toBe(true);
-  expect(game.minervaReprise?.seen).toEqual([0, 9, 0]);
+  expect(game.minervaReprise?.seen).toEqual([0, 8, 0]);
   choose(0.5); next(game);
   expect(game.minervaReprise?.cycle).toBe(4);
-  expect(game.minervaReprise?.seen).toEqual([0, 9, 0, 5]);
+  expect(game.minervaReprise?.seen).toEqual([0, 8, 0, 4]);
   game.startBoss(false, 10); expect(game.minervaReprise).toBeUndefined();
-  game.phaseFrame = 104; game.update(); expect(game.minervaReprise?.seen).toEqual([5]);
+  game.phaseFrame = 104; game.update(); expect(game.minervaReprise?.seen).toEqual([4]);
   game.startStage(5); expect(game.minervaReprise).toBeUndefined();
 });
 
-it('再演候補を指定の10技に絞る', () => {
+it('借りる技をVim以外の9技に絞る', () => {
   expect(REPRISES.map(source => source.phase.pattern)).toEqual([
-    'vim', 'enter', 'link', 'sweep', 'type', 'grid', 'jinraiKiss', 'jinraiSakura', 'jinraiClone', 'jinraiPetal',
+    'enter', 'link', 'sweep', 'type', 'grid', 'jinraiKiss', 'jinraiSakura', 'jinraiClone', 'jinraiPetal',
   ]);
 });
 
@@ -148,7 +148,7 @@ it.each(difficulties)('花影の%sはPower4で撃ち続けてもHP切替前に�
   expect(praying).toBe(true); expect(twoFired).toBe(true); expect(game.minervaReprise?.cycle).toBe(1);
 });
 
-it('HP8%ごとに再演3回と4回の後へ祈りを挟み、祈りもHPで終わる', () => {
+it('借りる技を3・4・3回と挟み、3回目の祈りをHP10%から撃破まで保つ', () => {
   const game = fight(); game.phaseFrame = 104; game.update();
   for (let cycle = 0; cycle <= 12; cycle++) {
     expect(game.minervaReprise?.cycle).toBe(cycle);
@@ -160,40 +160,41 @@ it('HP8%ごとに再演3回と4回の後へ祈りを挟み、祈りもHPで終�
     }
     if (cycle < 12) next(game);
   }
+  expect(game.phaseHp / game.phaseMaxHp).toBeCloseTo(0.1);
+  game.phaseHp = game.phaseMaxHp * 0.01; game.update();
+  expect(game.minervaReprise?.cycle).toBe(12); expect(game.minervaReprise?.prayer).toBe(true);
 });
 
-it.each(difficulties)('再演と祈りの%sはHP75%以下で1段、25%以下で2段上げる', difficulty => {
+it.each(difficulties)('借りる技と祈りの%sは3区間で1段ずつ上げる', difficulty => {
   const stronger = { easy: 'normal', normal: 'hard', hard: 'lunatic', lunatic: 'lunatic' }[difficulty];
   const strongest = { easy: 'hard', normal: 'lunatic', hard: 'lunatic', lunatic: 'lunatic' }[difficulty];
-  for (const ratio of [1, 0.7501, 0.75, 0.7499, 0.2501, 0.25, 0.2499, 0.01]) {
-    const expected = ratio <= 0.25 ? strongest : ratio <= 0.75 ? stronger : difficulty;
-    const game = fight('owlDawn', difficulty); game.phaseFrame = 104; game.phaseHp = game.phaseMaxHp * ratio; game.update();
-    expect(repriseDifficulty(difficulty, ratio)).toBe(expected);
-    expect(repriseView(game).difficulty).toBe(expected);
+  const game = fight('owlDawn', difficulty); game.phaseFrame = 104; game.update();
+  for (let cycle = 0; cycle <= 12; cycle++) {
+    const expected = cycle >= 9 ? strongest : cycle >= 4 ? stronger : difficulty;
+    expect(repriseDifficulty(difficulty, cycle)).toBe(expected);
+    expect(game.minervaReprise?.difficulty).toBe(expected);
     expect(game.difficulty).toBe(difficulty);
-    // 祈りは実Gameを使うが、発射は開始時の段階で行う。
-    game.minervaReprise!.prayer = true; game.minervaReprise!.cycle = 3; game.minervaReprise!.supplied = true;
-    game.phaseFrame = game.minervaReprise!.startFrame + PRAYER_CHARGE + 12 - 1; game.update();
-    expect(repriseView(game)).toBe(game); expect(game.difficulty).toBe(difficulty);
-    const bullets = game.bullets.objects.filter(b => b.active);
-    const level = difficulties.indexOf(expected as Game['difficulty']);
-    expect(bullets).toHaveLength([5, 7, 9, 11][level]);
-    expect(Math.hypot(bullets[0].vx, bullets[0].vy)).toBeCloseTo([2.6, 3, 3.6, 4.2][level]);
+    if (game.minervaReprise!.prayer) {
+      game.minervaReprise!.supplied = true; game.bullets.clear();
+      game.phaseFrame = game.minervaReprise!.startFrame + PRAYER_CHARGE + 12 - 1; game.update();
+      expect(repriseView(game)).toBe(game);
+      const bullets = game.bullets.objects.filter(b => b.active);
+      const level = difficulties.indexOf(expected as Game['difficulty']);
+      expect(bullets).toHaveLength([5, 7, 9, 11][level]);
+      expect(Math.hypot(bullets[0].vx, bullets[0].vy)).toBeCloseTo([2.6, 3, 3.6, 4.2][level]);
+    } else expect(repriseView(game).difficulty).toBe(expected);
+    if (cycle < 12) next(game);
   }
 });
 
-it.each(difficulties)('再演の%sはHP75%・25%を跨いでも予告と動きを保ち、次の再演から上げる', difficulty => {
-  for (const threshold of [0.75, 0.25]) {
-  const index = REPRISES.findIndex(source => source.phase.pattern === 'sweep');
-  vi.spyOn(Math, 'random').mockReturnValue((index + 0.5) / REPRISES.length);
-  const game = fight('owlDawn', difficulty); game.phaseFrame = 104; game.phaseHp = game.phaseMaxHp * (threshold + 0.01); game.update();
-  game.phaseFrame = game.minervaReprise!.startFrame + reprisePrepare(game.minervaReprise!) + 280;
-  const position = game.bossXY, reprise = game.minervaReprise;
-  game.phaseHp = game.phaseMaxHp * (threshold - 0.01); game.update();
-  expect(game.minervaReprise).toBe(reprise); expect(repriseView(game).difficulty).toBe(repriseDifficulty(difficulty, threshold + 0.01));
-  expect(Math.hypot(game.bossXY[0] - position[0], game.bossXY[1] - position[1])).toBeLessThan(8);
-  next(game); expect(repriseView(game).difficulty).toBe(repriseDifficulty(difficulty, threshold - 0.09));
+it('各枠の超過ダメージが最後の祈りへ累積しない', () => {
+  const game = fight(); game.phaseFrame = 104; game.update();
+  for (let cycle = 1; cycle <= 12; cycle++) {
+    const overshoot = cycle % 2 ? 20 : 1;
+    game.phaseHp = game.phaseMaxHp * (1 - cycle * 0.075) - overshoot; game.update();
+    expect(game.minervaReprise?.cycle).toBe(cycle);
   }
+  expect(game.phaseHp).toBeCloseTo(game.phaseMaxHp * 0.1 - 1);
 });
 
 it('召喚中はダメージを受けず、最終技のショットとボムのダメージだけ2/3になる', () => {
@@ -215,16 +216,16 @@ it('召喚中はダメージを受けず、最終技のショットとボムの�
   expect(hit(ordinary)).toBeCloseTo(30);
 });
 
-it('HP半分以下の祈りは途中から逆回転の星弾も出し、前半は追加しない', () => {
-  for (const ratio of [1, 0.65]) {
-    const game = fight(); prayer(game, ratio);
+it('1・2回目の祈りは主渦だけ、最後の祈りは途中から逆回転の星弾も出す', () => {
+  for (const cycle of [3, 8, 12]) {
+    const game = fight(); prayer(game, cycle);
     while (dawnPrayerStep(game.phaseFrame, game.minervaReprise) < PRAYER_CHARGE + 72) {
       game.update();
       if (dawnPrayerStep(game.phaseFrame, game.minervaReprise) < PRAYER_CHARGE + 72) expect(game.bullets.objects.some(b => b.active && b.kind === 'star')).toBe(false);
     }
     const added = game.bullets.objects.filter(b => b.active && b.kind === 'star');
-    expect(added).toHaveLength(ratio === 0.65 ? 9 : 0);
-    if (added.length) expect(added[0].vx).toBeCloseTo(Math.cos(Math.PI / 2 - 72 * 0.027 + Math.PI / 9) * 3.2);
+    expect(added).toHaveLength(cycle === 12 ? 11 : 0);
+    if (added.length) expect(added[0].vx).toBeCloseTo(Math.cos(Math.PI / 2 - 72 * 0.027 + Math.PI / 11) * 3.7);
   }
 });
 
@@ -288,9 +289,9 @@ it.each([[4, 0, false], [5, 0.2499, true], [5, 0.25, false], [5, 0.99, false]] a
   }
 });
 
-it('HP後半やボム中も必ず補給し、次の祈りでは新しい1セットを配る', () => {
+it('祈りごとに1セットずつ補給し、ボム中も配る', () => {
   for (const bombFrames of [0, 20]) {
-    const game = fight(); game.phaseHp = game.phaseMaxHp * 0.65; game.phaseFrame = 104; game.update(); next(game); next(game);
+    const game = fight(); game.phaseFrame = 104; game.update(); next(game); next(game);
     const spawn = vi.spyOn(game, 'spawnItem'); next(game);
     expect(spawn).not.toHaveBeenCalled();
     game.phaseFrame = game.minervaReprise!.startFrame + PRAYER_CHARGE - 1; game.bombFrames = bombFrames; game.update();

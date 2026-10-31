@@ -210,13 +210,13 @@ it('カットインは攻撃開始前に消え、入れ替えたボスに技が�
   }
 });
 
-it('最後の祈りは充填開始に低い唸りを1回鳴らし、連射と休止中には繰り返さない', () => {
+it('祈りは充填開始に低い唸りを1回鳴らし、連射と休止中には繰り返さない', () => {
   const game = new Game(); game.invincible = true; game.startStage(5); game.startBoss(false, 10);
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
   game.phaseFrame = 104; game.update();
-  for (let i = 0; i < 2; i++) { game.phaseHp -= game.phaseMaxHp * 0.08 + 0.000001; game.update(); }
+  for (let i = 0; i < 2; i++) { game.phaseHp -= game.phaseMaxHp * 0.075 + 0.000001; game.update(); }
   expect(play).not.toHaveBeenCalledWith('prayerCharge');
-  game.phaseHp -= game.phaseMaxHp * 0.08 + 0.000001; game.update();
+  game.phaseHp -= game.phaseMaxHp * 0.075 + 0.000001; game.update();
   expect(play.mock.calls.filter(([sound]) => sound === 'prayerCharge')).toHaveLength(1);
   expect(play).not.toHaveBeenCalledWith('declare');
   for (let i = 0; i < PRAYER_PERIOD - 1; i++) game.update();

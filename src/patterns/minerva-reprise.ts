@@ -11,11 +11,13 @@ import { emitNeo } from './neo';
 import { emitObsidia, sweepPosition } from './obsidia';
 
 export const REPRISE_PREPARE = 60;
-export const REPRISE_FINAL_HP = 0.25;
-const PATTERNS = ['vim', 'enter', 'link', 'sweep', 'type', 'grid', 'jinraiKiss', 'jinraiSakura', 'jinraiClone', 'jinraiPetal'];
+export const REPRISE_FINAL_SECTION_CYCLE = 9;
+export const REPRISE_LAST_CYCLE = 12;
+export const REPRISE_HP_STEP = 0.075;
+const PATTERNS = ['enter', 'link', 'sweep', 'type', 'grid', 'jinraiKiss', 'jinraiSakura', 'jinraiClone', 'jinraiPetal'];
 export const REPRISES = STAGES.slice(0, 4).flatMap(stage => stage.phases
   .filter(phase => PATTERNS.includes(phase.pattern)).map(phase => ({ boss: stage.boss, phase })));
-export interface Reprise { cycle: number; index: number; seen: number[]; entry: [number, number]; startFrame: number; startHp: number; prayer: boolean; supplied: boolean; difficulty: Difficulty; }
+export interface Reprise { cycle: number; index: number; seen: number[]; entry: [number, number]; startFrame: number; prayer: boolean; supplied: boolean; difficulty: Difficulty; }
 export function repriseIndex(seen: readonly number[], roll = Math.random()): number {
   // 祈りを挟んでも直前の再演を避け、未登場を優先する。全技は候補に残す。
   const weights = REPRISES.map((_, index) => index === seen.at(-1) ? 1 : seen.includes(index) ? 100 : 10000);
@@ -32,9 +34,9 @@ function repriseFrame(frame: number, reprise: Reprise): number {
   // 花影は単身射撃の前置きを省き、召喚後すぐに分身を始める。召喚中の時計は進めない。
   return 105 + elapsed + (elapsed >= 0 && REPRISES[reprise.index].phase.pattern === 'jinraiClone' ? CLONE_FIRST_CHARGE - 105 : 0);
 }
-export function repriseDifficulty(difficulty: Difficulty, hpRatio: number): Difficulty {
+export function repriseDifficulty(difficulty: Difficulty, cycle: number): Difficulty {
   const levels = ['easy', 'normal', 'hard', 'lunatic'] as const;
-  return levels[Math.min(3, levels.indexOf(difficulty) + (hpRatio <= REPRISE_FINAL_HP ? 2 : hpRatio <= 0.75 ? 1 : 0))];
+  return levels[Math.min(3, levels.indexOf(difficulty) + (cycle >= REPRISE_FINAL_SECTION_CYCLE ? 2 : cycle >= 4 ? 1 : 0))];
 }
 
 export function reprisePosition(frame: number, reprise: Reprise, difficulty: Difficulty): [number, number] {

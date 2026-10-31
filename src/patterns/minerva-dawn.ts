@@ -1,6 +1,6 @@
 import type { Game } from '../game';
 import { type ItemKind, MAX_POWER } from '../rules';
-import { emitReprise, type Reprise, repriseDifficulty, repriseIndex, repriseLocal, reprisePosition } from './minerva-reprise';
+import { emitReprise, REPRISE_HP_STEP, REPRISE_LAST_CYCLE, type Reprise, repriseDifficulty, repriseIndex, repriseLocal, reprisePosition } from './minerva-reprise';
 
 export const PRAYER_PERIOD = 360;
 export const PRAYER_CHARGE = 72;
@@ -28,7 +28,8 @@ export function emitDawn(game: Game): void {
   if (game.phaseHp <= 0) return;
   const previous = game.minervaReprise;
   if (game.bombFrames > 0) game.clearAttackEffects();
-  if (!previous || previous.startHp - game.phaseHp >= game.phaseMaxHp * 0.08) {
+  // 前の技の超過ダメージを次の枠へ持ち込み、最後の祈りに約10%を残す。
+  if (!previous || previous.cycle < REPRISE_LAST_CYCLE && game.phaseHp <= game.phaseMaxHp * (1 - (previous.cycle + 1) * REPRISE_HP_STEP)) {
     const cycle = previous ? previous.cycle + 1 : 0;
     const prayer = cycle % 9 === 3 || cycle % 9 === 8;
     const entry = dawnPosition(game.phaseFrame - 1, previous);
@@ -36,8 +37,8 @@ export function emitDawn(game: Game): void {
     const seen = previous?.seen ?? [];
     const index = prayer ? previous!.index : repriseIndex(seen);
     game.minervaReprise = { cycle, index, seen: prayer ? seen : [...seen, index], entry,
-      startFrame: game.phaseFrame, startHp: game.phaseHp, prayer, supplied: false,
-      difficulty: repriseDifficulty(game.difficulty, game.phaseHp / game.phaseMaxHp) };
+      startFrame: game.phaseFrame, prayer, supplied: false,
+      difficulty: repriseDifficulty(game.difficulty, cycle) };
     game.jinraiWindDirection = Math.random() < 0.5 ? -1 : 1;
     if (!previous) game.audio.play('owlRelease');
   }
@@ -80,8 +81,8 @@ export function emitDawn(game: Game): void {
     const b = game.spawnBullet(x + Math.cos(angle) * 22, y + Math.sin(angle) * 22, Math.cos(angle) * speed, Math.sin(angle) * speed, i % 2 ? 1 : 2, 'orb');
     if (b) b.radius = 2.3;
   }
-  // 後半は発散の途中から反対の渦を重ねる。主渦を保ち、追加は半分の頻度にする。
-  if (game.bombFrames <= 0 && game.phaseHp <= game.phaseMaxHp * 0.5 && fireTime >= 72 && fireTime % ([4, 3, 2, 2][level] * 2) === 0) {
+  // 最後の祈りだけ反対の渦を重ねる。主渦を保ち、追加は半分の頻度にする。
+  if (game.bombFrames <= 0 && cycle === REPRISE_LAST_CYCLE && fireTime >= 72 && fireTime % ([4, 3, 2, 2][level] * 2) === 0) {
     for (let i = 0; i < arms; i++) {
       const angle = Math.PI / 2 - rotation + (i + 0.5) * Math.PI * 2 / arms;
       const speed = [2.3, 2.7, 3.2, 3.7][level];
