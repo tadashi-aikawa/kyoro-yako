@@ -4,6 +4,8 @@ export const RAIN_GLYPHS = ['A', 'a', 'B', 'g', 'Ω', 'π', 'あ', '永', '&', '
 export const RAIN_FONTS = ['bold 18px serif', 'italic bold 18px sans-serif', 'bold 18px monospace'] as const;
 export const WEATHER_NAMES = ['小雨', '豪雨', '台風'] as const;
 export const WEATHER_PERIOD = 240;
+export const RAIN_TRANSITION = 48;
+export const RAIN_CLEAR_FRAMES = 30;
 export const GRID_PERIOD = [210, 180, 160, 145] as const;
 export const GRID_NAMES = ['均等列', '可変幅', '可変行', '千鳥配置'] as const;
 export const GRID_COLUMNS = [12, 8, 11, 10] as const;
@@ -29,13 +31,22 @@ export function emitTypographyRain(game: Game, t: number): void {
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
   const weatherPeriod = WEATHER_PERIOD;
   const weather = weatherAt(t);
+  const local = t % weatherPeriod;
   if (t % weatherPeriod === 0) game.audio.play(weather === 2 ? 'wind' : 'turn');
-  const period = [[20, 14, 12, 10], [8, 5, 4, 3], [6, 4, 3, 3]][weather][level];
+  // 切替時の残弾は30fで片付ける。豪雨・台風だけ新しい雨まで48f空ける。
+  // 小雨は待ちを入れず発射数と軌道を維持し、台風の残弾だけを短くする。
+  if (local === 0 && t > 0) game.bullets.forEach(b => {
+    if (b.motion === 'typographyRain') b.fadeAt = b.age + RAIN_CLEAR_FRAMES;
+  });
+  if (weather > 0 && local < RAIN_TRANSITION) return;
+  const period = [[20, 14, 12, 10], [12, 8, 6, 5], [10, 7, 5, 4]][weather][level];
   if (t % period !== 0) return;
-  const n = [[2, 3, 4, 5], [3, 4, 5, 6], [4, 5, 6, 7]][weather][level];
+  const n = [[2, 3, 4, 5], [3, 3, 4, 5], [3, 4, 5, 6]][weather][level];
   const wave = Math.floor(t / period);
   const direction = Math.floor(t / (weatherPeriod * 3)) % 2 ? -1 : 1;
-  for (let i = 0; i < n + (weather === 2 ? 1 : 0); i++) {
+  // 横からの雨は3波に1発。上端の雨との交差へ抜ける余地を作る。
+  const side = weather === 2 && wave % 3 === 0;
+  for (let i = 0; i < n + (side ? 1 : 0); i++) {
     const size = (wave + i) % 3;
     const fromSide = i === n;
     const x = fromSide ? direction > 0 ? -8 : 392 : 8 + (wave * 37 + i * 79) % 368;

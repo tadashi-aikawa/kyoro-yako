@@ -1,5 +1,5 @@
 export type Sound = 'shot' | 'hit' | 'graze' | 'kill' | 'bomb' | 'declare' | 'capture' | 'item' | 'extend'
-  | 'enemyShot' | 'jinraiShot' | 'jinraiCharge' | 'jinraiCrackle' | 'jinraiWarp' | 'laser' | 'thunder' | 'thunderBurst' | 'ninpo' | 'slash' | 'wind' | 'turn' | 'split' | 'sweepCharge' | 'sweepBurst' | 'prayerCharge' | 'roseCharge' | 'roseBloom' | 'chappySnap' | 'caromTap' | 'fireworkRise' | 'fireworkGrandRise' | 'fireworkBoom';
+  | 'enemyShot' | 'jinraiShot' | 'jinraiCharge' | 'jinraiCrackle' | 'jinraiWarp' | 'laser' | 'thunder' | 'thunderBurst' | 'ninpo' | 'slash' | 'wind' | 'turn' | 'split' | 'sweepCharge' | 'sweepBurst' | 'prayerCharge' | 'owlRelease' | 'roseCharge' | 'roseBloom' | 'chappySnap' | 'caromTap' | 'fireworkRise' | 'fireworkGrandRise' | 'fireworkBoom';
 // 周波数・秒数・波形・終端周波数・音量・最短間隔。
 // 常時鳴る自機ショットを抑え、敵の発射と仕掛けの切り替わりを聞き取れる比率にする。
 const tones: Record<Sound, [number, number, OscillatorType, number, number, number]> = {
@@ -18,6 +18,7 @@ const tones: Record<Sound, [number, number, OscillatorType, number, number, numb
   ninpo: [1600, 0.18, 'triangle', 180, 0.2, 0.16], thunderBurst: [2100, 0.27, 'sawtooth', 65, 0.25, 0.25],
   sweepCharge: [160, 0.85, 'sine', 980, 0.18, 0.5], sweepBurst: [1800, 0.38, 'sawtooth', 70, 0.26, 0.16],
   prayerCharge: [96, 1.2, 'triangle', 150, 0.26, 0.9],
+  owlRelease: [523.25, 3.2, 'sine', 523.25, 0.23, 1],
   roseCharge: [196, 0.95, 'sine', 1568, 0.24, 0.9],
   roseBloom: [1047, 0.28, 'triangle', 262, 0.21, 0.2],
   chappySnap: [2100, 0.055, 'triangle', 180, 0.3, 0.2],
@@ -45,6 +46,7 @@ export class AudioBank {
     for (const source of this.energySources) source.stop();
     this.energySources.clear();
     delete this.last.jinraiCharge; delete this.last.jinraiCrackle; delete this.last.jinraiWarp;
+    delete this.last.owlRelease;
   }
 
   unlock(): void {
@@ -63,6 +65,7 @@ export class AudioBank {
       const [frequency, duration, wave, end, peak, interval] = tones[sound];
       if (now - (this.last[sound] ?? -Infinity) < interval) return;
       this.last[sound] = now;
+      if (sound === 'owlRelease') { this.owlRelease(now, frequency, duration, peak); return; }
       if (sound === 'jinraiCharge' || sound === 'jinraiCrackle' || sound === 'jinraiWarp') {
         this.jinraiEnergy(now, sound, duration, peak); return;
       }
@@ -99,6 +102,32 @@ export class AudioBank {
       if (sound === 'fireworkRise' || sound === 'fireworkGrandRise' || sound === 'fireworkBoom') this.noise(now, duration, sound);
       if (sound === 'thunder' || sound === 'thunderBurst' || sound === 'ninpo' || sound === 'slash' || sound === 'wind' || sound === 'declare' || sound === 'sweepBurst' || sound === 'jinraiShot') this.noise(now, sound === 'thunderBurst' ? 0.55 : duration, sound);
     } catch { /* audio is optional when browser blocks it */ }
+  }
+
+  private owlRelease(now: number, frequency: number, duration: number, peak: number): void {
+    const context = this.context!;
+    const buffer = context.createBuffer(1, Math.ceil(context.sampleRate * duration), context.sampleRate);
+    const samples = buffer.getChannelData(0);
+    // 澄んだ鐘を長三和音で重ね、わずかな倍音の揺れと長い余韻で離陸を包む。
+    const notes = [1, 1.25, 1.5, 2];
+    for (let i = 0; i < samples.length; i++) {
+      const t = i / context.sampleRate;
+      let value = 0;
+      for (const [index, ratio] of notes.entries()) {
+        const age = t - index * 0.16;
+        if (age < 0) continue;
+        const phase = Math.PI * 2 * frequency * ratio * age;
+        const tone = Math.sin(phase) + Math.sin(phase * 1.003) * 0.25 + Math.sin(phase * 2.76) * Math.exp(-age * 3) * 0.15;
+        value += tone * Math.min(1, age / 0.025) * Math.exp(-age * 1.45) * (index === 3 ? 0.22 : 0.3);
+      }
+      samples[i] = value * Math.min(1, (duration - t) / 0.3);
+    }
+    const source = context.createBufferSource(); source.buffer = buffer;
+    const gain = context.createGain(); gain.gain.value = this.volume * peak;
+    source.connect(gain).connect(context.destination);
+    this.energySources.add(source);
+    source.onended = () => { this.energySources.delete(source); source.disconnect(); gain.disconnect(); };
+    source.start(now); source.stop(now + duration);
   }
 
   private jinraiEnergy(now: number, sound: 'jinraiCharge' | 'jinraiCrackle' | 'jinraiWarp', duration: number, peak: number): void {

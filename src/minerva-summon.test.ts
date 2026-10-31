@@ -9,6 +9,22 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+it('離陸の音はカットイン後に1回だけ鳴り、再演切替では繰り返さない', () => {
+  const game = new Game(); game.invincible = true;
+  game.startStage(5); game.startBoss(false, 10);
+  const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
+  while (game.phaseFrame < 104) game.update();
+  expect(play).not.toHaveBeenCalledWith('owlRelease');
+  game.update();
+  expect(game.phaseFrame).toBe(105);
+  expect(play.mock.calls.filter(([sound]) => sound === 'owlRelease')).toHaveLength(1);
+  for (let i = 0; i < 3; i++) {
+    game.phaseHp -= game.phaseMaxHp * 0.081; game.update();
+    for (let frame = 0; frame < 300; frame++) game.update();
+  }
+  expect(play.mock.calls.filter(([sound]) => sound === 'owlRelease')).toHaveLength(1);
+});
+
 it('手を差し出す姿は離陸中だけ使い、頭上に着いた後の待機は専用の呼吸2コマへ切り替える', () => {
   const game = new Game();
   expect(game.images['minerva-solo-release-sprite'].src).toContain('minerva-solo-release.webp');

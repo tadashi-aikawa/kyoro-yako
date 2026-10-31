@@ -333,8 +333,9 @@ export class Renderer {
       const prayer = game.phase.pattern === 'owlDawn' ? dawnPrayerStep(game.phaseFrame, game.minervaReprise) : -1;
       const praying = prayer >= 0 && prayer < PRAYER_CHARGE;
       const channeling = prayer >= 0 && prayer < PRAYER_CHARGE + PRAYER_FIRE;
-      const sweepLevel = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
-      const sweep = game.phase.pattern === 'sweep' ? sweepStep(game.phaseFrame, sweepLevel) : -1;
+      // 再演は元技の時計と難易度を使い、溜めを本体の祈りへ合わせる。
+      const sweepLevel = ['easy', 'normal', 'hard', 'lunatic'].indexOf(attack.difficulty);
+      const sweep = attack.phase?.pattern === 'sweep' ? sweepStep(attack.phaseFrame, sweepLevel) : -1;
       const sweepCharging = sweep >= SWEEP_MOVE && sweep < SWEEP_MOVE + SWEEP_CHARGE[sweepLevel];
       if (sweepCharging) {
         const progress = (sweep - SWEEP_MOVE) / SWEEP_CHARGE[sweepLevel];
@@ -417,7 +418,7 @@ export class Renderer {
         c.save();
         if (seal && !dashIntro) { c.shadowColor = '#ffe591'; c.shadowBlur = 8 + Math.min(20, (burst - BURST_MOVE) * 0.6); }
         const bossSize = bloom ? bloom.size : 64;
-        const soloSprite = minervaSoloSprite(channeling ? 'prayer' : casting ? 'cast' : pose, game.frame, game.phaseFrame);
+        const soloSprite = minervaSoloSprite(channeling || sweepCharging ? 'prayer' : casting ? 'cast' : pose, game.frame, game.phaseFrame);
         if (game.phase.pattern === 'jinraiDash') this.jinraiDashTrail(game);
         this.fieldCharacter(game, solo ? this.readySprite(game, soloSprite) : channeling ? 'minerva-prayer' : seal || thunder?.charging ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || thunder?.charging || sweepCharging || kissing || bloom ? 0 : Math.sin(game.frame * 0.045) * 2), bossSize, tilt, burstVisibility(burst));
         if (bloom && bloom.closed > 0) {
@@ -1166,6 +1167,34 @@ export class Renderer {
     const release = reprise?.cycle === 0 ? OWL_RELEASE_FRAMES : 0;
     const summoning = reprise && !reprise.prayer && local >= release && local < reprisePrepare(reprise);
     c.save();
+    if (game.phaseFrame >= 105) {
+      // 手元と使い魔を常につなぎ、離陸後も霊を呼ぶ媒体だと分かるようにする。
+      // 細く淡い帯にして、弾やHP表示の視認性を保つ。
+      const handX = x - 16 + owl.progress * 7, handY = y - 15 + owl.progress * 7;
+      const breath = 0.8 + Math.sin(game.frame * 0.045) * 0.2;
+      const glow = c.createLinearGradient(handX, handY, owl.x, owl.y);
+      glow.addColorStop(0, '#fff3c9'); glow.addColorStop(0.5, '#d4c5ff'); glow.addColorStop(1, '#fff8dc');
+      c.strokeStyle = glow; c.shadowColor = '#e7d7ff'; c.shadowBlur = 10;
+      const bend = Math.sin(game.frame * 0.025) * 8;
+      // 顔を横切ると頭から伸びる帯に見えるので、手元から髪の外側を回す。
+      const cx1 = handX - 26 + bend, cy1 = handY - 14;
+      const cx2 = owl.x - 28 + bend, cy2 = owl.y + 20;
+      for (const [width, opacity] of [[15, 0.07], [7, 0.16], [1.5, 0.55]]) {
+        c.lineWidth = width; c.globalAlpha = opacity * breath;
+        c.beginPath(); c.moveTo(handX, handY);
+        c.bezierCurveTo(cx1, cy1, cx2, cy2, owl.x, owl.y); c.stroke();
+      }
+      c.fillStyle = '#fff5d6'; c.shadowBlur = 6;
+      for (let i = 0; i < 7; i++) {
+        const p = (game.frame * 0.008 + i / 7) % 1;
+        c.globalAlpha = Math.sin(p * Math.PI) * 0.65;
+        const q = 1 - p;
+        const px = q ** 3 * handX + 3 * q ** 2 * p * cx1 + 3 * q * p ** 2 * cx2 + p ** 3 * owl.x;
+        const py = q ** 3 * handY + 3 * q ** 2 * p * cy1 + 3 * q * p ** 2 * cy2 + p ** 3 * owl.y;
+        c.beginPath(); c.arc(px, py, 0.8 + Math.sin(p * Math.PI) * 0.6, 0, Math.PI * 2); c.fill();
+      }
+      c.shadowBlur = 0; c.globalAlpha = 1;
+    }
     if (summoning) {
       const progress = (local - release) / 60;
       const strength = Math.sin(progress * Math.PI);

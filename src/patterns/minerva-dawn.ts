@@ -39,6 +39,7 @@ export function emitDawn(game: Game): void {
       startFrame: game.phaseFrame, startHp: game.phaseHp, prayer, supplied: false,
       difficulty: repriseDifficulty(game.difficulty, game.phaseHp / game.phaseMaxHp) };
     game.jinraiWindDirection = Math.random() < 0.5 ? -1 : 1;
+    if (!previous) game.audio.play('owlRelease');
   }
   const cycle = game.minervaReprise!.cycle;
   const prayer = dawnPrayerStep(game.phaseFrame, game.minervaReprise);
