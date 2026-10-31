@@ -24,6 +24,12 @@ owleryのメンバーが登場する、ブラウザ向けの弾幕シューテ�
 各階をクリアすると勝負の記録が集まります。
 タイトルの「冒険ノート」から読み返せます。
 
+## 効果音素材
+
+迅雷の瞬間移動音は、[OtoLogic](https://otologic.jp/free/se/motion-agility01.html)の「Motion-Agility13-1(Mid)」を使用しています。
+ライセンスは[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)です。
+出典と再生時の無音区間の扱いは[音源クレジット](public/assets/audio/ATTRIBUTION.txt)に記載しています。
+
 ## 開発者向け
 
 起動・公開・検証の手順は[開発ガイド](docs/development.md)を参照してください。

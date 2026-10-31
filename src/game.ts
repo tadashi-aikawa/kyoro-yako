@@ -597,6 +597,7 @@ export class Game {
     }
     if (stage === 5) this.movies.preload(['lastboss', 'minerva-finale', ...ENDING_MOVIES]);
     if (stage === 4) {
+      this.audio.prepareJinraiWarp();
       this.movies.preload(['jinrai-gift']);
     }
     this.sceneryDistance = 0;

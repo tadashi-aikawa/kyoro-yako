@@ -128,6 +128,10 @@ export const CREDITS_STAFF = [
     "name": "タダシ・チャッピー"
   },
   {
+    "role": "効果音素材",
+    "name": "OtoLogic / CC BY 4.0"
+  },
+  {
     "role": "テスト・動作確認",
     "name": "タダシ・チャッピー・迅雷"
   },

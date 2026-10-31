@@ -1,0 +1,12 @@
+Sound effect by OtoLogic (https://otologic.jp/)
+Title: Motion-Agility13-1(Mid)
+License: Creative Commons Attribution 4.0 International
+https://creativecommons.org/licenses/by/4.0/
+Source collection: https://otologic.jp/free/se/motion-agility01.html
+Original file: https://otologic.jp/sounds/se/pre2/Motion-Agility13-1%28Mid%29.mp3
+License information: https://otologic.jp/free/license.html
+SHA-256: 23cc132a4da1e11b383265503dab4850d3d88cc1188de17f5e61a9ec6af3125e
+
+The distributed MP3 file is unmodified.
+Playback skips 0.08 seconds of leading silence and stops at 1.08 seconds.
+The sound's pitch, speed, and timbre are unchanged.

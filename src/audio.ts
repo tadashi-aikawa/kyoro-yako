@@ -15,7 +15,7 @@ const tones: Record<Sound, [number, number, OscillatorType, number, number, numb
   jinraiCharge: [65, 5.1, 'sine', 145, 0.38, 4.9],
   jinraiRecharge: [65, 2.95, 'sine', 145, 0.38, 2.9],
   jinraiCrackle: [120, 1.8, 'sawtooth', 120, 0.48, 1.5],
-  jinraiWarp: [1800, 0.24, 'sine', 700, 0.42, 0.15],
+  jinraiWarp: [1800, 1, 'sine', 700, 1, 0.15], // 専用音源。秒数・音量・最短間隔だけ使う。
   laser: [180, 0.45, 'sawtooth', 960, 0.18, 0.3], thunder: [90, 0.5, 'sawtooth', 40, 0.24, 0.25],
   slash: [1500, 0.2, 'triangle', 120, 0.22, 0.18], wind: [280, 0.65, 'sine', 700, 0.2, 0.5],
   turn: [760, 0.18, 'sine', 240, 0.22, 0.16], split: [1200, 0.1, 'triangle', 540, 0.15, 0.12],
@@ -41,11 +41,32 @@ export class AudioBank {
   private stampBuffer?: AudioBuffer;
   private shineBuffer?: AudioBuffer;
   private ultimateRequested = false;
+  private warpRequested = false;
+  private warpBuffer?: AudioBuffer;
+  private warpLoading?: Promise<void>;
 
   prepareUltimate(): void {
     this.ultimateRequested = true;
     if (!this.context) return;
     try { this.prepareShineBuffer(); } catch { /* 音声を使えなくてもステージを開始する */ }
+  }
+
+  prepareJinraiWarp(): void {
+    this.warpRequested = true;
+    if (this.context) void this.loadJinraiWarp();
+  }
+
+  private loadJinraiWarp(): Promise<void> {
+    const context = this.context;
+    if (!context || this.warpBuffer) return Promise.resolve();
+    if (this.warpLoading) return this.warpLoading;
+    this.warpLoading = (async () => {
+      const response = await fetch(`${import.meta.env.BASE_URL}assets/audio/jinrai-warp.mp3`);
+      if (!response.ok) throw new Error('Unable to load jinrai warp sound');
+      this.warpBuffer = await context.decodeAudioData(await response.arrayBuffer());
+    })().catch(() => { /* 読み込みに失敗しても進行を止めず、後の先読み・音声解除で再試行する */ })
+      .finally(() => { this.warpLoading = undefined; });
+    return this.warpLoading;
   }
 
   stopFireworks(): void {
@@ -70,6 +91,7 @@ export class AudioBank {
       this.context ??= new AudioContext();
       if (this.context.state === 'suspended') void this.context.resume().catch(() => {});
       if (this.ultimateRequested) this.prepareShineBuffer();
+      if (this.warpRequested) void this.loadJinraiWarp();
     } catch { /* 音声を使えない環境でもゲームを続ける */ }
   }
 
@@ -85,7 +107,8 @@ export class AudioBank {
       if (sound === 'ultimateStamp') { this.ultimateStamp(now, duration, peak); return; }
       if (sound === 'ultimateShine') { this.ultimateShine(now, duration, peak); return; }
       if (sound === 'owlRelease') { this.owlRelease(now, frequency, duration, peak); return; }
-      if (sound === 'jinraiCharge' || sound === 'jinraiRecharge' || sound === 'jinraiCrackle' || sound === 'jinraiWarp') {
+      if (sound === 'jinraiWarp') { this.jinraiWarp(now, duration, peak); return; }
+      if (sound === 'jinraiCharge' || sound === 'jinraiRecharge' || sound === 'jinraiCrackle') {
         this.jinraiEnergy(now, sound === 'jinraiRecharge' ? 'jinraiCharge' : sound, duration, peak); return;
       }
       const oscillator = this.context.createOscillator();
@@ -231,11 +254,23 @@ export class AudioBank {
     source.start(now); source.stop(now + duration);
   }
 
-  private jinraiEnergy(now: number, sound: 'jinraiCharge' | 'jinraiCrackle' | 'jinraiWarp', duration: number, peak: number): void {
+  private jinraiWarp(now: number, duration: number, peak: number): void {
+    if (!this.warpBuffer) { this.prepareJinraiWarp(); return; }
+    const context = this.context!, source = context.createBufferSource();
+    source.buffer = this.warpBuffer;
+    const gain = context.createGain(); gain.gain.value = this.volume * peak;
+    source.connect(gain).connect(context.destination);
+    this.energySources.add(source);
+    source.onended = () => { this.energySources.delete(source); source.disconnect(); gain.disconnect(); };
+    // 採用した原音の音色を保ち、先頭0.08秒と1.08秒以降の無音だけを再生から外す。
+    source.start(now, 0.08, duration);
+  }
+
+  private jinraiEnergy(now: number, sound: 'jinraiCharge' | 'jinraiCrackle', duration: number, peak: number): void {
     const context = this.context!;
     const buffer = context.createBuffer(1, Math.ceil(context.sampleRate * duration), context.sampleRate);
     const samples = buffer.getChannelData(0);
-    let rumble = 0, warpPhase = 0;
+    let rumble = 0;
     for (let i = 0; i < samples.length; i++) {
       const t = i / context.sampleRate;
       const p = t / duration;
@@ -247,27 +282,18 @@ export class AudioBank {
         const phase = Math.PI * 2 * (65 * t + 40 / duration * t * t);
         const tone = Math.sin(phase) * 0.4 + Math.sin(phase * 1.018) * 0.2 + Math.sin(phase * 3) * 0.28 + Math.sin(phase * 4) * 0.12;
         samples[i] = (tone + rumble * 0.8) * (0.45 + p * 0.55) * fade;
-      } else if (sound === 'jinraiCrackle') {
+      } else {
         // 一撃で減衰させず、細かな放電の断続と電源ハムを重ねて鳴らし続ける。
         const crackle = 0.06 + 0.94 * Math.max(0, Math.sin(t * Math.PI * 2 * 26 + Math.sin(t * 37))) ** 2;
         const buzz = Math.sin(t * Math.PI * 2 * 120) + Math.sin(t * Math.PI * 2 * 240) * 0.5 + Math.sin(t * Math.PI * 2 * 480) * 0.25;
         samples[i] = (noise * 0.5 + buzz * 0.35) * crackle * fade;
-      } else {
-        // 鋭い空気のアタックと、瞬時に跳ね上がって落ちる高音を重ねた短い「シュイン」。
-        rumble += (noise - rumble) * 0.18;
-        const frequency = 700 + 4200 * (1 - Math.exp(-t / 0.008)) * Math.exp(-t * 15);
-        warpPhase += Math.PI * 2 * frequency / context.sampleRate;
-        const phase = warpPhase + Math.sin(t * Math.PI * 2 * 75) * 0.65;
-        const tone = Math.sin(phase) * 0.65 + Math.sin(phase * 2.02) * 0.22 + Math.sin(phase * 3.9) * 0.08;
-        const envelope = Math.min(1, t / 0.002, (duration - t) / 0.025) * Math.exp(-t * 18);
-        samples[i] = Math.tanh((tone + (noise - rumble) * 0.6) * 1.3) * envelope * 0.75;
       }
     }
     const source = context.createBufferSource(); source.buffer = buffer;
     const filter = context.createBiquadFilter();
-    filter.type = sound === 'jinraiWarp' ? 'highpass' : 'lowpass';
-    filter.frequency.setValueAtTime(sound === 'jinraiCharge' ? 600 : sound === 'jinraiWarp' ? 900 : 3600, now);
-    filter.frequency.exponentialRampToValueAtTime(sound === 'jinraiCharge' ? 1400 : sound === 'jinraiWarp' ? 1400 : 5200, now + duration);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(sound === 'jinraiCharge' ? 600 : 3600, now);
+    filter.frequency.exponentialRampToValueAtTime(sound === 'jinraiCharge' ? 1400 : 5200, now + duration);
     const gain = context.createGain(); gain.gain.value = this.volume * peak;
     source.connect(filter).connect(gain).connect(context.destination);
     this.energySources.add(source);
