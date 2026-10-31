@@ -1,5 +1,5 @@
 export type Sound = 'shot' | 'hit' | 'graze' | 'kill' | 'bomb' | 'declare' | 'ultimateStamp' | 'ultimateShine' | 'capture' | 'item' | 'extend'
-  | 'enemyShot' | 'jinraiShot' | 'jinraiCharge' | 'jinraiCrackle' | 'jinraiWarp' | 'laser' | 'thunder' | 'thunderBurst' | 'ninpo' | 'slash' | 'wind' | 'turn' | 'split' | 'sweepCharge' | 'sweepBurst' | 'prayerCharge' | 'owlRelease' | 'roseCharge' | 'roseBloom' | 'chappySnap' | 'caromTap' | 'fireworkRise' | 'fireworkGrandRise' | 'fireworkBoom';
+  | 'enemyShot' | 'jinraiShot' | 'jinraiCharge' | 'jinraiRecharge' | 'jinraiCrackle' | 'jinraiWarp' | 'laser' | 'thunder' | 'thunderBurst' | 'ninpo' | 'slash' | 'wind' | 'turn' | 'split' | 'sweepCharge' | 'sweepBurst' | 'prayerCharge' | 'owlRelease' | 'roseCharge' | 'roseBloom' | 'chappySnap' | 'caromTap' | 'fireworkRise' | 'fireworkGrandRise' | 'fireworkBoom';
 export const ULTIMATE_SHINE_DURATION = 1.05;
 // 周波数・秒数・波形・終端周波数・音量・最短間隔。
 // 常時鳴る自機ショットを抑え、敵の発射と仕掛けの切り替わりを聞き取れる比率にする。
@@ -13,8 +13,9 @@ const tones: Record<Sound, [number, number, OscillatorType, number, number, numb
   extend: [660, 0.5, 'triangle', 891, 0.12, 0.025], enemyShot: [520, 0.08, 'triangle', 190, 0.2, 0.11],
   jinraiShot: [1700, 0.055, 'sawtooth', 130, 0.28, 0.055],
   jinraiCharge: [65, 5.5, 'sine', 145, 0.38, 5.3],
+  jinraiRecharge: [65, 2.95, 'sine', 145, 0.38, 2.9],
   jinraiCrackle: [120, 1.8, 'sawtooth', 120, 0.48, 1.5],
-  jinraiWarp: [180, 0.55, 'sine', 85, 0.42, 0.35],
+  jinraiWarp: [180, 0.5, 'sine', 85, 0.42, 0.35],
   laser: [180, 0.45, 'sawtooth', 960, 0.18, 0.3], thunder: [90, 0.5, 'sawtooth', 40, 0.24, 0.25],
   slash: [1500, 0.2, 'triangle', 120, 0.22, 0.18], wind: [280, 0.65, 'sine', 700, 0.2, 0.5],
   turn: [760, 0.18, 'sine', 240, 0.22, 0.16], split: [1200, 0.1, 'triangle', 540, 0.15, 0.12],
@@ -58,6 +59,7 @@ export class AudioBank {
     for (const source of this.energySources) source.stop();
     this.energySources.clear();
     delete this.last.jinraiCharge; delete this.last.jinraiCrackle; delete this.last.jinraiWarp;
+    delete this.last.jinraiRecharge;
     delete this.last.owlRelease;
     delete this.last.ultimateStamp;
     delete this.last.ultimateShine;
@@ -83,8 +85,8 @@ export class AudioBank {
       if (sound === 'ultimateStamp') { this.ultimateStamp(now, duration, peak); return; }
       if (sound === 'ultimateShine') { this.ultimateShine(now, duration, peak); return; }
       if (sound === 'owlRelease') { this.owlRelease(now, frequency, duration, peak); return; }
-      if (sound === 'jinraiCharge' || sound === 'jinraiCrackle' || sound === 'jinraiWarp') {
-        this.jinraiEnergy(now, sound, duration, peak); return;
+      if (sound === 'jinraiCharge' || sound === 'jinraiRecharge' || sound === 'jinraiCrackle' || sound === 'jinraiWarp') {
+        this.jinraiEnergy(now, sound === 'jinraiRecharge' ? 'jinraiCharge' : sound, duration, peak); return;
       }
       const oscillator = this.context.createOscillator();
       const gain = this.context.createGain();

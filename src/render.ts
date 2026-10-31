@@ -5,13 +5,14 @@ import { CREDITS_ART, CREDITS_STAFF, CREDITS_STAFF_FRAMES, creditsFade, creditsS
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
 import { BATTLE_COMMENT_FADE_FRAMES, BATTLE_COMMENT_FRAMES, BATTLE_COMMENT_REVEAL_FRAMES, PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
+import { drawIssen } from './jinrai-issen-render';
 import { notebookBomb, notebookBookmark, notebookFeather, notebookOwl, notebookPage, notebookStar } from './notebook-icons';
 import { sugarCasting } from './patterns/chappy';
 import { claudineScene, complementBoundary, whiteSpaceCircle } from './patterns/claudine';
 import { BLOOM_CUTIN, bloomPose } from './patterns/claudine-finale';
 import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, gridLayoutAt, gridPoint, gridRows, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_NAMES, WEATHER_PERIOD, weatherAt } from './patterns/claudine-weather-grid';
-import { BURST_MOVE, BURST_RETURN, burstVisibility, DASH_ATTACK, DASH_CHARGE, DASH_CHARGE_START, DASH_CHARGED, DASH_CUTIN, DASH_TRAIL_LIFE, dashBurstStep, dashMotion } from './patterns/jinrai';
 import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
+import { DASH_CHARGE, DASH_CUTIN, DASH_TRAIL_LIFE, issenScene } from './patterns/jinrai-issen';
 import { KISS_CHARGE, KISS_FADE, KISS_ORIGIN, KISS_POSE_END, kissEdgeWarning, kissStep } from './patterns/jinrai-kiss';
 import { THUNDER_FADE, THUNDER_HOLD, thunderGround, thunderPath, thunderScene } from './patterns/jinrai-thunder';
 import { dawnPrayerStep, eyeX, PRAYER_CHARGE, PRAYER_FIRE, recallReturnWarning } from './patterns/minerva';
@@ -328,11 +329,10 @@ export class Renderer {
       const attack = game.attackContext();
       const clones = attack.phase?.pattern === 'jinraiClone' && (attack === game || attack.phaseFrame >= 105) ? jinraiCloneScene(attack.phaseFrame, attack.phase.duration) : undefined;
       const [x, y] = game.bossXY;
-      const burst = game.phase.pattern === 'jinraiDash' ? dashBurstStep(game) : -1;
-      const dash = game.phase.pattern === 'jinraiDash' && game.phaseFrame >= DASH_ATTACK && burst < 0 ? dashMotion(game) : undefined;
-      const dashIntro = game.phase.pattern === 'jinraiDash' && game.phaseFrame >= DASH_CHARGE_START && game.phaseFrame < DASH_ATTACK;
-      const seal = dashIntro || burst >= BURST_MOVE && burst < BURST_RETURN;
-      if (dashIntro && game.phaseFrame < DASH_CHARGED) this.jinraiCharge(x, y, game.phaseFrame - DASH_CHARGE_START);
+      const dash = issenScene(game);
+      const seal = !!dash?.charging;
+      const bossOpacity = dash?.opacity ?? 1;
+      if (dash?.charging) this.jinraiCharge(x, y, dash.progress * DASH_CHARGE);
       const prayer = game.phase.pattern === 'owlDawn' ? dawnPrayerStep(game.phaseFrame, game.minervaReprise) : -1;
       const praying = prayer >= 0 && prayer < PRAYER_CHARGE;
       const channeling = prayer >= 0 && prayer < PRAYER_CHARGE + PRAYER_FIRE;
@@ -373,7 +373,7 @@ export class Renderer {
         }
         c.restore();
       }
-      if (!seal && !clones) this.magic(x, y, game.frame, stage.colors[2], 38, 0.7 * burstVisibility(burst));
+      if (!seal && !clones) this.magic(x, y, game.frame, stage.colors[2], 38, 0.7 * bossOpacity);
       if (clones) {
         const scene = clones;
         const performingNinpo = scene.charging || scene.splitting;
@@ -410,20 +410,19 @@ export class Renderer {
         const bloom = bloomPose(game);
         const kiss = game.phase.pattern === 'jinraiKiss' ? kissStep(game.phaseFrame - 105, game.difficulty) : -1;
         const kissing = kiss >= 0 && kiss < KISS_POSE_END;
-        const tilt = bloom ? bloom.tilt : channeling || seal || thunder?.charging || sweepCharging || kissing ? 0 : dash?.moving ? -game.jinraiDashDirection * 0.18 : Math.cos(game.phaseFrame * 0.012) * 0.045;
+        const tilt = bloom ? bloom.tilt : channeling || seal || thunder?.charging || sweepCharging || kissing ? 0 : dash?.moving ? -dash.direction * 0.18 : Math.cos(game.phaseFrame * 0.012) * 0.045;
         const motionPose = updateBossMotion(this.bossMotion, `${game.boss}:${game.phase.name}`, game.frame, x);
-        const pose = dash?.moving ? game.jinraiDashDirection > 0 ? 'right' : 'left' : motionPose;
+        const pose = dash?.moving || dash?.hopping ? dash.direction > 0 ? 'right' : 'left' : motionPose;
         const solo = game.boss === 'minerva' && game.phase.pattern === 'owlDawn';
         const summoning = solo && game.minervaReprise && !game.minervaReprise.prayer && repriseLocal(game.phaseFrame, game.minervaReprise) < reprisePrepare(game.minervaReprise);
         const casting = !!summoning || !!game.galaxyFlash || sugarCasting(game) || isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame);
         const spriteId = bloom ? bloom.sprite : kissing ? 'jinrai-kiss' : bossSpriteId(game.boss, casting && !dash?.moving ? 'cast' : pose, game.frame);
         const bossSprite = this.readySprite(game, spriteId);
         c.save();
-        if (seal && !dashIntro) { c.shadowColor = '#ffe591'; c.shadowBlur = 8 + Math.min(20, (burst - BURST_MOVE) * 0.6); }
         const bossSize = bloom ? bloom.size : 64;
         const soloSprite = minervaSoloSprite(channeling || sweepCharging ? 'prayer' : casting ? 'cast' : pose, game.frame, game.phaseFrame);
         if (game.phase.pattern === 'jinraiDash') this.jinraiDashTrail(game);
-        this.fieldCharacter(game, solo ? this.readySprite(game, soloSprite) : channeling ? 'minerva-prayer' : seal || thunder?.charging ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (channeling || seal || thunder?.charging || sweepCharging || kissing || bloom ? 0 : Math.sin(game.frame * 0.045) * 2), bossSize, tilt, burstVisibility(burst));
+        this.fieldCharacter(game, solo ? this.readySprite(game, soloSprite) : channeling ? 'minerva-prayer' : seal || thunder?.charging ? 'jinrai-seal' : sweepCharging ? 'obsidia-sweep' : bossSprite, x, y + (dash || channeling || seal || thunder?.charging || sweepCharging || kissing || bloom ? 0 : Math.sin(game.frame * 0.045) * 2), bossSize, tilt, bossOpacity);
         if (bloom && bloom.closed > 0) {
           // 閉眼差分は目の部分だけ重ね、元絵の身体と手・髪の輪郭は動かさない。
           c.save(); c.beginPath();
@@ -433,9 +432,8 @@ export class Renderer {
           this.fieldCharacter(game, this.readySprite(game, 'claudine-bloom-closed'), x, y - 1.5, bossSize, 0, bloom.closed);
           c.restore();
         }
-        if (game.boss === 'jinrai' && game.phase.pattern === 'jinraiDash' && game.phaseFrame >= DASH_CHARGED) {
-          const direction = dash?.moving ? game.jinraiDashDirection : 0;
-          this.jinraiLightningAura(x, y + (seal ? 0 : Math.sin(game.frame * 0.045) * 2), tilt, game.frame, burstVisibility(burst), direction);
+        if (dash && (dash.moving || dash.charging && dash.progress > 0.5)) {
+          this.jinraiLightningAura(x, y, tilt, game.frame, bossOpacity, dash.moving ? dash.direction : 0);
         }
         c.restore();
       }
@@ -640,37 +638,7 @@ export class Renderer {
         c.restore();
       }
     }
-    if (pattern === 'jinraiDash' && game.phaseFrame >= DASH_ATTACK) {
-      const burst = dashBurstStep(game);
-      if (burst >= 0 && burst < 24) this.ninjaSmoke(game.jinraiBurstFromX, game.jinraiBurstFromY, burst);
-      if (burst >= BURST_MOVE && burst < BURST_MOVE + 24) this.ninjaSmoke(192, 224, burst - BURST_MOVE);
-      if (game.phaseFrame < game.jinraiBurstFlashUntil) this.burstLightning(game.phaseFrame, game.jinraiBurstFlashUntil - game.phaseFrame);
-      c.strokeStyle = '#fff1b9bb'; c.lineWidth = 1.5;
-      game.bullets.forEach((b) => {
-        if (b.motion !== 'jinraiHold' || b.releaseAt <= 0) return;
-        const angle = Math.atan2(b.targetY - b.y, b.targetX - b.x);
-        c.beginPath(); c.moveTo(b.x, b.y); c.lineTo(b.x + Math.cos(angle) * 13, b.y + Math.sin(angle) * 13); c.stroke();
-      });
-      if (burst >= BURST_MOVE && burst < BURST_RETURN) {
-        c.save(); c.strokeStyle = '#fff3bf'; c.shadowColor = '#ffe282'; c.shadowBlur = 18;
-        const hot = game.phaseFrame < game.jinraiBurstFlashUntil;
-        for (let i = 0; i < 12; i++) {
-          const angle = i * Math.PI / 6 + game.jinraiBurstCount * 0.3;
-          c.lineWidth = hot ? 2.6 : 1.2;
-          c.globalAlpha = hot ? 0.85 : 0.35;
-          c.beginPath();
-          for (let j = 0; j < 6; j++) {
-            const radius = 24 + j * (hot ? 14 : 5);
-            const bend = Math.sin(Math.floor(game.frame / 3) * 2.1 + i * 4 + j * 3) * (j ? 7 : 0);
-            const px = 192 + Math.cos(angle) * radius - Math.sin(angle) * bend;
-            const py = 224 + Math.sin(angle) * radius + Math.cos(angle) * bend;
-            if (j === 0) c.moveTo(px, py); else c.lineTo(px, py);
-          }
-          c.stroke();
-        }
-        c.restore();
-      }
-    }
+    if (pattern === 'jinraiDash') drawIssen(c, game);
     for (const laser of game.jinraiLasers) {
       const warning = laser.age <= laser.warning;
       c.strokeStyle = warning ? '#ffd9f4aa' : '#ff87cbe8';
@@ -731,9 +699,9 @@ export class Renderer {
 
   private jinraiDashTrail(game: Game): void {
     const c = this.ctx;
-    const trails = game.jinraiDashTrails.filter(trail => game.phaseFrame - trail.frame < DASH_TRAIL_LIFE);
+    const trails = game.jinraiIssen?.trails ?? [];
     c.save(); c.lineJoin = 'round';
-    // 実際に通った位置を0.6秒残す。到着した後も残像で軌道を追えるようにする。
+    // 実際に通った位置を0.7秒残す。到着した後も残像で軌道を追えるようにする。
     for (const trail of trails) {
       const fade = 1 - (game.phaseFrame - trail.frame) / DASH_TRAIL_LIFE;
       const sprite = this.readySprite(game, bossSpriteId('jinrai', trail.direction > 0 ? 'right' : 'left', game.frame));
@@ -742,7 +710,6 @@ export class Renderer {
     // 電撃は残像の上へ重ね、密になった区間でもビリビリを見せる。
     for (let i = 1; i < trails.length; i++) {
       const from = trails[i - 1], to = trails[i];
-      if (from.wave !== to.wave) continue;
       const fade = 1 - (game.phaseFrame - from.frame) / DASH_TRAIL_LIFE;
       const dx = to.x - from.x, dy = to.y - from.y, distance = Math.hypot(dx, dy) || 1;
       c.globalAlpha = fade * 0.65;
@@ -825,34 +792,6 @@ export class Renderer {
     c.restore();
   }
 
-  private burstLightning(frame: number, remaining: number): void {
-    const c = this.ctx;
-    const fade = remaining / 12;
-    c.save();
-    c.fillStyle = `rgba(255, 233, 177, ${remaining > 9 ? 0.12 : 0.025 * fade})`;
-    c.fillRect(0, 0, FIELD.w, FIELD.h);
-    c.globalAlpha = fade * 0.7;
-    c.strokeStyle = '#ffdf48'; c.shadowColor = '#ffc400'; c.shadowBlur = 14;
-    const seed = Math.floor((frame + remaining) / 18);
-    for (let i = 0; i < 10; i++) {
-      const angle = i * Math.PI / 5 + seed * 0.37;
-      c.beginPath(); c.moveTo(192, 224);
-      for (let j = 1; j <= 8; j++) {
-        const distance = j * 55;
-        const bend = Math.sin(seed * 3.1 + i * 7 + j * 4.9) * 22;
-        const x = 192 + Math.cos(angle) * distance - Math.sin(angle) * bend;
-        const y = 224 + Math.sin(angle) * distance + Math.cos(angle) * bend;
-        c.lineTo(x, y);
-        if (j === 3 || j === 5) {
-          c.lineTo(x + Math.cos(angle + 0.5) * 36, y + Math.sin(angle + 0.5) * 36); c.moveTo(x, y);
-        }
-      }
-      c.lineWidth = 3; c.stroke();
-      c.strokeStyle = '#fff4d2'; c.lineWidth = 1; c.stroke(); c.strokeStyle = '#ffdf48';
-    }
-    c.restore();
-  }
-
   private owl(enemy: Pick<Enemy, 'x' | 'y' | 'color'>, frame: number, angle = 0): void {
     const c = this.ctx; c.save(); c.translate(enemy.x, enemy.y); c.rotate(angle);
     c.fillStyle = ['#9ab1ec', '#e0a6d5', '#e6ca95'][enemy.color];
@@ -887,6 +826,16 @@ export class Renderer {
 
   private bullet(b: Bullet): void {
     if (drawChappyBullet(this.ctx, b)) return;
+    if (b.kind === 'kunai') {
+      const c = this.ctx;
+      c.save(); c.translate(b.x, b.y); c.rotate(Math.atan2(b.vy, b.vx));
+      c.globalAlpha = b.delay > 0 ? 0.4 : 1;
+      c.beginPath(); c.moveTo(9, 0); c.lineTo(0, -3.5); c.lineTo(-4, 0); c.lineTo(0, 3.5); c.closePath();
+      c.fillStyle = '#ffe8a1'; c.fill(); c.strokeStyle = '#c28d24'; c.lineWidth = 1; c.stroke();
+      c.beginPath(); c.moveTo(9, 0); c.lineTo(-7, 0); c.strokeStyle = '#fffde2'; c.stroke();
+      c.beginPath(); c.arc(-9, 0, 2, 0, Math.PI * 2); c.strokeStyle = '#ffd05a'; c.stroke();
+      c.restore(); return;
+    }
     if (b.motion === 'jinraiSpark') {
       const c = this.ctx;
       c.save(); c.translate(b.x, b.y); c.rotate(Math.atan2(b.vy, b.vx));

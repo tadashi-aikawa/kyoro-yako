@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { emitBossNormal, normalPeriod } from './patterns/boss-normal';
-import { DASH_ATTACK, DASH_CHARGE_START, DASH_CHARGED, DASH_CUTIN, DASH_DROP, DASH_MOVE, DASH_START_Y, DASH_TRAIL_LIFE, dashBurstStep, dashCrossingPoint, dashCrossingX, dashMotion, emitJinraiPattern } from './patterns/jinrai';
+import { DASH_ATTACK, DASH_CHARGE_START, DASH_CHARGED, DASH_CUTIN, emitJinraiPattern } from './patterns/jinrai';
 import { CLONE_HOP, CLONE_SHOOT, CLONE_STAGGER, HOP_OUT, jinraiCloneScene } from './patterns/jinrai-clone';
+import { issenScene } from './patterns/jinrai-issen';
 import { KISS_CHARGE, KISS_FADE, KISS_LIFE, KISS_PERIOD, kissEdgeWarning, updateJinraiHeart } from './patterns/jinrai-kiss';
-import { bulletSpeed } from './rules';
 import { MID_PHASE, STAGES } from './stages';
 import { ULTIMATE_CUTIN_FRAMES, ULTIMATE_SECOND_STAMP, ULTIMATE_TITLE } from './ultimate-cutin';
 
@@ -23,12 +23,6 @@ function phase(index: number): Game {
   return game;
 }
 
-function startDashBurst(game: Game): number {
-  game.phaseHp = game.phaseMaxHp / 2;
-  for (let frame = 0; frame < DASH_ATTACK + 300 && game.jinraiBurstStartFrame < 0; frame++) game.update();
-  expect(game.jinraiBurstStartFrame).toBeGreaterThanOrEqual(0);
-  return game.jinraiBurstStartFrame;
-}
 
 it('迅雷の11フェーズへ直行でき、Power 4.00の理論撃破時間は通常14秒・スペル25秒・一閃12.5秒になる', () => {
   const dps = (2 + Math.floor(4 / 2)) * 1.35 * (60 / 5);
@@ -278,20 +272,20 @@ it('一閃はゆっくり移動し、印から1秒後にカットインを挟ん
     game.px = game.bossXY[0]; game.update();
     const frame = game.phaseFrame;
     expect(game.bullets.count).toBe(0);
-    expect(game.jinraiDashTick).toBe(-1);
+    expect(game.jinraiIssen?.trails).toHaveLength(0);
     expect(game.phaseHp).toBe(hp);
     if (frame < DASH_CHARGED) expect(play).not.toHaveBeenCalledWith('jinraiCrackle');
     if (frame === DASH_CHARGED) {
       expect(play).toHaveBeenCalledWith('jinraiCrackle');
-      expect(game.bossXY).toEqual([192, 132]);
+      expect(game.bossXY).toEqual(game.jinraiIssen?.origin);
     }
     expect(game.cutin).toBe(frame >= DASH_CUTIN ? Math.max(0, ULTIMATE_CUTIN_FRAMES - frame + DASH_CUTIN) : 0);
     if (frame < DASH_CHARGE_START) expect(play).not.toHaveBeenCalledWith('jinraiCharge');
     if (frame === DASH_CHARGE_START) expect(play).toHaveBeenCalledWith('jinraiCharge');
   }
   expect(game.phaseFrame).toBe(DASH_ATTACK - 1); game.update();
-  expect(game.jinraiDashTick).toBe(0);
-  expect(game.bossXY).toEqual([24, 115]);
+  expect(game.jinraiIssen?.cycle).toBe(0);
+  expect(game.bossXY).toEqual(game.jinraiIssen?.origin);
   expect(game.cutin).toBe(0);
   expect(play.mock.calls.filter(([sound]) => sound === 'declare')).toHaveLength(1);
   expect(play.mock.calls.filter(([sound]) => sound === 'jinraiCharge')).toHaveLength(1);
@@ -338,21 +332,6 @@ it('全画面カットインの開始・終了境界もショットとボムを�
   press(); expect(game.bombs).toBe(bombs - 1); expect(game.bombUsed).toBe(true);
 });
 
-it('一閃の横断は24フレームで加減速し、左右対称に斜め下へ駆け抜ける', () => {
-  const left = Array.from({ length: DASH_MOVE + 1 }, (_, frame) => dashCrossingX(1, frame));
-  const speed = left.slice(1).map((x, i) => x - left[i]);
-  expect(left[0]).toBe(24); expect(left.at(-1)).toBe(360);
-  expect(Math.max(...speed)).toBeGreaterThan(35);
-  expect(Math.max(...speed)).toBeLessThan(45);
-  expect(speed[0]).toBeLessThan(2); expect(speed.at(-1)).toBeLessThan(2);
-  for (let i = 0; i <= DASH_MOVE; i++) expect(dashCrossingX(-1, i)).toBeCloseTo(384 - left[i]);
-  for (const direction of [1, -1]) {
-    const path = Array.from({ length: DASH_MOVE + 1 }, (_, frame) => dashCrossingPoint(direction, 115, frame));
-    expect(path[0][1]).toBe(115); expect(path.at(-1)![1]).toBe(165);
-    expect(path.slice(1).every((p, i) => p[1] > path[i][1])).toBe(true);
-    expect(path.every(([x, y]) => Math.abs(y - 115 - Math.abs(x - path[0][0]) / 336 * DASH_DROP) < 0.001)).toBe(true);
-  }
-});
 
 it('一閃は時間制限∞・体力1620のスペルで、時間切れにならず撃破すると終了する', () => {
   const game = phase(10);
@@ -362,7 +341,7 @@ it('一閃は時間制限∞・体力1620のスペルで、時間切れになら
   expect(game.phaseIndex).toBe(10);
   expect(game.phaseHp).toBe(1620);
   expect(game.debugState.phaseRemainingSeconds).toBe('∞');
-  while (dashMotion(game).local < dashMotion(game).warning + DASH_MOVE) game.update();
+  while ((issenScene(game)?.opacity ?? 1) < 1) game.update();
   const [x, y] = game.bossXY;
   Object.assign(game.shots.acquire()!, { x, y, vx: 0, vy: 0, damage: game.phaseHp, radius: 3, homing: false });
   game.update();
@@ -383,154 +362,11 @@ it('一閃のボーナスはミネルヴァ最終技と同じ速度で減衰し�
   }
 });
 
-it.each([DASH_ATTACK + 25, 1300, 4000])('一閃は体力50%%超では発散せず、50%%到達後の横断終了から発散する: frame %s', (frame) => {
-  const game = phase(10);
-  const play = vi.spyOn(game.audio, 'play');
-  game.phaseHp = game.phaseMaxHp / 2 + 1;
-  while (game.phaseFrame < frame) game.update();
-  expect(game.jinraiBurstStartFrame).toBe(-1);
-  expect(dashBurstStep(game)).toBe(-1);
-  expect(play).not.toHaveBeenCalledWith('ninpo');
-  expect(play).not.toHaveBeenCalledWith('thunderBurst');
-  const end = game.phaseFrame + 90 - game.jinraiDashTick;
-  game.phaseHp = game.phaseMaxHp / 2;
-  while (game.phaseFrame < end - 1) {
-    game.update(); expect(dashBurstStep(game)).toBe(-1);
-  }
-  game.update();
-  expect(game.jinraiBurstStartFrame).toBe(end);
-  expect(dashBurstStep(game)).toBe(0);
-});
-
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('一閃の発散は8秒経過後の最初の往復終了まで待ち、発射待ちの列を残さない: %s', (difficulty) => {
-  const game = phase(10); game.difficulty = difficulty;
-  const first = startDashBurst(game);
-  const pending = () => game.bullets.objects.filter((b) => b.active && b.motion === 'jinraiHold');
-  expect(pending()).toHaveLength(0);
-  for (let count = 2; count <= 4; count++) {
-    const previous = game.jinraiBurstStartFrame;
-    while (game.phaseFrame < previous + 480) game.update();
-    expect(game.jinraiBurstStartFrame).toBe(previous);
-    expect(game.jinraiDashDouble).toBe(true);
-    expect(dashBurstStep(game)).toBe(-1);
-    const end = game.phaseFrame + 170 - game.jinraiDashTick;
-    expect(end).toBeGreaterThan(previous + 480);
-    const crossing = game.jinraiDashCrossing;
-    while (game.phaseFrame < end - 1) {
-      game.update();
-      expect(game.jinraiBurstStartFrame).toBe(previous);
-      expect(dashBurstStep(game)).toBe(-1);
-    }
-    expect(game.jinraiDashTick).toBe(169);
-    expect(game.jinraiDashCrossing).toBe(crossing + 1);
-    const held = pending();
-    expect(held.length).toBeGreaterThan(0);
-    expect(held.every((b) => b.releaseAt > 0)).toBe(true);
-    game.update();
-    expect(game.jinraiBurstStartFrame).toBe(end);
-    expect(game.jinraiBurstCount).toBe(count);
-    expect(dashBurstStep(game)).toBe(0);
-    expect(pending()).toHaveLength(0);
-    expect(held.every((b) => !b.active)).toBe(true);
-    while (dashBurstStep(game) >= 0) {
-      expect(pending()).toHaveLength(0);
-      game.update();
-    }
-  }
-  expect(game.jinraiBurstStartFrame).toBeGreaterThan(first + 3 * 480);
-});
-
-it('一閃の中央発散タイマーはフェーズ開始でリセットする', () => {
-  const game = phase(10); startDashBurst(game);
-  game.startBoss(false, 10);
-  expect(game.jinraiBurstStartFrame).toBe(-1);
-  expect(game.jinraiBurstCount).toBe(0);
-  expect(dashBurstStep(game)).toBe(-1);
-});
-
-it('一閃は開幕から体力半分以下なら最初の往復が終わってから発散する', () => {
-  const game = new Game(); game.audio.volume = 0; game.invincible = true;
-  game.startStage(4); game.startBoss(false, 10);
-  game.phaseHp = game.phaseMaxHp / 2;
-  while (game.phaseFrame < DASH_ATTACK + 84) game.update();
-  expect(game.jinraiDashDouble).toBe(true);
-  expect(game.jinraiDashTick).toBe(84);
-  expect(game.jinraiDashCrossing).toBe(0);
-  expect(dashBurstStep(game)).toBe(-1);
-  game.update();
-  expect(dashBurstStep(game)).toBe(-1);
-  expect(game.jinraiDashCrossing).toBe(1);
-  while (game.phaseFrame < DASH_ATTACK + 169) game.update();
-  expect(game.jinraiDashTick).toBe(169);
-  expect(dashBurstStep(game)).toBe(-1);
-  game.update();
-  expect(dashBurstStep(game)).toBe(0);
-  expect(game.jinraiDashCrossing).toBe(1);
-});
-
-it('一閃は体力半分以下で煙で消えて中央へ瞬間移動し、雷と花びらを三連発散して横断へ戻る', () => {
-  const game = phase(10);
-  const play = vi.spyOn(game.audio, 'play');
-  game.phaseHp = game.phaseMaxHp / 2;
-  while (game.jinraiDashTick < 89) game.update();
-  const before = game.bossXY;
-  game.update();
-  const start = game.jinraiBurstStartFrame;
-  expect(game.bossXY).toEqual(before);
-  while (game.phaseFrame < start + 17) game.update();
-  expect(game.bossXY).toEqual(before);
-  expect(play).toHaveBeenCalledWith('ninpo');
-  while (game.phaseFrame < start + 18) game.update();
-  expect(game.bossXY).toEqual([192, 224]);
-  const crossing = game.jinraiDashCrossing;
-  while (game.phaseFrame < start + 48) game.update();
-  expect(game.jinraiBurstFlashUntil).toBeGreaterThan(game.phaseFrame);
-  expect(game.bullets.objects.some((b) => b.active && b.age === 1 && b.kind === 'needle')).toBe(true);
-  expect(game.bullets.objects.some((b) => b.active && b.age === 1 && b.kind === 'petal')).toBe(true);
-  expect(game.bullets.objects.filter((b) => b.active && b.age === 1)).toHaveLength(56);
-  while (game.phaseFrame < start + 84) game.update();
-  expect(play.mock.calls.filter(([sound]) => sound === 'thunderBurst')).toHaveLength(3);
-  while (game.phaseFrame < start + 120) game.update();
-  expect(game.jinraiDashCrossing).toBe(crossing + 1);
-  expect(game.jinraiDashTick).toBe(0);
-  while (game.phaseFrame < start + 480) game.update();
-  expect(game.bossXY.every(Number.isFinite)).toBe(true);
-});
-
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('一閃の発散は針も花びらも通常攻撃より気持ち速い: %s', (difficulty) => {
-  const game = new Game(); game.audio.volume = 0; game.invincible = true;
-  game.difficulty = difficulty; game.startStage(4); game.startBoss(false, 10);
-  const start = startDashBurst(game);
-  while (game.phaseFrame < start + 48) game.update();
-  const speeds = (kind: string) => game.bullets.objects.filter((b) => b.active && b.age === 1 && b.kind === kind).map((b) => Math.hypot(b.vx, b.vy));
-  const normal = bulletSpeed(difficulty, 5.1);
-  for (const kind of ['needle', 'petal']) {
-    expect(Math.min(...speeds(kind)), kind).toBeGreaterThan(normal);
-    expect(Math.max(...speeds(kind)), kind).toBeLessThan(normal * 1.15);
-  }
-});
-
-it('忍術で消えている間はショットが本体のいた場所を通り抜ける', () => {
-  const game = phase(10);
-  const start = startDashBurst(game);
-  while (game.phaseFrame < start + 9) game.update();
-  const [x, y] = game.bossXY;
-  const hp = game.phaseHp;
-  const shot = game.shots.acquire()!;
-  Object.assign(shot, { x, y, vx: 0, vy: 0, damage: 10, radius: 3, homing: false });
-  game.update();
-  expect(game.phaseHp).toBe(hp);
-  expect(shot.active).toBe(true);
-  while (game.phaseFrame < start + 29) game.update();
-  shot.x = 192; shot.y = 224;
-  game.update();
-  expect(game.phaseHp).toBe(hp - 20);
-  expect(shot.active).toBe(false);
-});
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('迅雷一閃だけショットとボムの初撃・継続ダメージが2倍になる: %s', (difficulty) => {
   for (let index = 0; index < STAGES[3].phases.length; index++) {
     const game = phase(index); game.difficulty = difficulty;
+    if (index === 10) for (let frame = 0; frame < 9; frame++) game.update();
     const multiplier = index === 10 ? 2 : 1;
     const hp = game.phaseHp;
     const [x, y] = game.bossXY;
@@ -548,108 +384,6 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('迅雷一閃だけシ�
   }
 });
 
-it('一閃は16px間隔の列に切れ目を作り、停止後に光って時間差で飛ぶ', () => {
-  const game = phase(10);
-  while (dashMotion(game).local < dashMotion(game).warning + DASH_MOVE) game.update();
-  const held = game.bullets.objects.filter((b) => b.active && b.motion === 'jinraiHold');
-  expect(held).toHaveLength(20);
-  expect(held.every((b) => Math.abs(b.y - 115 - DASH_DROP * b.dashOrder / 21) < 0.001)).toBe(true);
-  const positions = held.map((b) => b.x).sort((a, b) => a - b);
-  const spacing = positions.slice(1).map((x, i) => x - positions[i]);
-  expect(spacing.filter((gap) => gap > 40)).toHaveLength(1);
-  expect(spacing.filter((gap) => gap < 40).every((gap) => gap > 14 && gap < 17)).toBe(true);
-  while (game.jinraiDashTick < 52) game.update();
-  expect(held.every((b) => b.vx === 0 && b.vy === 0)).toBe(true);
-  while (game.jinraiDashTick < 62) game.update();
-  expect(held.every((b) => b.releaseAt > game.phaseFrame)).toBe(true);
-  while (game.jinraiDashTick < 72) game.update();
-  expect(held.some((b) => b.motion === 'normal')).toBe(true);
-  expect(held.some((b) => b.motion === 'jinraiHold')).toBe(true);
-  while (held.some((b) => b.motion === 'jinraiHold')) game.update();
-  expect(held.every((b) => b.motion === 'normal')).toBe(true);
-});
-
-it('一閃の高さは3段を巡回し、体力半分以下では次の巡回から往復する', () => {
-  const game = phase(10);
-  expect(game.bossXY[1]).toBe(115);
-  game.phaseHp = game.phaseMaxHp / 2;
-  while (game.jinraiDashCrossing < 1) game.update();
-  expect(game.jinraiDashDouble).toBe(true);
-  expect(game.bossXY[1]).toBe(DASH_START_Y[1]);
-  const firstDirection = game.jinraiDashDirection;
-  while (game.jinraiDashCrossing < 2) game.update();
-  expect(game.jinraiDashTick).toBe(85);
-  expect(game.bossXY[1]).toBe(DASH_START_Y[2]);
-  expect(game.jinraiDashDirection).toBe(-firstDirection);
-  expect(game.bossXY[1]).toBeLessThanOrEqual(398 - 120);
-});
-
-it('一閃の残像は等間隔で残り、寿命と上限があり、移動開始だけ転移音が鳴る', () => {
-  const game = phase(10);
-  const play = vi.spyOn(game.audio, 'play');
-  while (dashMotion(game).local < dashMotion(game).warning) game.update();
-  expect(play.mock.calls.filter(([sound]) => sound === 'jinraiWarp')).toHaveLength(1);
-  expect(play.mock.calls.some(([sound]) => sound === 'wind')).toBe(false);
-  for (let frame = 0; frame < DASH_MOVE; frame++) game.update();
-  const trails = game.jinraiDashTrails;
-  expect(trails).toHaveLength(15);
-  expect(new Set(trails.map(trail => trail.wave)).size).toBe(1);
-  for (let i = 1; i < trails.length; i++) {
-    expect(trails[i].x - trails[i - 1].x).toBe(24);
-    expect(trails[i].y - trails[i - 1].y).toBeCloseTo(DASH_DROP / 14);
-  }
-  const snapshot = trails.map(trail => ({ ...trail }));
-  game.scene = 'pause';
-  for (let frame = 0; frame < 60; frame++) game.update();
-  expect(game.jinraiDashTrails).toEqual(snapshot);
-  game.scene = 'stage';
-  for (let frame = 0; frame < DASH_TRAIL_LIFE; frame++) game.update();
-  expect(game.jinraiDashTrails).toHaveLength(0);
-  for (let frame = 0; frame < 1000; frame++) {
-    game.update();
-    expect(game.jinraiDashTrails.length).toBeLessThanOrEqual(15);
-    expect(game.jinraiDashTrails.every(trail => game.phaseFrame - trail.frame < DASH_TRAIL_LIFE)).toBe(true);
-    expect(new Set(game.jinraiDashTrails.map(trail => trail.wave)).size).toBeLessThanOrEqual(1);
-  }
-  while (!game.jinraiDashTrails.length) game.update();
-  game.startBoss(false, 10);
-  expect(game.jinraiDashTrails).toHaveLength(0);
-});
-
-it('一閃はNormalの斜め移動中に画面内へ39〜90発を維持する', () => {
-  const game = new Game(); game.audio.volume = 0; game.invincible = true;
-  game.startStage(4); game.startBoss(false, 10);
-  while (game.phaseFrame < DASH_ATTACK - 105) game.update();
-  const begin = game.phaseFrame;
-  for (let tick = 1; game.phaseFrame < begin + 720 && tick < 820; tick++) {
-    game.update();
-    const frame = game.phaseFrame - begin;
-    if (frame < 240 || frame % 60 !== 0) continue;
-    const visible = game.bullets.objects.filter((b) => b.active && b.x >= 0 && b.x <= 384 && b.y >= 0 && b.y <= 448).length;
-    expect(visible, `frame ${frame}`).toBeGreaterThanOrEqual(39);
-    expect(visible, `frame ${frame}`).toBeLessThanOrEqual(90);
-  }
-});
-
-it('一閃の後半の横断もNormalは40〜90発に収まり、Lunaticの列にも切れ目が残る', () => {
-  const normal = phase(10);
-  normal.phaseHp = normal.phaseMaxHp / 2;
-  for (let frame = 1; frame <= 600; frame++) {
-    normal.update();
-    if (frame < 240 || frame % 60 !== 0) continue;
-    // 中央発散と横断の再開直後は除き、列が画面内に揃ってから数える。
-    if (normal.phaseFrame - normal.jinraiBurstStartFrame < 240) continue;
-    const visible = normal.bullets.objects.filter((b) => b.active && b.x >= 0 && b.x <= 384 && b.y >= 0 && b.y <= 448).length;
-    expect(visible, `frame ${frame}`).toBeGreaterThanOrEqual(40);
-    expect(visible, `frame ${frame}`).toBeLessThanOrEqual(90);
-  }
-  const lunatic = new Game(); lunatic.audio.volume = 0; lunatic.invincible = true;
-  lunatic.difficulty = 'lunatic'; lunatic.startStage(4); lunatic.startBoss(false, 10);
-  while (dashMotion(lunatic).local < dashMotion(lunatic).warning + DASH_MOVE) lunatic.update();
-  const positions = lunatic.bullets.objects.filter((b) => b.active && b.dashWave === 0).map((b) => b.x).sort((a, b) => a - b);
-  expect(positions).toHaveLength(20);
-  expect(positions.slice(1).filter((x, i) => x - positions[i] > 40)).toHaveLength(1);
-});
 
 it('中ボスは分身せず、単身から左右にずれた針の扇を二連射する', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;

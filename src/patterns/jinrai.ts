@@ -3,81 +3,15 @@ import { SAKURA_PERIOD } from '../game';
 import { bulletSpeed, DIFFICULTY, density, FIELD } from '../rules';
 import { emitBossNormal } from './boss-normal';
 import { CLONE_CHARGE, jinraiCloneScene } from './jinrai-clone';
+import { emitIssen } from './jinrai-issen';
 import { emitJinraiKiss } from './jinrai-kiss';
 import { emitThunder, updateThunder } from './jinrai-thunder';
 
-export const BURST_MOVE = 18;
-export const BURST_SHOTS = [48, 66, 84] as const;
-export const BURST_RETURN = 96;
-export const BURST_SPEED = 5.6;
-export const BURST_PETAL_RATIO = 0.92;
-export const DASH_CHARGE = 240;
-export const DASH_CHARGE_START = 90;
-export const DASH_CUTIN = DASH_CHARGE_START + 60;
-export const DASH_CHARGED = DASH_CHARGE_START + DASH_CHARGE;
-export const DASH_ATTACK = DASH_CHARGED + 30;
-export const DASH_MOVE = 24;
-export const DASH_DROP = 50;
-export const DASH_START_Y = [115, 165, 215] as const;
-export const DASH_TRAIL_LIFE = 36;
-
-export function dashMotion(game: Game): { local: number; warning: number; moving: boolean } {
-  const tick = Math.max(0, game.jinraiDashTick);
-  const local = tick - (game.jinraiDashDouble && tick >= 85 ? 85 : 0);
-  const warning = [30, 24, 20, 16][['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty)];
-  return { local, warning, moving: local >= warning && local < warning + DASH_MOVE };
-}
-
-export function dashCrossingX(direction: number, elapsed: number): number {
-  const p = Math.max(0, Math.min(1, elapsed / DASH_MOVE));
-  const ease = p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2;
-  return (direction > 0 ? 24 : 360) + direction * 336 * ease;
-}
-
-export function dashCrossingPoint(direction: number, startY: number, elapsed: number): [number, number] {
-  const x = dashCrossingX(direction, elapsed);
-  const progress = Math.abs(x - (direction > 0 ? 24 : 360)) / 336;
-  return [x, startY + DASH_DROP * progress];
-}
-const BURST_DURATION = 120;
-// 前回の発散開始から8秒以上経ち、横断・往復を終えた区切りで三連発散する。
-export function dashBurstStep(game: Game): number {
-  const elapsed = game.phaseFrame - game.jinraiBurstStartFrame;
-  return game.jinraiBurstStartFrame >= 0 && elapsed >= 0 && elapsed < BURST_DURATION ? elapsed : -1;
-}
-export function burstVisibility(step: number): number {
-  if (step < 0 || step >= BURST_MOVE + 10) return 1;
-  if (step < 6) return 1 - step / 6;
-  if (step < BURST_MOVE) return 0;
-  return (step - BURST_MOVE) / 10;
-}
-export function dashPosition(game: Game, entry: [number, number] = [192, 132]): [number, number] {
-  if (game.phaseFrame < DASH_ATTACK) {
-    if (game.phaseFrame < DASH_CHARGED) {
-      const progress = Math.min(1, game.phaseFrame / DASH_CHARGE_START);
-      const ease = progress * progress * (3 - 2 * progress);
-      return [entry[0] + (192 - entry[0]) * ease, entry[1] + (132 - entry[1]) * ease];
-    }
-    const progress = (game.phaseFrame - DASH_CHARGED) / (DASH_ATTACK - DASH_CHARGED);
-    const ease = progress * progress * (3 - 2 * progress);
-    return [192 - 168 * ease, 132 - 17 * ease];
-  }
-  const { local, warning } = dashMotion(game);
-  return dashCrossingPoint(game.jinraiDashDirection, game.jinraiDashY, local - warning);
-}
-export function burstPosition(game: Game, step: number): [number, number] {
-  if (step < BURST_MOVE) {
-    return [game.jinraiBurstFromX, game.jinraiBurstFromY];
-  }
-  if (step < BURST_RETURN) return [192, 224];
-  const crossing = game.jinraiDashCrossing + 1;
-  const progress = (step - BURST_RETURN) / (BURST_DURATION - BURST_RETURN);
-  return [192 + ((crossing % 2 ? 360 : 24) - 192) * progress, 224 + (DASH_START_Y[crossing % 3] - 224) * progress];
-}
+export { DASH_ATTACK, DASH_CHARGE, DASH_CHARGE_START, DASH_CHARGED, DASH_CUTIN } from './jinrai-issen';
 
 export function emitJinraiPattern(game: Game, pattern: string, t: number): void {
     const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
-    if (pattern === 'jinraiDash') { emitJinraiDash(game, level); return; }
+    if (pattern === 'jinraiDash') { emitIssen(game, level); return; }
     const [x, y] = game.bossPosition();
     if (pattern === 'jinraiClone') {
       const scene = jinraiCloneScene(game.phaseFrame, game.phase?.duration);
@@ -168,95 +102,6 @@ export function emitJinraiPattern(game: Game, pattern: string, t: number): void 
     }
   }
 
-  function emitJinraiDash(game: Game, level: number): void {
-    while (game.jinraiDashTrails.length && game.phaseFrame - game.jinraiDashTrails[0].frame >= DASH_TRAIL_LIFE) game.jinraiDashTrails.shift();
-    if (game.phaseFrame < DASH_ATTACK) return;
-    const lowHp = game.phaseHp <= game.phaseMaxHp * 0.5;
-    const crossingEnd = game.jinraiDashTick === (game.jinraiDashDouble ? 169 : 89);
-    const burstReady = game.jinraiBurstStartFrame < 0 || game.phaseFrame - game.jinraiBurstStartFrame >= 480;
-    if (lowHp && burstReady && crossingEnd) {
-      game.jinraiBurstStartFrame = game.phaseFrame;
-      game.jinraiBurstCount++;
-    }
-    const burst = dashBurstStep(game);
-    if (burst >= 0) {
-      if (burst === 0) {
-        // 発散への切替時に発射待ちの列を残さない。
-        game.bullets.forEach((b) => { if (b.motion === 'jinraiHold') b.active = false; });
-        [game.jinraiBurstFromX, game.jinraiBurstFromY] = dashPosition(game);
-        game.audio.play('ninpo');
-        game.spark(game.jinraiBurstFromX, game.jinraiBurstFromY, '#d8c9ec', 22);
-      }
-      if (burst === BURST_MOVE) { game.audio.play('ninpo'); game.spark(192, 224, '#f1dbff', 26); }
-      if (BURST_SHOTS.some((shot) => shot === burst)) {
-        game.audio.play('thunderBurst'); game.audio.play('wind');
-        game.jinraiBurstFlashUntil = game.phaseFrame + 12;
-        game.spark(192, 224, '#fff3b0', 32);
-        const n = [24, 32, 40, 48][level];
-        const offset = (burst - BURST_SHOTS[0]) * 0.02 + (game.jinraiBurstCount - 1) * 0.3;
-        // 通常攻撃(5.1×unit)より気持ち速く。花びらも通常攻撃を下回らない速さで後を追う。
-        const speed = bulletSpeed(game.difficulty, BURST_SPEED);
-        for (let i = 0; i < n; i++) {
-          if (i % (n / 4) === 0) continue;
-          const angle = offset + i * Math.PI * 2 / n;
-          const bolt = game.spawnBullet(192, 224, Math.cos(angle) * speed, Math.sin(angle) * speed, 2, 'needle');
-          if (bolt) bolt.motion = 'jinraiSpark';
-          const petal = game.spawnBullet(192, 224, Math.cos(angle + 0.08) * speed * BURST_PETAL_RATIO, Math.sin(angle + 0.08) * speed * BURST_PETAL_RATIO, 3 + i % 3, 'petal');
-          if (petal) { petal.radius = 2.5; petal.motion = 'jinraiSpark'; }
-        }
-      }
-      if (burst === BURST_DURATION - 1) game.jinraiDashTick = -1;
-      return;
-    }
-    game.jinraiDashTick++;
-    if (game.jinraiDashTick === 0 || game.jinraiDashTick >= (game.jinraiDashDouble ? 170 : 90)) {
-      game.jinraiDashTick = 0;
-      game.jinraiDashDouble = lowHp;
-    }
-    const { local, warning } = dashMotion(game);
-    if (local === 0) {
-      game.jinraiDashCrossing++;
-      game.jinraiDashDirection = game.jinraiDashCrossing % 2 ? -1 : 1;
-      game.jinraiDashY = DASH_START_Y[game.jinraiDashCrossing % 3];
-      game.spark(game.jinraiDashDirection > 0 ? 24 : 360, game.jinraiDashY, '#fff2b8', 12);
-    }
-    const wave = game.jinraiDashCrossing;
-    if (local === warning) game.audio.play('jinraiWarp');
-    if (local >= warning && local <= warning + DASH_MOVE) {
-      // 加速しても弾列の16px間隔と切れ目を保つ。通過した位置だけを埋める。
-      const step = local - warning;
-      const start = game.jinraiDashDirection > 0 ? 24 : 360;
-      const previous = step === 0 ? -1 : Math.floor(Math.abs(dashCrossingX(game.jinraiDashDirection, step - 1) - start) / 16 + 1e-8);
-      const current = Math.floor(Math.abs(dashCrossingX(game.jinraiDashDirection, step) - start) / 16 + 1e-8);
-      // 加速区間にも等間隔の残像を置き、低速の両端で重ねすぎない。
-      const previousTrail = step === 0 ? -1 : Math.floor(Math.abs(dashCrossingX(game.jinraiDashDirection, step - 1) - start) / 24 + 1e-8);
-      const currentTrail = Math.floor(Math.abs(dashCrossingX(game.jinraiDashDirection, step) - start) / 24 + 1e-8);
-      for (let order = previousTrail + 1; order <= currentTrail; order++) {
-        const x = start + game.jinraiDashDirection * order * 24;
-        const y = game.jinraiDashY + DASH_DROP * order / 14;
-        game.jinraiDashTrails.push({ x, y, frame: game.phaseFrame, direction: game.jinraiDashDirection, wave });
-      }
-      for (let order = previous + 1; order <= current; order++) {
-        const gap = 9 + wave % 4;
-        if (order >= gap && order < gap + 2) continue;
-        const b = game.spawnBullet(start + game.jinraiDashDirection * order * 16, game.jinraiDashY + DASH_DROP * order / 21, 0, 0, 1, 'star');
-        if (b) { b.motion = 'jinraiHold'; b.radius = 5; b.dashWave = wave; b.dashOrder = order; }
-      }
-    }
-    if (local === warning + 28) game.bullets.forEach((b) => {
-      if (b.motion === 'jinraiHold' && b.dashWave === wave) { b.vx = 0; b.vy = 0; b.color = 3; }
-    });
-    if (local === warning + 38) {
-      game.audio.play('slash');
-      game.bullets.forEach((b) => {
-        if (b.motion !== 'jinraiHold' || b.dashWave !== wave) return;
-        b.targetX = game.px; b.targetY = game.py;
-        b.releaseAt = game.phaseFrame + 8 + b.dashOrder * 2;
-        b.color = 2;
-      });
-      game.spark(192, game.jinraiDashY + DASH_DROP / 2, '#fff5c1', 24);
-    }
-  }
 
   export function updateJinraiHazards(game: Game): void {
     for (let i = game.jinraiLasers.length - 1; i >= 0; i--) {

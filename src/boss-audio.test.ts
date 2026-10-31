@@ -181,7 +181,6 @@ it('一閃と夜桜の突風が発動に同期する', () => {
   const game = new Game(); game.startStage(4); game.startBoss(false, 10);
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
   game.phaseFrame = DASH_ATTACK;
-  game.jinraiDashTick = 61;
   emitJinraiPattern(game, 'jinraiDash', 0);
   expect(play).toHaveBeenCalledWith('slash');
   play.mockClear();

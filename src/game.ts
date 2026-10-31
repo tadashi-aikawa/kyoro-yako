@@ -14,8 +14,9 @@ import { BLOOM_ATTACK, BLOOM_CUTIN, reflowPlayer, updateBloomBullet } from './pa
 import { reflectEnterShot } from './patterns/enter-reflect';
 import { emitEtokichi, emitGalaxyFlash, type GalaxyFlash, updateGalaxyFlash } from './patterns/etokichi';
 import { emitEtokichiDawn } from './patterns/etokichi-dawn';
-import { burstPosition, burstVisibility, DASH_ATTACK, DASH_CHARGE_START, DASH_CHARGED, DASH_CUTIN, dashBurstStep, dashPosition, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
+import { DASH_ATTACK, DASH_CHARGE_START, DASH_CHARGED, DASH_CUTIN, emitJinraiPattern, updateJinraiHazards } from './patterns/jinrai';
 import { jinraiCloneScene } from './patterns/jinrai-clone';
+import { createIssen, type Issen, issenScene } from './patterns/jinrai-issen';
 import { KISS_FADE, updateJinraiHeart } from './patterns/jinrai-kiss';
 import { type Thunderbolt, type Thunderstorm, thunderPosition } from './patterns/jinrai-thunder';
 import { dawnPosition, emitMinerva, eyeX, interviewPosition } from './patterns/minerva';
@@ -36,7 +37,7 @@ import { ULTIMATE_CUTINS, ULTIMATE_SECOND_STAMP, ULTIMATE_TITLE, ultimateCueFram
 
 export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'letter' | 'stage' | 'arrival' | 'transition' | 'dialogue' | 'gift' | 'departure' | 'clear' | 'pause' | 'gameover' | 'movie' | 'ending' | 'credits';
 type AfterBossMovie = 'jinrai-gift' | 'minerva-finale';
-export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'starOwl' | 'starTrail' | 'jinraiHeart' | 'jinraiHold' | 'jinraiSpark' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'tagPull' | 'sweepRadial' | 'chappyYoyo' | 'chappyStitch' | 'chappySugar' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'bloomRocket' | 'bloomSpark'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
+export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'kunai' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'starOwl' | 'starTrail' | 'jinraiHeart' | 'jinraiSpark' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'vim' | 'enterLine' | 'bookshelf' | 'vanish' | 'tagPull' | 'sweepRadial' | 'chappyYoyo' | 'chappyStitch' | 'chappySugar' | 'trim' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'bloomRocket' | 'bloomSpark'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
 export interface JinraiLaser { x: number; y: number; angle: number; age: number; warning: number; life: number; speed: number; }
 export interface Shot { active: boolean; x: number; y: number; vx: number; vy: number; damage: number; radius: number; homing: boolean; }
 export type WaveKind = 'arc' | 'ring' | 'cross' | 'threeWay' | 'return' | 'sweep' | 'pincer' | 'serpent' | 'orbit' | 'chevron';
@@ -111,6 +112,7 @@ export class Game {
   autoshot = false;
   invulnFrames = 0;
   pendingHit = -1;
+  private pendingLifeLoss: 1 | 2 = 1;
   bombFrames = 0;
   bombUsed = false;
   hitDuringSpell = false;
@@ -163,17 +165,7 @@ export class Game {
   galaxyFlash?: GalaxyFlash;
   keyboardWord = '';
   vimAttack?: VimAttack;
-  jinraiDashTick = -1;
-  jinraiDashDouble = false;
-  jinraiDashCrossing = -1;
-  jinraiDashY = 115;
-  jinraiDashDirection = 1;
-  jinraiDashTrails: { x: number; y: number; frame: number; direction: number; wave: number }[] = [];
-  jinraiBurstStartFrame = -1;
-  jinraiBurstCount = 0;
-  jinraiBurstFromX = 192;
-  jinraiBurstFromY = 132;
-  jinraiBurstFlashUntil = 0;
+  jinraiIssen?: Issen;
   jinraiWindDirection = 0;
   readonly audio = new AudioBank();
   readonly bgm: BgmPlayer;
@@ -469,7 +461,7 @@ export class Game {
   private clearEncounter(): void {
     this.phaseIntro = undefined; this.battleComment = undefined; this.battleCommentFrames = 0;
     this.clearBullets(); this.enemies.clear(); this.shots.clear(); this.clones.clear();
-    this.pendingHit = -1; this.bombFrames = 0; this.flash = 0;
+    this.pendingHit = -1; this.pendingLifeLoss = 1; this.bombFrames = 0; this.flash = 0;
   }
 
   private startLastbossMovie(): void {
@@ -620,6 +612,7 @@ export class Game {
     this.px = FIELD.w / 2;
     this.py = FIELD.h - 50;
     this.pendingHit = -1;
+    this.pendingLifeLoss = 1;
     this.invulnFrames = 120;
     this.clearBullets(); this.shots.clear(); this.enemies.clear(); this.items.clear(); this.particles.clear(); this.clones.clear();
     this.highScore = safeLoad(`owlery-high-${this.difficulty}`, 0, (s) => Number(s) || 0);
@@ -676,6 +669,7 @@ export class Game {
     this.updateClones();
     this.updateBullets();
     this.updateEnemies();
+    this.updateBossContact();
     this.updateItems();
     this.updateParticles();
     if (this.pendingHit >= 0) {
@@ -746,7 +740,7 @@ export class Game {
 
   private useBomb(): void {
     this.bombs--;
-    if (deathbomb(this.pendingHit, this.bombs + 1)) this.pendingHit = -1;
+    if (deathbomb(this.pendingHit, this.bombs + 1)) { this.pendingHit = -1; this.pendingLifeLoss = 1; }
     this.bombFrames = 150;
     this.invulnFrames = Math.max(this.invulnFrames, this.bombFrames);
     this.bombUsed = true;
@@ -760,10 +754,12 @@ export class Game {
   }
 
   private commitHit(): void {
+    const lifeLoss = this.pendingLifeLoss;
+    this.pendingLifeLoss = 1;
     this.pendingHit = -1;
     if (this.invincible) return;
     this.vimAttack = undefined;
-    this.lives--;
+    this.lives -= lifeLoss;
     this.bombs = Math.max(3, this.bombs);
     const lostPower = Math.min(1, this.power);
     this.power = Math.max(0, this.power - 1);
@@ -777,6 +773,23 @@ export class Game {
     for (let i = 0; i < recoveryCount; i++) this.scatterItem('small', i, recoveryCount);
     for (let i = 0; i < 3; i++) this.spawnItem(this.px + (Math.random() - 0.5) * 60, this.py - 15, 'point', false);
     if (this.lives < 0) { this.scene = 'gameover'; this.menu = 0; }
+  }
+
+  // 猶予中の接触は合算せず大きい損失だけ使う。一閃直前の本体接触でも直撃2機を1機へ下げない。
+  queueHit(lifeLoss: 1 | 2 = 1): void {
+    if (this.invincible || this.invulnFrames > 0 || this.bombFrames > 0) return;
+    if (this.pendingHit >= 0) { if (lifeLoss > this.pendingLifeLoss) this.pendingLifeLoss = lifeLoss; return; }
+    this.pendingHit = 0; this.pendingLifeLoss = lifeLoss; this.hitDuringSpell = true;
+  }
+
+  private updateBossContact(): void {
+    if (!this.phase || this.phaseIntro || this.phaseFrame < 105 || this.cutin > 0 || this.pendingHit >= 0) return;
+    if ((issenScene(this)?.opacity ?? 1) < 1) return;
+    const attack = this.attackContext();
+    const targets = attack.phase?.pattern === 'jinraiClone' && (attack === this || attack.phaseFrame >= 105)
+      ? jinraiCloneScene(attack.phaseFrame, attack.phase.duration).bodies.filter(body => body.opacity === 1).map(body => [body.x, body.y])
+      : [this.bossPosition()];
+    if (targets.some(([x, y]) => circlesHit(this.px, this.py, 2.5, x, y, 18))) this.queueHit();
   }
 
   private get bossAt(): number { return this.stage === 5 ? Math.max(2900, 8370 - this.midbossElapsedFrames) : 4900; }
@@ -963,17 +976,7 @@ export class Game {
     this.jinraiLasers.length = 0;
     this.jinraiBolts.length = 0; this.jinraiThunderstorm = undefined;
     this.minervaReprise = undefined;
-    this.jinraiDashTick = -1;
-    this.jinraiDashDouble = false;
-    this.jinraiDashCrossing = -1;
-    this.jinraiDashY = 115;
-    this.jinraiDashDirection = 1;
-    this.jinraiDashTrails.length = 0;
-    this.jinraiBurstStartFrame = -1;
-    this.jinraiBurstCount = 0;
-    this.jinraiBurstFromX = 192;
-    this.jinraiBurstFromY = 132;
-    this.jinraiBurstFlashUntil = 0;
+    this.jinraiIssen = phase.pattern === 'jinraiDash' ? createIssen(this.bossEntry) : undefined;
     this.jinraiWindDirection = 0;
     this.bombUsed = false;
     this.hitDuringSpell = false;
@@ -1198,10 +1201,7 @@ export class Game {
       const body = jinraiCloneScene(this.phaseFrame, this.phase.duration).bodies[0];
       return [body.x, body.y];
     }
-    if (this.phase?.pattern === 'jinraiDash') {
-      const step = dashBurstStep(this);
-      return step >= 0 ? burstPosition(this, step) : dashPosition(this, this.bossEntry);
-    }
+    if (this.phase?.pattern === 'jinraiDash') return issenScene(this)?.position ?? this.bossEntry;
     if (this.phase?.pattern === 'flash') return [192 + Math.sin(this.phaseFrame * 0.052) * 120, 132];
     if (this.phase) {
       if (this.phase.pattern === 'chappySugar' && this.phaseFrame >= 105 && !hasSugarWave(this)) return [192, 132];
@@ -1313,7 +1313,7 @@ export class Game {
         // 予告のdelayを通過した最初の移動フレームで、斉射をまとめて鳴らす。
         if (this.phase && this.boss && this.lastBossShotFrame !== this.frame) {
           this.lastBossShotFrame = this.frame;
-          this.audio.play(this.boss === 'jinrai' && (this.phase.kind === 'normal' || this.phase.pattern === 'jinraiClone') ? 'jinraiShot' : 'enemyShot');
+          this.audio.play(this.boss === 'jinrai' && (this.phase.kind === 'normal' || this.phase.pattern === 'jinraiClone' || b.kind === 'kunai') ? 'jinraiShot' : 'enemyShot');
         }
       }
       if (b.motion === 'gridSnap') {
@@ -1349,12 +1349,6 @@ export class Game {
         const vx = b.vx * Math.cos(b.sway) - b.vy * Math.sin(b.sway);
         b.vy = b.vx * Math.sin(b.sway) + b.vy * Math.cos(b.sway);
         b.vx = vx;
-      }
-      if (b.motion === 'jinraiHold' && b.releaseAt > 0 && attackFrame >= b.releaseAt) {
-        const angle = Math.atan2(b.targetY - b.y, b.targetX - b.x);
-        const speed = 0.95 + attackLevel * 0.14;
-        b.vx = Math.cos(angle) * speed; b.vy = Math.sin(angle) * speed;
-        b.motion = 'normal';
       }
       if (b.motion === 'recall') {
         if (b.age === b.gridRow) { b.vx = 0; b.vy = 0; }
@@ -1484,7 +1478,7 @@ export class Game {
         s.active = false; this.spark(s.x, s.y, '#c7ddff', 1); return;
       }
       if (s.y < -10 || s.x < -15 || s.x > FIELD.w + 15) { s.active = false; return; }
-      if (this.phase && !(this.phase.pattern === 'jinraiDash' && burstVisibility(dashBurstStep(this)) < 1)) {
+      if (this.phase && (issenScene(this)?.opacity ?? 1) >= 1) {
         if (this.bossTargets().some(([bx, by]) => circlesHit(s.x, s.y, s.radius, bx, by, 20))) {
           this.damageBoss(s.damage);
           s.active = false; this.spark(s.x, s.y, '#ffe2ac', 1); return;
