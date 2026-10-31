@@ -305,8 +305,7 @@ export class Game {
   update(): void {
     if (this.media?.loading) {
       this.audio.stopEnergy();
-      if (this.just('Escape')) this.returnToTitle();
-      else if (this.media.failed) {
+      if (this.media.failed) {
         if (this.just('ArrowDown')) this.media.menu = (this.media.menu + 1) % 3;
         if (this.just('ArrowUp')) this.media.menu = (this.media.menu + 2) % 3;
         if (this.accept()) {
@@ -403,7 +402,7 @@ export class Game {
     }
     if (this.just('KeyX') || this.just('Escape')) {
       if (this.scene === 'pause') this.scene = this.resumeScene;
-      else if (this.scene === 'difficulty' || this.scene === 'option' || this.scene === 'help' || this.scene === 'practice' || this.scene === 'notebook') this.returnToTitle();
+      else if (this.just('KeyX') && (this.scene === 'difficulty' || this.scene === 'option' || this.scene === 'help' || this.scene === 'practice' || this.scene === 'notebook')) this.returnToTitle();
       else if (this.scene === 'player') this.scene = 'difficulty';
       return;
     }

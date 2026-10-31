@@ -74,13 +74,24 @@ it('省略は失敗した素材だけに適用し、プレイヤーの決定前�
   game.update(); expect(game.bgm.cue).toBeNull();
 });
 
-it('待機中のEscでタイトルへ戻り、遅い応答で元の面へ戻らない', async () => {
+it('待機中のEscは進行を捨てず、素材が届くとその面を再開する', async () => {
   let deliver!: () => void;
   const held = new Promise<Response>(resolve => { deliver = () => resolve(response()); });
   const { game, media } = make(vi.fn(async (input: RequestInfo | URL) => String(input).includes('stage-gate') ? held : response()));
-  press(game, 'Escape'); expect(game.scene).toBe('title'); expect(media.loading).toBe(false);
-  deliver(); await vi.advanceTimersByTimeAsync(0);
-  expect(game.scene).toBe('title'); expect(media.stage).toBeUndefined();
+  const frame = game.stageIntroFrame;
+  press(game, 'Escape'); expect(game.scene).toBe('stage'); expect(media.loading).toBe(true);
+  expect(game.stageIntroFrame).toBe(frame);
+  deliver(); await vi.waitFor(() => expect(media.loading).toBe(false)); game.update();
+  expect(game.scene).toBe('stage'); expect(media.stage).toBe(1); expect(game.stageIntroFrame).toBe(frame + 1);
+});
+
+it('読み込み失敗時もEscで選択を捨てず、タイトル復帰は選んで決定する', async () => {
+  const { game, media } = make(vi.fn(async () => new Response(null, { status: 503 })));
+  await vi.waitFor(() => expect(media.failed).toBe(true));
+  press(game, 'ArrowDown'); expect(media.menu).toBe(1);
+  press(game, 'Escape'); expect(game.scene).toBe('stage'); expect(media.failed).toBe(true); expect(media.menu).toBe(1);
+  press(game, 'ArrowDown'); press(game, 'KeyZ');
+  expect(game.scene).toBe('title'); expect(media.loading).toBe(false);
 });
 
 it('次面の先読みはその先の面を取得せず、展開済みの曲を増やさない', async () => {
@@ -155,7 +166,7 @@ it('サブメニューからタイトルへ戻っても、タイトル曲を頭�
   await vi.waitFor(() => expect(game.bgm.diagnostics.tracks).toBe(1)); game.update();
   const count = startSource.mock.calls.length; expect(count).toBeGreaterThan(0);
   for (const menu of [0, 1, 2, 3, 4]) {
-    game.menu = menu; press(game, 'KeyZ'); press(game, 'Escape');
+    game.menu = menu; press(game, 'KeyZ'); press(game, 'KeyX');
     expect(game.scene).toBe('title'); expect(startSource).toHaveBeenCalledTimes(count);
   }
 });

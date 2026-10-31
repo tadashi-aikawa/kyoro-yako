@@ -147,9 +147,8 @@ export class Renderer {
       c.fillStyle = '#252e44'; c.fillRect(196, 280, 248, 4);
       c.fillStyle = '#dec38b'; c.fillRect(196, 280, 248 * (state.total ? state.complete / state.total : 0), 4);
       this.uiText('Loading...', 320, 314, 14, '#dec38b', 'center');
-      this.uiText('Esc：タイトルへ戻る', 320, 405, 12, '#9da5b9', 'center');
     }
-    if (media.failed) this.uiText('↑↓ 選択　Z 決定　Esc タイトルへ', 320, 432, 11, '#9da5b9', 'center');
+    if (media.failed) this.uiText('↑↓ 選択　Z 決定', 320, 432, 11, '#9da5b9', 'center');
     c.restore();
   }
 

@@ -50,6 +50,12 @@ it('道中と中ボスの間も背景が進み、ポーズと会話では止ま�
   game.startStage(2); expect(game.sceneryDistance).toBe(0);
 });
 
+it.each(['difficulty', 'option', 'help', 'practice', 'notebook'] as const)('%sのEscはタイトルへ戻さず、Xで戻れる', scene => {
+  const game = new Game(); game.audio.volume = 0; game.scene = scene;
+  press(game, 'Escape'); expect(game.scene).toBe(scene);
+  press(game, 'KeyX'); expect(game.scene).toBe('title');
+});
+
 it('難易度選択の次は自機選択を飛ばして1面を始める', () => {
   const game = new Game(); game.audio.volume = 0;
   press(game, 'KeyZ');

@@ -79,9 +79,9 @@ it('タイトルの5番目からノートを開き、未獲得頁も選べ、戻
   press(g, 'KeyZ'); press(g, 'KeyZ'); expect(g.scene).toBe('letter');
 });
 
-it('ノートのZとEscは選択をリセットして戻り、保存不可でもクリアできる', () => {
+it('ノートのZとXは選択をリセットして戻り、保存不可でもクリアできる', () => {
   const g = game();
-  for (const code of ['KeyZ', 'Escape']) {
+  for (const code of ['KeyZ', 'KeyX']) {
     g.scene = 'notebook'; g.menu = 4; press(g, code);
     expect(g.scene).toBe('title'); expect(g.menu).toBe(0);
   }
