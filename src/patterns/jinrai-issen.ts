@@ -9,7 +9,8 @@ export const DASH_ATTACK = 360;
 export const DASH_MOVE = 8;
 export const DASH_TRAIL_LIFE = 42;
 export const ISSEN_CHARGE = 180;
-export const ISSEN_WARNING = 60;
+export const ISSEN_AIM_LEAD = 60;
+export const ISSEN_WARNING = 30;
 export const ISSEN_BREAK = DASH_MOVE + 18;
 export const ISSEN_RECOVERY = ISSEN_BREAK + 180;
 export const ISSEN_HOP = 60;
@@ -133,7 +134,7 @@ export function emitIssen(game: Game, level: number): void {
     elapsed = frame - state.attackFrame;
   }
   if (state.cycle && frame === state.chargeStart) game.audio.play('jinraiRecharge');
-  if (frame >= state.attackFrame - ISSEN_WARNING && !state.aim) lockAim(game, state);
+  if (frame >= state.attackFrame - ISSEN_AIM_LEAD && !state.aim) lockAim(game, state);
   if (elapsed === 0) { game.audio.play('slash'); game.audio.play('jinraiWarp'); }
   if (elapsed > 0 && elapsed <= DASH_MOVE) {
     const from = lerp(state.origin, state.end, (elapsed - 1) / DASH_MOVE);

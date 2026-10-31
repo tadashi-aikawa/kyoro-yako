@@ -11,8 +11,6 @@ export function drawIssen(ctx: CanvasRenderingContext2D, game: Game): void {
   if (scene.warning) {
     c.strokeStyle = '#ffe7a0'; c.globalAlpha = 0.45 + scene.progress * 0.3; c.lineWidth = 1;
     c.setLineDash([7, 5]); c.beginPath(); c.moveTo(...from); c.lineTo(...to); c.stroke(); c.setLineDash([]);
-    c.lineWidth = 1.5; c.beginPath(); c.arc(mx, my, 9, 0, Math.PI * 2); c.stroke();
-    c.beginPath(); c.moveTo(mx - 14, my); c.lineTo(mx + 14, my); c.moveTo(mx, my - 14); c.lineTo(mx, my + 14); c.stroke();
   }
   if (t >= 0 && t < ISSEN_BREAK + 28) {
     const moving = t <= DASH_MOVE;

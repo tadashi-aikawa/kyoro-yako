@@ -43,10 +43,17 @@ it('発動1秒前のみみこを狙い、それ以降の移動を追尾しない
   advance(game, DASH_ATTACK - 60);
   const state = game.jinraiIssen!, end = [...state.end];
   expect(state.aim).toEqual([80, 380]);
+  expect(issenScene(game)?.warning).toBe(false);
   const [ox, oy] = state.origin;
   expect((end[0] - ox) * (380 - oy) - (end[1] - oy) * (80 - ox)).toBeCloseTo(0);
   game.px = 320; game.py = 250;
+  advance(game, DASH_ATTACK - 31);
+  expect(issenScene(game)?.warning).toBe(false);
+  game.update();
+  expect(issenScene(game)?.warning).toBe(true);
+  expect(state.aim).toEqual([80, 380]); expect(state.end).toEqual(end);
   advance(game, DASH_ATTACK);
+  expect(issenScene(game)?.warning).toBe(false);
   expect(state.aim).toEqual([80, 380]); expect(state.end).toEqual(end);
   const from = game.bossXY;
   advance(game, DASH_ATTACK + DASH_MOVE);
