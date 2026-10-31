@@ -1041,7 +1041,7 @@ export class Renderer {
       this.text(`${GRID_NAMES[layout]} ${GRID_DIRECTIONS[layout]}`, 12, 52, 11, '#fff0c6');
       const local = Math.max(0, sceneTime) % GRID_PERIOD[level];
       if (local < [90, 70, 55, 42][level]) for (let row = 0; row < gridRows(level); row++) for (let col = 0; col < GRID_COLUMNS[layout]; col++) {
-        const [x, y] = gridPoint(layout, row, col, level);
+        const [x, y] = gridPoint(layout, row, col, level, Math.floor(Math.max(0, sceneTime) / GRID_PERIOD[level]));
         c.strokeRect(x - 12, y - 10, 24, 20);
       }
       game.bullets.forEach((b) => {

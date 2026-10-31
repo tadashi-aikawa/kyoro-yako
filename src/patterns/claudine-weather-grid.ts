@@ -1,4 +1,5 @@
 import type { Bullet, Game } from '../game';
+import { FIELD } from '../rules';
 
 export const RAIN_GLYPHS = ['A', 'a', 'B', 'g', 'Ω', 'π', 'あ', '永', '&', '¶', '@', '※'] as const;
 export const RAIN_FONTS = ['bold 18px serif', 'italic bold 18px sans-serif', 'bold 18px monospace'] as const;
@@ -17,12 +18,14 @@ export const gridVelocity = (layout: number, level: number): [number, number] =>
 export const weatherAt = (t: number): number => Math.floor(Math.max(0, t) / WEATHER_PERIOD) % 3;
 export const gridLayoutAt = (t: number, level: number): number => Math.floor(Math.max(0, t) / GRID_PERIOD[level]) % 4;
 
-export function gridPoint(layout: number, row: number, column: number, level = 1): [number, number] {
+export function gridPoint(layout: number, row: number, column: number, level = 1, wave = layout): [number, number] {
   const x = layout === 1 ? 8 + [0, 0.07, 0.2, 0.31, 0.5, 0.58, 0.8, 1][column] * 368
     : Math.min(376, 8 + column * 368 / (GRID_COLUMNS[layout] - 1) + (layout === 3 && row % 2 ? 14 : 0));
   const fraction = row / (gridRows(level) - 1);
-  const y = 54 + (layout === 2 ? fraction ** 0.8 : fraction) * 344;
-  return [x, y + (layout === 1 ? column % 2 * 10 : 0)];
+  // 横向きの行を波ごとに11pxずらし、下端付近の同じ隙間に居座れないようにする。
+  const bottom = layout === 1 || layout === 3 ? FIELD.h - 9 - Math.floor(wave / 2) % 4 * 11 : 398;
+  const y = 54 + (layout === 2 ? fraction ** 0.8 : fraction) * (bottom - 54);
+  return [x, Math.min(FIELD.h - 9, y + (layout === 1 ? column % 2 * 10 : 0))];
 }
 
 function rainVelocity(weather: number, level: number, size: number, direction: number): [number, number] {
@@ -82,7 +85,7 @@ export function emitChangingGrid(game: Game, t: number): void {
   game.audio.play('turn'); game.spark(x, y, '#fff2d1', 14);
   const [vx, vy] = gridVelocity(layout, level);
   for (let row = 0; row < gridRows(level); row++) for (let col = 0; col < GRID_COLUMNS[layout]; col++) {
-    const [tx, ty] = gridPoint(layout, row, col, level);
+    const [tx, ty] = gridPoint(layout, row, col, level, wave);
     const b = game.spawnBullet(tx, ty, 0, 0, (row + layout) % 4, 'orb');
     if (!b) continue;
     b.motion = 'layoutGrid'; b.targetX = tx; b.targetY = ty; b.gridColumn = col; b.gridRow = row;

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { emitChangingGrid, emitTypographyRain, GRID_PERIOD, gridPoint, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_PERIOD } from './patterns/claudine-weather-grid';
+import { bulletContact, FIELD } from './rules';
 
 beforeEach(() => {
   vi.stubGlobal('location', { search: '' });
@@ -144,6 +145,56 @@ it('グリッドは静止した位置を通り、待機だけでは終わらな�
     for (let t = 0; t < 700 && game.lives === lives; t++) game.update();
     expect(game.lives, `${x},${y}`).toBeLessThan(lives);
   }
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sでは初回の下向きグリッドの隙間で下端に居座って撃ち続けると、次の横向きグリッドに当たる', difficulty => {
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
+  const game = start(5); game.difficulty = difficulty; game.invincible = false;
+  game.px = 192; game.py = FIELD.h - 9; game.keys.add('KeyZ'); game.phaseFrame = 104;
+  const lives = game.lives;
+  for (let frame = 0; frame < GRID_PERIOD[level]; frame++) game.update();
+  expect(game.lives).toBe(lives);
+  expect(game.pendingHit).toBe(-1);
+  for (let frame = 0; frame < GRID_PERIOD[level] && game.lives === lives; frame++) game.update();
+  expect(game.lives).toBeLessThan(lives);
+  expect(game.phase?.pattern).toBe('grid');
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sでは最初の横向きグリッドが下端の全座標を通る', difficulty => {
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
+  const game = start(5); game.difficulty = difficulty;
+  game.phaseFrame = 104 + GRID_PERIOD[level];
+  const hit = new Set<number>();
+  for (let frame = 0; frame < GRID_PERIOD[level]; frame++) {
+    game.update();
+    game.bullets.forEach(b => {
+      if (b.delay > 0) return;
+      for (let x = 9; x <= FIELD.w - 9; x++) {
+        if (bulletContact(x, FIELD.h - 9, b.x, b.y, b.radius, false) === 'hit') hit.add(x);
+      }
+    });
+  }
+  expect(hit.size).toBe(FIELD.w - 17);
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sでは下端から35px以内の全座標を2周以内に通る', difficulty => {
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
+  const game = start(5); game.difficulty = difficulty; game.phaseFrame = 104;
+  const width = FIELD.w - 17;
+  const hit = new Uint8Array(width * 36);
+  for (let frame = 0; frame < GRID_PERIOD[level] * 8; frame++) {
+    game.update();
+    game.bullets.forEach(b => {
+      if (b.delay > 0 || b.y < 392 || b.y > 445) return;
+      for (let y = Math.max(404, Math.ceil(b.y - 6)); y <= Math.min(439, Math.floor(b.y + 6)); y++) {
+        for (let x = Math.max(9, Math.ceil(b.x - 6)); x <= Math.min(375, Math.floor(b.x + 6)); x++) {
+          if (bulletContact(x, y, b.x, b.y, b.radius, false) === 'hit') hit[(y - 404) * width + x - 9] = 1;
+        }
+      }
+    });
+  }
+  const safe = Array.from(hit.entries()).filter(([, value]) => !value).slice(0, 20).map(([index]) => [9 + index % width, 404 + Math.floor(index / width)]);
+  expect(safe).toEqual([]);
 });
 
 it('グリッドは予告位置から配置を保って上下左右へ流れ、自機の移動では向きを変えない', () => {
