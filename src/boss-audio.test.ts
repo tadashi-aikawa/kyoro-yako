@@ -63,6 +63,8 @@ it.each([[3, 9, 120, 43], [4, 10, 150, 64], [5, 10, 0, 43]] as const)('%s面の�
   while (game.ultimateFrame < title) game.update();
   expect(game.bgm.sceneVolumeMultiplier).toBe(0.35);
   const phaseFrame = game.phaseFrame;
+  while (game.ultimateFrame < title + 62) game.update();
+  expect(game.bgm.sceneVolumeMultiplier).toBe(0.35);
   while (game.ultimateFrame < title + 63) game.update();
   expect(game.bgm.sceneVolumeMultiplier).toBe(1);
   expect(game.phaseFrame).toBeLessThan(phaseFrame + 63);

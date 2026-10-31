@@ -1,4 +1,4 @@
-import { AudioBank } from './audio';
+import { AudioBank, ULTIMATE_SHINE_DURATION } from './audio';
 import { type BgmCue, BgmPlayer } from './bgm';
 import { CAST_GAP, MOTION_SPRITES } from './boss-motion';
 import { patternPosition } from './boss-movement';
@@ -345,7 +345,7 @@ export class Game {
     const cutinStart = this.cutinStartFrame();
     const ultimateQuiet = ultimate && this.phaseFrame >= cutinStart - 12 && this.phaseFrame < cutinStart + ULTIMATE_SECOND_STAMP + 24;
     const titleFrame = ultimate ? ultimateCueFrame(ultimate, ULTIMATE_TITLE) : 0;
-    const titleQuiet = ultimate && this.cutin > 0 && this.ultimateFrame >= titleFrame - 8 && this.ultimateFrame < titleFrame + 63;
+    const titleQuiet = ultimate && this.cutin > 0 && this.ultimateFrame >= titleFrame - 8 && this.ultimateFrame < titleFrame + Math.round(ULTIMATE_SHINE_DURATION * 60);
     const multiplier = this.scene === 'credits' ? 1 - creditsFade(this.creditsFrame) : ultimateQuiet ? 0.1 : titleQuiet || lastbossQuiet || postBossQuiet ? 0.35 : 1;
     this.bgm.sync(cue, false, multiplier, this.scene === 'credits' ? 1 / 60 : ultimate ? 0.18 : 1);
   }
@@ -598,6 +598,7 @@ export class Game {
     this.stageIntroFrame = this.presentation ? 0 : 180;
     const boss = STAGES[stage - 1].boss;
     const ultimate = ULTIMATE_CUTINS[boss as keyof typeof ULTIMATE_CUTINS];
+    if (ultimate) this.audio.prepareUltimate();
     if (ultimate && !this.images[`${boss}-ultimate`]) {
       const image = new Image(); image.src = `${import.meta.env.BASE_URL}assets/cutins/${ultimate.id}.webp`;
       this.images[`${boss}-ultimate`] = image;
