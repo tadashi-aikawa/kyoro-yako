@@ -126,10 +126,10 @@ export class Renderer {
     const c = this.ctx;
     c.save();
     c.fillStyle = '#10162b'; c.fillRect(0, 0, 640, 480);
-    c.strokeStyle = '#4a5266'; c.lineWidth = 1;
-    c.beginPath(); c.moveTo(84, 98); c.lineTo(556, 98); c.moveTo(84, 405); c.lineTo(556, 405); c.stroke();
-    this.text(media.failed ? '読み込みできませんでした' : '読み込み中', 320, 134, 25, '#f0dfb1', 'center');
     if (media.failed) {
+      c.strokeStyle = '#4a5266'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(84, 98); c.lineTo(556, 98); c.moveTo(84, 405); c.lineTo(556, 405); c.stroke();
+      this.text('読み込みできませんでした', 320, 134, 25, '#f0dfb1', 'center');
       const failures = state.failures.slice(0, 3);
       failures.forEach((label, index) => { this.uiText(label, 320, 179 + index * 21, 12, '#c0c6d2', 'center'); });
       const entries = ['読み込み直す', '未取得の音声・映像を省略して続ける', 'タイトルへ戻る'];
@@ -139,11 +139,15 @@ export class Renderer {
       });
       this.uiText('タイトルへ戻ると、このプレイの途中から再開できません', 320, 375, 11, '#9da5b9', 'center');
     } else {
-      this.uiText(state.phase === 'video' ? '映像の再生を準備しています' : state.phase === 'audio' ? '音楽を準備しています' : '音楽と映像を準備しています', 320, 213, 15, '#d6d9e3', 'center');
-      c.fillStyle = '#252e44'; c.fillRect(156, 250, 328, 4);
-      c.fillStyle = '#dec38b'; c.fillRect(156, 250, 328 * (state.total ? state.complete / state.total : 0), 4);
-      this.uiText(`${state.complete} / ${state.total}`, 320, 283, 13, '#c0c6d2', 'center');
-      this.uiText('Esc：タイトルへ戻る', 320, 373, 12, '#9da5b9', 'center');
+      // 戦闘時計は待機中に止まるため、準備開始からの実時間で羽ばたかせる。
+      const elapsed = media.elapsedMs;
+      const pose = [0, 1, 2, 1][Math.floor(elapsed / 160) % 4];
+      const owl = game.images[`minerva-owl-${pose}-sprite`];
+      if (owl?.complete && owl.naturalWidth > 0) c.drawImage(owl, 276, 166 + Math.sin(elapsed / 420) * 3, 88, 88);
+      c.fillStyle = '#252e44'; c.fillRect(196, 280, 248, 4);
+      c.fillStyle = '#dec38b'; c.fillRect(196, 280, 248 * (state.total ? state.complete / state.total : 0), 4);
+      this.uiText('Loading...', 320, 314, 14, '#dec38b', 'center');
+      this.uiText('Esc：タイトルへ戻る', 320, 405, 12, '#9da5b9', 'center');
     }
     if (media.failed) this.uiText('↑↓ 選択　Z 決定　Esc タイトルへ', 320, 432, 11, '#9da5b9', 'center');
     c.restore();
