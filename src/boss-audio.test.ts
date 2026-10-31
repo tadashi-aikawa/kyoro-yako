@@ -11,6 +11,25 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+it('奥・義の二拍だけBGMを下げ、ポーズ中も維持し、その後とリトライで元へ戻す', () => {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true;
+  const sync = vi.spyOn(game.bgm, 'sync');
+  game.startStage(4); game.startBoss(false, 10);
+  for (let i = 0; i < 137; i++) game.update();
+  expect(game.bgm.sceneVolumeMultiplier).toBe(1);
+  game.update(); expect(game.bgm.sceneVolumeMultiplier).toBe(0.1);
+  expect(sync).toHaveBeenLastCalledWith('boss-jinrai', false, 0.1, 0.18);
+  game.resumeScene = 'stage'; game.scene = 'pause'; game.update();
+  expect(game.bgm.sceneVolumeMultiplier).toBe(0.1);
+  game.scene = 'stage'; while (game.phaseFrame < 185) game.update();
+  expect(game.bgm.sceneVolumeMultiplier).toBe(0.1);
+  game.update(); expect(game.bgm.sceneVolumeMultiplier).toBe(1);
+  expect(sync).toHaveBeenLastCalledWith('boss-jinrai', false, 1, 0.18);
+  game.phaseFrame = 150; game.update(); expect(game.bgm.sceneVolumeMultiplier).toBe(0.1);
+  game.startStage(4); game.startBoss(false, 0); game.update();
+  expect(game.bgm.sceneVolumeMultiplier).toBe(1);
+});
+
 it('発射SEは斉射の弾数によらず1フレーム1回で、道中には混ざらない', () => {
   const game = new Game();
   const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});

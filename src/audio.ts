@@ -4,7 +4,7 @@ export type Sound = 'shot' | 'hit' | 'graze' | 'kill' | 'bomb' | 'declare' | 'ul
 // 常時鳴る自機ショットを抑え、敵の発射と仕掛けの切り替わりを聞き取れる比率にする。
 const tones: Record<Sound, [number, number, OscillatorType, number, number, number]> = {
   shot: [820, 0.035, 'triangle', 1107, 0.03, 0.07], hit: [95, 0.32, 'sawtooth', 40, 0.12, 0.025],
-  ultimateStamp: [96, 0.24, 'triangle', 36, 0.55, 0.12],
+  ultimateStamp: [150, 0.28, 'triangle', 52, 0.85, 0.12], // 周波数・波形は専用バッファで合成し、ここでは秒数・音量・最短間隔だけ使う。
   graze: [1100, 0.045, 'sine', 1485, 0.12, 0.025], kill: [330, 0.12, 'triangle', 446, 0.12, 0.025],
   bomb: [125, 0.7, 'sawtooth', 40, 0.12, 0.025], declare: [220, 0.7, 'triangle', 880, 0.16, 0.3],
   capture: [880, 0.6, 'triangle', 1188, 0.12, 0.025], item: [950, 0.06, 'sine', 1283, 0.12, 0.025],
@@ -35,6 +35,7 @@ export class AudioBank {
   private last: Partial<Record<Sound, number>> = {};
   private readonly energySources = new Set<AudioBufferSourceNode>();
   private readonly fireworkSources = new Set<AudioScheduledSourceNode>();
+  private stampBuffer?: AudioBuffer;
 
   stopFireworks(): void {
     for (const source of this.fireworkSources) source.stop();
@@ -48,6 +49,7 @@ export class AudioBank {
     this.energySources.clear();
     delete this.last.jinraiCharge; delete this.last.jinraiCrackle; delete this.last.jinraiWarp;
     delete this.last.owlRelease;
+    delete this.last.ultimateStamp;
   }
 
   unlock(): void {
@@ -66,6 +68,7 @@ export class AudioBank {
       const [frequency, duration, wave, end, peak, interval] = tones[sound];
       if (now - (this.last[sound] ?? -Infinity) < interval) return;
       this.last[sound] = now;
+      if (sound === 'ultimateStamp') { this.ultimateStamp(now, duration, peak); return; }
       if (sound === 'owlRelease') { this.owlRelease(now, frequency, duration, peak); return; }
       if (sound === 'jinraiCharge' || sound === 'jinraiCrackle' || sound === 'jinraiWarp') {
         this.jinraiEnergy(now, sound, duration, peak); return;
@@ -101,8 +104,35 @@ export class AudioBank {
       oscillator.stop(now + duration);
       if (firework) this.fireworkSources.add(oscillator);
       if (sound === 'fireworkRise' || sound === 'fireworkGrandRise' || sound === 'fireworkBoom') this.noise(now, duration, sound);
-      if (sound === 'thunder' || sound === 'thunderBurst' || sound === 'ninpo' || sound === 'slash' || sound === 'wind' || sound === 'declare' || sound === 'ultimateStamp' || sound === 'sweepBurst' || sound === 'jinraiShot') this.noise(now, sound === 'thunderBurst' ? 0.55 : duration, sound);
+      if (sound === 'thunder' || sound === 'thunderBurst' || sound === 'ninpo' || sound === 'slash' || sound === 'wind' || sound === 'declare' || sound === 'sweepBurst' || sound === 'jinraiShot') this.noise(now, sound === 'thunderBurst' ? 0.55 : duration, sound);
     } catch { /* audio is optional when browser blocks it */ }
+  }
+
+  private ultimateStamp(now: number, duration: number, peak: number): void {
+    const context = this.context!;
+    if (!this.stampBuffer) {
+      this.stampBuffer = context.createBuffer(1, Math.ceil(context.sampleRate * duration), context.sampleRate);
+      const samples = this.stampBuffer.getChannelData(0);
+      let lowNoise = 0;
+      // 低い唸りではなく、硬いアタック・太鼓の胴鳴り・短い残響を重ねた「バン」。
+      for (let i = 0; i < samples.length; i++) {
+        const t = i / context.sampleRate;
+        const noise = Math.random() * 2 - 1;
+        lowNoise += (noise - lowNoise) * 0.38;
+        const drumPhase = Math.PI * 2 * (70 * t + 100 * 0.016 * (1 - Math.exp(-t / 0.016)));
+        const drum = Math.sin(drumPhase) * Math.exp(-t * 19) * 0.55;
+        const body = Math.sin(Math.PI * 2 * 220 * t) * Math.exp(-t * 25) * 0.55;
+        const crack = (noise - lowNoise) * Math.exp(-t * 65) * 0.9;
+        const tail = lowNoise * Math.exp(-t * 13) * 0.5;
+        samples[i] = Math.tanh((drum + body + crack + tail) * 1.6) * 0.82 * Math.min(1, t / 0.0015, (duration - t) / 0.035);
+      }
+    }
+    const source = context.createBufferSource(); source.buffer = this.stampBuffer;
+    const gain = context.createGain(); gain.gain.value = this.volume * peak;
+    source.connect(gain).connect(context.destination);
+    this.energySources.add(source);
+    source.onended = () => { this.energySources.delete(source); source.disconnect(); gain.disconnect(); };
+    source.start(now); source.stop(now + duration);
   }
 
   private owlRelease(now: number, frequency: number, duration: number, peak: number): void {

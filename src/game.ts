@@ -340,7 +340,9 @@ export class Game {
     else if (this.scene === 'dialogue' && (this.afterDialogue === 'boss' || this.afterDialogue === 'clear' || this.afterDialogue === 'gift')) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else if (this.phase && !this.midboss) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else cue = STAGES[this.stage - 1].bgm;
-    this.bgm.sync(cue, false, this.scene === 'credits' ? 1 - creditsFade(this.creditsFrame) : lastbossQuiet || postBossQuiet ? 0.35 : 1, this.scene === 'credits' ? 1 / 60 : 1);
+    const ultimateQuiet = this.boss === 'jinrai' && this.phase?.pattern === 'jinraiDash' && this.phaseFrame >= DASH_CUTIN - 12 && this.phaseFrame < DASH_CUTIN + ULTIMATE_SECOND_STAMP + 24;
+    const multiplier = this.scene === 'credits' ? 1 - creditsFade(this.creditsFrame) : ultimateQuiet ? 0.1 : lastbossQuiet || postBossQuiet ? 0.35 : 1;
+    this.bgm.sync(cue, false, multiplier, this.scene === 'credits' ? 1 / 60 : this.phase?.pattern === 'jinraiDash' ? 0.18 : 1);
   }
 
   private updateMenu(): void {
