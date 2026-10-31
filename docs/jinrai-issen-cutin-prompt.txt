@@ -1,0 +1,13 @@
+Built-in image_gen, transparent_background: true.
+References:
+- public/assets/members/jinrai-stand.webp: approved identity, costume, proportions, rendering.
+- public/assets/members/jinrai-face.webp: face and mature composed gaze.
+Output: public/assets/cutins/jinrai-issen.webp, lossy WebP q90, alpha q100.
+
+Use case: stylized-concept
+Asset type: a NEW transparent character illustration for a fullscreen ultimate-attack cut-in in a Japanese bullet-hell game, not a UI mockup.
+Input images: Image 1 is the approved identity, costume, proportions, and rendering reference of Jinrai. Image 2 is her face reference, especially narrow amber eyes and mature composed gaze. Preserve the same character and outfit. These are reference images, draw a new pose.
+Primary request: 迅雷が奥義「迅雷一閃」を放つ直前の、一瞬で斬り込むくノ一の強い構え。腰を落とし、体を斜めにひねり、片手の短いクナイを胸の前で水平に構え、もう一方の手は後ろへ引く。顔は観客へ向けた3/4 view、鋭いが穏やかな確信を持つ眼差し。金の髪筋と長い黒髪、袖と金の帯が横へ流れ、これから画面を横断する勢いを出す。立っているだけのポーズにしない。
+Composition/framing: landscape 3:2 canvas. Character fills the right two thirds, head near upper-right third, sweeping fabric toward lower left, upper thighs to full hair ornaments all visible, close enough that her face reads on a 640x480 game. Left quarter is mostly transparent negative space for separately animated typography. Keep hands and weapon legible, do not clip head or hands. The entire subject is a self-contained cutout, with soft transparent edges only in a few small gold sparks. No scenery or opaque background.
+Style/medium: detailed clean anime game illustration matching the approved references, same stylized body proportions, head about 29 percent of standing height excluding ornaments. Preserve costume black/gold, shoulder openings, her recognizable golden hair stripe and ornaments. Keep a visible natural neck, no elongated torso. Her eyes must stay narrow and confident, never childish round eyes or an angry scowl. Restrained gold rim light and a few thin lightning arcs along the kunai, no bright effect over her face.
+Constraints: ONE character only, natural anatomy, two hands with five fingers, one short kunai only, no sword, no book, no wings. No text, no Japanese characters, no logos, no watermark, no frame, no UI. Truly transparent background, not checkerboard. The words 奥義 and 迅雷一閃 will be rendered later in code and must NOT be in this asset.

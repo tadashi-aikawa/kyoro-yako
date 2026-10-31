@@ -6,6 +6,7 @@ import { BLOOM_CUTIN, BLOOM_OPEN } from './patterns/claudine-finale';
 import { DASH_CUTIN } from './patterns/jinrai';
 import { STAGES } from './stages';
 import { INVITATION, RECORDS } from './story';
+import { ULTIMATE_CUTIN_FRAMES } from './ultimate-cutin';
 
 const listeners: Record<string, (event: { code: string; repeat: boolean; preventDefault: () => void }) => void> = {};
 const run = (game: Game, frames: number) => { for (let i = 0; i < frames; i++) game.update(); };
@@ -54,7 +55,7 @@ it.each([1, 2, 3, 4, 5])('%s階は前の技を終えてから吹き出しを読�
     run(game, BLOOM_CUTIN - 1); expect(game.cutin).toBe(0);
     game.update(); expect(game.cutin).toBe(100);
     run(game, BLOOM_OPEN - BLOOM_CUTIN); expect(game.cutin).toBe(0);
-  } else if (stage === 4) { run(game, DASH_CUTIN); expect(game.cutin).toBe(100); }
+  } else if (stage === 4) { run(game, DASH_CUTIN); expect(game.cutin).toBe(ULTIMATE_CUTIN_FRAMES); }
   else { run(game, 105); expect(game.phaseFrame).toBe(105); expect(game.cutin).toBe(0); }
 });
 

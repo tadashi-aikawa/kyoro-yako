@@ -29,6 +29,7 @@ import { drawScenery } from './stage-scenery';
 import { NAMES, STAGES } from './stages';
 import { GAME_TITLE, INVITATION, RECORDS } from './story';
 import { wrapBattleComment, wrapDialogue } from './text-layout';
+import { drawUltimateCutin } from './ultimate-cutin';
 
 const PALETTE = ['#a674ff', '#6ddaf5', '#fbd768', '#ff9dbe'];
 
@@ -97,6 +98,7 @@ export class Renderer {
     if (game.scene === 'ending' || game.scene === 'credits') { this.drawEnding(game); return; }
     this.drawField(game);
     this.drawPanel(game);
+    if (game.boss === 'jinrai' && game.phase?.pattern === 'jinraiDash' && game.cutin > 0) drawUltimateCutin(c, game.images['jinrai-ultimate'], game.cutin);
     if (game.scene === 'letter' || (game.scene === 'pause' && game.resumeScene === 'letter')) this.drawLetter();
     if (game.scene === 'dialogue') this.drawDialogue(game);
     if (game.scene === 'pause') this.fade(game.whiteAlpha, '#fff');
@@ -475,7 +477,7 @@ export class Renderer {
     }
     this.jinraiThunderbolts(game);
     if (game.bombFrames > 0) this.bombEffect(game);
-    if (game.cutin > 0 && game.boss) this.cutin(game);
+    if (game.cutin > 0 && game.boss && game.phase?.pattern !== 'jinraiDash') this.cutin(game);
     if (game.phase?.spell && !game.phaseIntro && game.cutin <= 20 && !(game.phase.pattern === 'jinraiDash' && game.phaseFrame < DASH_CUTIN) && !(game.phase.pattern === 'final' && game.phaseFrame < BLOOM_CUTIN)) {
       c.save();
       // 頭上を召喚の舞台に使う終符では、技名を読ませた後に帯を退ける。
@@ -1616,7 +1618,9 @@ export class Renderer {
   }
 
   private drawOverlay(game: Game): void {
-    const c = this.ctx; c.fillStyle = '#080615cf'; c.fillRect(32, 16, 384, 448);
+    const c = this.ctx; c.fillStyle = '#080615cf';
+    if (game.boss === 'jinrai' && game.phase?.pattern === 'jinraiDash' && game.cutin > 0) c.fillRect(0, 0, 640, 480);
+    else c.fillRect(32, 16, 384, 448);
     if (game.scene === 'clear') {
       this.text('この階の勝負、勝ったの！', 224, 115, 24, '#ffebc2', 'center');
       const record = RECORDS[game.stage - 1];

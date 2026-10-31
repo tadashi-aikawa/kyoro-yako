@@ -32,6 +32,7 @@ import { Pool } from './pool';
 import { autoCollect, bulletContact, bulletSpeed, circlesHit, type Difficulty, deathbomb, density, FIELD, type ItemKind, MAX_BOMBS, MAX_POWER, newExtends, type PlayerId, pointValue, safeLoad, safeSave } from './rules';
 import { type BossId, midPhases, NAMES, type Phase, STAGES } from './stages';
 import { readRecords } from './story';
+import { ULTIMATE_CUTIN_FRAMES, ULTIMATE_SECOND_STAMP, ULTIMATE_TITLE } from './ultimate-cutin';
 
 export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'letter' | 'stage' | 'arrival' | 'transition' | 'dialogue' | 'gift' | 'departure' | 'clear' | 'pause' | 'gameover' | 'movie' | 'ending' | 'credits';
 type AfterBossMovie = 'jinrai-gift' | 'minerva-finale';
@@ -589,7 +590,13 @@ export class Game {
     this.stageFrame = 0;
     this.stageIntroFrame = this.presentation ? 0 : 180;
     if (stage === 5) this.movies.preload(['lastboss', 'minerva-finale', ...ENDING_MOVIES]);
-    if (stage === 4) this.movies.preload(['jinrai-gift']);
+    if (stage === 4) {
+      this.movies.preload(['jinrai-gift']);
+      if (!this.images['jinrai-ultimate']) {
+        const image = new Image(); image.src = `${import.meta.env.BASE_URL}assets/cutins/jinrai-issen.webp`;
+        this.images['jinrai-ultimate'] = image;
+      }
+    }
     this.sceneryDistance = 0;
     this.midbossElapsedFrames = 0;
     this.collectionFrames = 0;
@@ -684,7 +691,7 @@ export class Game {
     this.px = Math.max(9, Math.min(FIELD.w - 9, this.px + dx));
     this.py = Math.max(12, Math.min(FIELD.h - 9, this.py + dy));
     reflowPlayer(this);
-    if (!canAttack) return;
+    if (!canAttack || (this.phase?.pattern === 'jinraiDash' && this.phaseFrame >= DASH_CUTIN - 1 && this.phaseFrame < DASH_CUTIN + ULTIMATE_CUTIN_FRAMES)) return;
     if ((this.held('KeyZ') || this.autoshot) && this.frame % 5 === 0) this.fireShot(focus);
     if (this.just('KeyX') && this.bombs > 0 && this.bombFrames <= 0) this.useBomb();
   }
@@ -1083,7 +1090,9 @@ export class Game {
     if (phase.pattern === 'final' && this.phaseFrame === BLOOM_CUTIN) { this.cutin = 100; this.flash = 12; this.audio.play('declare'); }
     if (phase.pattern === 'jinraiDash') {
       if (this.phaseFrame === DASH_CHARGE_START) this.audio.play('jinraiCharge');
-      if (this.phaseFrame === DASH_CUTIN) { this.cutin = 100; this.flash = 12; this.audio.play('declare'); }
+      if (this.phaseFrame === DASH_CUTIN) { this.cutin = ULTIMATE_CUTIN_FRAMES; this.audio.play('declare'); this.audio.play('ultimateStamp'); }
+      if (this.phaseFrame === DASH_CUTIN + ULTIMATE_SECOND_STAMP) this.audio.play('ultimateStamp');
+      if (this.phaseFrame === DASH_CUTIN + ULTIMATE_TITLE) this.audio.play('slash');
       if (this.phaseFrame === DASH_CHARGED) { this.audio.play('jinraiCrackle'); this.spark(...this.bossXY, '#ffe45c', 32); }
     }
     if (this.midboss) this.midbossElapsedFrames++;

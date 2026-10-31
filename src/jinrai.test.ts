@@ -6,6 +6,7 @@ import { CLONE_HOP, CLONE_SHOOT, CLONE_STAGGER, HOP_OUT, jinraiCloneScene } from
 import { KISS_CHARGE, KISS_FADE, KISS_LIFE, KISS_PERIOD, kissEdgeWarning, updateJinraiHeart } from './patterns/jinrai-kiss';
 import { bulletSpeed } from './rules';
 import { MID_PHASE, STAGES } from './stages';
+import { ULTIMATE_CUTIN_FRAMES, ULTIMATE_SECOND_STAMP, ULTIMATE_TITLE } from './ultimate-cutin';
 
 const listeners: Record<string, (event: { code: string; repeat: boolean; preventDefault: () => void }) => void> = {};
 beforeEach(() => {
@@ -268,7 +269,7 @@ it('一閃はゆっくり移動し、印から1秒後にカットインを挟ん
   const play = vi.spyOn(game.audio, 'play');
   game.startStage(4); game.startBoss(false, 10);
   expect(game.cutin).toBe(0);
-  expect(DASH_CHARGED - (DASH_CUTIN + 100)).toBeGreaterThanOrEqual(60);
+  expect(DASH_ATTACK - (DASH_CUTIN + ULTIMATE_CUTIN_FRAMES)).toBeGreaterThanOrEqual(60);
   expect(play).not.toHaveBeenCalledWith('declare');
   expect(play).not.toHaveBeenCalledWith('jinraiCharge');
   const hp = game.phaseHp;
@@ -283,7 +284,7 @@ it('一閃はゆっくり移動し、印から1秒後にカットインを挟ん
       expect(play).toHaveBeenCalledWith('jinraiCrackle');
       expect(game.bossXY).toEqual([192, 132]);
     }
-    expect(game.cutin).toBe(frame >= DASH_CUTIN ? Math.max(0, 100 - frame + DASH_CUTIN) : 0);
+    expect(game.cutin).toBe(frame >= DASH_CUTIN ? Math.max(0, ULTIMATE_CUTIN_FRAMES - frame + DASH_CUTIN) : 0);
     if (frame < DASH_CHARGE_START) expect(play).not.toHaveBeenCalledWith('jinraiCharge');
     if (frame === DASH_CHARGE_START) expect(play).toHaveBeenCalledWith('jinraiCharge');
   }
@@ -294,6 +295,46 @@ it('一閃はゆっくり移動し、印から1秒後にカットインを挟ん
   expect(play.mock.calls.filter(([sound]) => sound === 'declare')).toHaveLength(1);
   expect(play.mock.calls.filter(([sound]) => sound === 'jinraiCharge')).toHaveLength(1);
   expect(play.mock.calls.filter(([sound]) => sound === 'jinraiCrackle')).toHaveLength(1);
+  expect(play.mock.calls.filter(([sound]) => sound === 'ultimateStamp')).toHaveLength(2);
+});
+
+it('専用カットインは二拍と技名に音が同期し、ポーズ中は進まずリトライで消える', () => {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true;
+  game.startStage(4); game.startBoss(false, 10);
+  const events: [string, number][] = [];
+  vi.spyOn(game.audio, 'play').mockImplementation(sound => { events.push([sound, game.phaseFrame]); });
+  for (let frame = 0; frame < DASH_CUTIN + 6; frame++) game.update();
+  const frozen = [game.phaseFrame, game.cutin];
+  game.scene = 'pause';
+  for (let frame = 0; frame < 60; frame++) game.update();
+  expect([game.phaseFrame, game.cutin]).toEqual(frozen);
+  game.scene = 'stage';
+  while (game.phaseFrame < DASH_CUTIN + ULTIMATE_TITLE + 1) game.update();
+  expect(events.filter(([sound]) => sound === 'ultimateStamp')).toEqual([
+    ['ultimateStamp', DASH_CUTIN], ['ultimateStamp', DASH_CUTIN + ULTIMATE_SECOND_STAMP],
+  ]);
+  expect(events.filter(([sound]) => sound === 'slash')).toEqual([['slash', DASH_CUTIN + ULTIMATE_TITLE]]);
+  game.startStage(4); game.startBoss(false, 0);
+  expect(game.cutin).toBe(0);
+});
+
+it('全画面カットインの開始・終了境界もショットとボムを止め、画面復帰後はボムを使える', () => {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true;
+  game.startStage(4); game.startBoss(false, 10);
+  const press = () => {
+    listeners.keydown({ code: 'KeyX', repeat: false, preventDefault: () => {} }); game.update();
+    listeners.keyup({ code: 'KeyX', repeat: false, preventDefault: () => {} });
+  };
+  const bombs = game.bombs;
+  for (const frame of [DASH_CUTIN - 1, DASH_CUTIN, DASH_CUTIN + 80, DASH_CUTIN + ULTIMATE_CUTIN_FRAMES - 1]) {
+    while (game.phaseFrame < frame) game.update();
+    game.autoshot = true;
+    press();
+    expect(game.bombs).toBe(bombs); expect(game.bombUsed).toBe(false);
+    expect(game.shots.count).toBe(0);
+  }
+  expect(game.cutin).toBe(0);
+  press(); expect(game.bombs).toBe(bombs - 1); expect(game.bombUsed).toBe(true);
 });
 
 it('一閃の横断は24フレームで加減速し、左右対称に斜め下へ駆け抜ける', () => {
