@@ -1071,10 +1071,14 @@ export class Renderer {
       const period = WEATHER_PERIOD;
       const local = Math.max(0, sceneTime) % period;
       const next = (weather + 1) % WEATHER_NAMES.length;
-      this.text(local >= period - 45 ? `${WEATHER_NAMES[weather]} → ${WEATHER_NAMES[next]}` : WEATHER_NAMES[weather], 12, 52, 11, '#fff0c6');
+      const direction = Math.floor(Math.max(0, sceneTime) / (period * 3)) % 2 ? -1 : 1;
+      const wind = direction > 0 ? '↘' : '↙';
+      const currentName = weather === 2 ? `${WEATHER_NAMES[weather]} ${wind}` : WEATHER_NAMES[weather];
+      const nextName = next === 2 ? `${WEATHER_NAMES[next]} ${wind}` : WEATHER_NAMES[next];
+      const forecast = local >= period - 45;
+      this.text(forecast ? `${currentName} → ${nextName}` : currentName, 12, 52, forecast ? 10 : 11, '#fff0c6');
       if (weather === 2) {
         c.strokeStyle = '#ffe4bf55'; c.lineWidth = 1;
-        const direction = Math.floor(Math.max(0, sceneTime) / (period * 3)) % 2 ? -1 : 1;
         for (let i = 0; i < 7; i++) {
           const x = (game.frame * direction * 2 + i * 67 + 10000) % 450 - 30;
           c.beginPath(); c.moveTo(x, 70 + i * 44); c.lineTo(x + direction * 65, 98 + i * 44); c.stroke();

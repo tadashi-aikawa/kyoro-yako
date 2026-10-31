@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
-import { emitChangingGrid, emitTypographyRain, GRID_PERIOD, gridPoint, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, RAIN_TRANSITION, WEATHER_PERIOD } from './patterns/claudine-weather-grid';
+import { emitChangingGrid, emitTypographyRain, GRID_PERIOD, gridPoint, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_PERIOD } from './patterns/claudine-weather-grid';
 
 beforeEach(() => {
   vi.stubGlobal('location', { search: '' });
@@ -25,7 +25,8 @@ it('文字の雨は12文字と3種類の書体を混ぜ、小雨から豪雨・�
     counts.push(bullets.length);
     for (const b of bullets) { glyphs.add(b.gridColumn); fonts.add(b.gridRow); }
     expect(bullets.every((b) => b.kind === 'glyph' && b.motion === 'typographyRain')).toBe(true);
-    if (weather === 2) expect(bullets.every((b) => b.sway > 1 && b.spin !== 0 && b.vx > 1)).toBe(true);
+    expect(bullets.find(b => b.radius > 3.5)!.vy).toBeGreaterThan(bullets.find(b => b.radius < 2.5)!.vy);
+    if (weather === 2) expect(bullets.every((b) => b.spin !== 0 && b.vx > b.vy)).toBe(true);
   }
   expect(counts[1]).toBeGreaterThan(counts[0]);
   expect(counts[2]).toBeGreaterThan(counts[1]);
@@ -43,7 +44,7 @@ it('台風は次の周回で逆向きに吹く', () => {
   expect(left.bullets.objects.filter((b) => b.active).every((b) => b.vx < 0)).toBe(true);
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの小雨を保ち、豪雨と台風は従来の6割以下の発射数へ抑える', difficulty => {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの小雨を保ち、豪雨・台風の発射密度を段階的に上げる', difficulty => {
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
   const counts = [0, 1, 2].map(weather => {
     const game = start(3); game.difficulty = difficulty;
@@ -51,41 +52,75 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの小雨を保ち、
     return game.bullets.count;
   });
   expect(counts[0]).toBe([24, 54, 80, 120][level]);
-  const previousHeavy = Math.ceil(WEATHER_PERIOD / [8, 5, 4, 3][level]) * [3, 4, 5, 6][level];
-  const previousTyphoon = Math.ceil(WEATHER_PERIOD / [6, 4, 3, 3][level]) * [5, 6, 7, 8][level];
-  expect(counts[1]).toBeLessThanOrEqual(previousHeavy * 0.6);
-  expect(counts[2]).toBeLessThanOrEqual(previousTyphoon * 0.6);
+  expect(counts[1]).toBeGreaterThan(counts[0]);
+  expect(counts[2]).toBeGreaterThan(counts[1]);
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの豪雨・台風へ入ると残弾が消えてから次の雨が始まる', difficulty => {
-  for (const weather of [1, 2]) {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの全切替で残弾を残し、発射を待たずに同じ文字を加減速・転向させる', difficulty => {
+  for (let step = 1; step <= 6; step++) {
+    const weather = step % 3;
+    const boundary = WEATHER_PERIOD * step;
     const game = start(3); game.difficulty = difficulty;
-    game.phaseFrame = 104 + WEATHER_PERIOD * weather - 1;
-    // 画面内の遅い残弾を置き、自然な画面外退出で通過しないようにする。
-    const old = game.spawnBullet(192, 250, 0, 0, 0, 'glyph')!;
-    old.motion = 'typographyRain';
-    game.update(); expect(old.active).toBe(true);
-    for (let frame = 0; frame < RAIN_TRANSITION; frame++) {
+    // 切替直前の実際の発射弾を、自然退出しない画面内へ置く。
+    for (let t = boundary - 20; t < boundary; t++) emitTypographyRain(game, t);
+    const old = game.bullets.objects.find(b => b.active)!;
+    old.x = 192; old.y = 100;
+    const before = { vx: old.targetX, vy: old.vy, rotation: old.rotation, glyph: old.gridColumn, font: old.gridRow, radius: old.radius };
+    const unrelated = game.spawnBullet(50, 50, 0, 0, 0)!;
+    game.phaseFrame = 104 + boundary;
+    const spawn = vi.spyOn(game, 'spawnBullet');
+    for (let frame = 0; frame < 40; frame++) {
       game.update();
-      expect(game.bullets.objects.some(b => b.active && b !== old)).toBe(false);
+      expect(old.active).toBe(true);
+      expect(old.fadeAt).toBe(0);
+      if (frame === 12) expect(spawn).toHaveBeenCalled();
     }
-    expect(old.active).toBe(false);
-    for (let frame = 0; frame < 12; frame++) game.update();
-    expect(game.bullets.count).toBeGreaterThan(0);
+    expect([old.gridColumn, old.gridRow, old.radius]).toEqual([before.glyph, before.font, before.radius]);
+    expect([unrelated.x, unrelated.y, unrelated.vx, unrelated.vy, unrelated.fadeAt]).toEqual([50, 50, 0, 0, 0]);
+    if (weather === 1) {
+      expect(old.vy).toBeGreaterThan(before.vy * 1.5);
+      expect(Math.abs(old.targetX)).toBeLessThan(0.01);
+    } else if (weather === 2) {
+      const direction = step === 2 ? 1 : -1;
+      expect(old.targetX * direction).toBeGreaterThan(old.vy);
+      expect(old.rotation * direction).toBeGreaterThan(before.rotation * direction);
+    } else {
+      expect(Math.abs(old.targetX)).toBeLessThan(Math.abs(before.vx) * 0.05);
+      expect(Math.abs(old.spin)).toBeLessThan(0.0003);
+    }
+    spawn.mockRestore();
   }
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの小雨へ戻ると台風の残弾だけ消し、小雨は待たずに発射する', difficulty => {
-  const game = start(3); game.difficulty = difficulty;
-  game.phaseFrame = 104 + WEATHER_PERIOD * 3;
-  const old = game.spawnBullet(192, 250, 0, 0, 0, 'glyph')!;
-  old.motion = 'typographyRain';
-  for (let frame = 0; frame <= 30; frame++) game.update();
-  expect(old.active).toBe(false);
-  const unchanged = start(3); unchanged.difficulty = difficulty;
-  for (let t = WEATHER_PERIOD * 3; t <= WEATHER_PERIOD * 3 + 30; t++) emitTypographyRain(unchanged, t);
-  expect(game.bullets.count).toBeGreaterThan(0);
-  expect(game.bullets.count).toBe(unchanged.bullets.count);
+it('天候切替の最初のフレームで速度と位置が飛ばない', () => {
+  const game = start(3);
+  const b = game.spawnBullet(192, 150, 0, 3.08, 0, 'glyph')!;
+  b.motion = 'typographyRain'; b.radius = 3;
+  game.phaseFrame = 104 + WEATHER_PERIOD * 2;
+  game.update();
+  expect(b.targetX).toBeGreaterThan(0);
+  expect(b.targetX).toBeLessThan(0.4);
+  expect(Math.abs(b.vy - 3.08)).toBeLessThan(0.2);
+  expect(Math.abs(b.x - 192)).toBeLessThan(0.4);
+  expect(Math.abs(b.y - 150)).toBeLessThan(3.1);
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sで2周連続して雨が途切れず、豪雨では画面内の密度も上がる', difficulty => {
+  const game = start(3); game.difficulty = difficulty; game.phaseFrame = 104;
+  const counts: number[][] = [[], [], []];
+  for (let t = 0; t < WEATHER_PERIOD * 7; t++) {
+    game.update();
+    const step = Math.floor(t / WEATHER_PERIOD);
+    if (t >= WEATHER_PERIOD && t % WEATHER_PERIOD < 40) expect(game.bullets.count).toBeGreaterThan(0);
+    game.bullets.forEach(b => {
+      expect(b.fadeAt).toBe(0);
+      expect(b.radius).toBeGreaterThanOrEqual(2.4);
+      expect(b.radius).toBeLessThanOrEqual(3.6);
+    });
+    if (step >= 3 && step < 6 && t % WEATHER_PERIOD >= WEATHER_PERIOD / 2) counts[step % 3].push(game.bullets.count);
+  }
+  const means = counts.map(samples => samples.reduce((sum, n) => sum + n, 0) / samples.length);
+  expect(means[1]).toBeGreaterThan(means[0] * 1.1);
 });
 
 it('グリッドは均等列・可変幅・可変行・千鳥配置へ切り替わる', () => {
@@ -129,7 +164,7 @@ it('グリッドは予告位置から配置を保って上下左右へ流れ、�
   }
 });
 
-it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの台風は間引いた後も風上側の壁から流れ込み、画面下部へ届く', difficulty => {
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの台風は両方向とも風上側の壁から流れ込み、画面下部へ届く', difficulty => {
   for (const cycle of [0, 1]) {
     const game = start(3); game.difficulty = difficulty;
     game.phaseFrame = 104 + WEATHER_PERIOD * (cycle * 3 + 2);
