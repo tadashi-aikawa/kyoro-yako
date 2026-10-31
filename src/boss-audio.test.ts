@@ -64,37 +64,35 @@ it.each([[3, 9, 120, 100], [4, 10, 150, 150], [5, 10, 0, 100]] as const)('%s面�
   expect(game.bgm.sceneVolumeMultiplier).toBe(1);
 });
 
-it.each([[3, 9, 120, 43], [4, 10, 150, 64], [5, 10, 0, 43]] as const)('%s面の技名SEの前後だけBGMを下げ、保持中でも実時間で元へ戻す', (stage, phase, start, title) => {
-  const game = new Game(); game.audio.volume = 0; game.invincible = true;
-  game.startStage(stage); game.startBoss(false, phase);
-  while (game.phaseFrame < start) game.update();
-  while (game.ultimateFrame < title) game.update();
-  expect(game.bgm.sceneVolumeMultiplier).toBe(0.35);
-  const phaseFrame = game.phaseFrame;
-  while (game.ultimateFrame < title + 62) game.update();
-  expect(game.bgm.sceneVolumeMultiplier).toBe(0.35);
-  while (game.ultimateFrame < title + 63) game.update();
-  expect(game.bgm.sceneVolumeMultiplier).toBe(1);
-  expect(game.phaseFrame).toBeLessThan(phaseFrame + 63);
-});
-
-it('奥・義の二拍だけBGMを下げ、ポーズ中も維持し、その後とリトライで元へ戻す', () => {
+it.each([[3, 9, 120], [4, 10, 150], [5, 10, 0]] as const)('%s面の最終宣言は二拍・技名・保持・退場を通してBGMの音量を維持する', (stage, phase, start) => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   const sync = vi.spyOn(game.bgm, 'sync');
-  game.startStage(4); game.startBoss(false, 10);
-  for (let i = 0; i < 137; i++) game.update();
-  expect(game.bgm.sceneVolumeMultiplier).toBe(1);
-  game.update(); expect(game.bgm.sceneVolumeMultiplier).toBe(0.1);
-  expect(sync).toHaveBeenLastCalledWith('boss-jinrai', false, 0.1, 0.18);
+  game.startStage(stage); game.startBoss(false, phase);
+  game.bgm.setVolume(60);
+  const duration = ULTIMATE_CUTINS[game.boss as keyof typeof ULTIMATE_CUTINS].duration;
+  do {
+    expect(game.bgm.sceneVolumeMultiplier).toBe(1);
+    expect(game.bgm.effectiveVolume).toBeCloseTo(0.6);
+    game.update();
+  } while (game.phaseFrame <= start + duration + 5);
+  expect(sync.mock.calls.every(([, duck, multiplier]) => !duck && multiplier === 1)).toBe(true);
+});
+
+it.each([[3, 9, 120], [4, 10, 150], [5, 10, 0]] as const)('%s面の最終カットインでもポーズの減音と復帰・リトライ時の通常音量を保つ', (stage, phase, start) => {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true;
+  game.startStage(stage); game.startBoss(false, phase);
+  while (game.phaseFrame < start + 12) game.update();
+  game.bgm.setVolume(60);
+  const frame = game.ultimateFrame;
   game.resumeScene = 'stage'; game.scene = 'pause'; game.update();
-  expect(game.bgm.sceneVolumeMultiplier).toBe(0.1);
-  game.scene = 'stage'; while (game.phaseFrame < 185) game.update();
-  expect(game.bgm.sceneVolumeMultiplier).toBe(0.1);
-  game.update(); expect(game.bgm.sceneVolumeMultiplier).toBe(1);
-  expect(sync).toHaveBeenLastCalledWith('boss-jinrai', false, 1, 0.18);
-  game.phaseFrame = 150; game.update(); expect(game.bgm.sceneVolumeMultiplier).toBe(0.1);
-  game.startStage(4); game.startBoss(false, 0); game.update();
+  expect(game.ultimateFrame).toBe(frame);
   expect(game.bgm.sceneVolumeMultiplier).toBe(1);
+  expect(game.bgm.effectiveVolume).toBeCloseTo(0.6 * 0.35);
+  game.scene = 'stage'; game.update();
+  expect(game.bgm.effectiveVolume).toBeCloseTo(0.6);
+  game.startStage(stage); game.startBoss(false, phase); game.update();
+  expect(game.bgm.sceneVolumeMultiplier).toBe(1);
+  expect(game.bgm.effectiveVolume).toBeCloseTo(0.6);
 });
 
 it('発射SEは斉射の弾数によらず1フレーム1回で、道中には混ざらない', () => {

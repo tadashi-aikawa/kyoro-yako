@@ -1,4 +1,4 @@
-import { AudioBank, ULTIMATE_SHINE_DURATION } from './audio';
+import { AudioBank } from './audio';
 import { type BgmCue, BgmPlayer } from './bgm';
 import { CAST_GAP, MOTION_SPRITES } from './boss-motion';
 import { patternPosition } from './boss-movement';
@@ -354,13 +354,9 @@ export class Game {
     else if (this.scene === 'dialogue' && (this.afterDialogue === 'boss' || this.afterDialogue === 'clear' || this.afterDialogue === 'gift')) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else if (this.phase && !this.midboss) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else cue = STAGES[this.stage - 1].bgm;
-    const ultimate = !this.phaseIntro && ultimateCutin(this.boss, this.phase?.pattern);
-    const cutinStart = this.cutinStartFrame();
-    const ultimateQuiet = ultimate && this.phaseFrame >= cutinStart - 12 && this.phaseFrame < cutinStart + ULTIMATE_SECOND_STAMP + 24;
-    const titleFrame = ultimate ? ultimateCueFrame(ultimate, ULTIMATE_TITLE) : 0;
-    const titleQuiet = ultimate && this.cutin > 0 && this.ultimateFrame >= titleFrame - 8 && this.ultimateFrame < titleFrame + Math.round(ULTIMATE_SHINE_DURATION * 60);
-    const multiplier = this.scene === 'credits' ? 1 - creditsFade(this.creditsFrame) : ultimateQuiet ? 0.1 : titleQuiet || lastbossQuiet || postBossQuiet ? 0.35 : 1;
-    if (!this.media || this.media.ensure(cue, this.scene === 'movie' ? this.movieName : undefined)) this.bgm.sync(cue, false, multiplier, this.scene === 'credits' ? 1 / 60 : ultimate ? 0.18 : 1);
+    // 最終カットインでも聞き続けたボス曲の音量を保ち、専用SE側の音量で強調する。
+    const multiplier = this.scene === 'credits' ? 1 - creditsFade(this.creditsFrame) : lastbossQuiet || postBossQuiet ? 0.35 : 1;
+    if (!this.media || this.media.ensure(cue, this.scene === 'movie' ? this.movieName : undefined)) this.bgm.sync(cue, false, multiplier, this.scene === 'credits' ? 1 / 60 : 1);
     return cue;
   }
 
@@ -1055,7 +1051,7 @@ export class Game {
     const ultimate = ultimateCutin(this.boss, this.phase?.pattern);
     this.cutin = ultimate?.duration ?? 100; this.flash = ultimate ? 0 : 12;
     this.ultimateFrame = ultimate ? 0 : -1;
-    if (ultimate) { this.bgm.sync(this.bgm.cue, false, 0.1, 0); this.audio.play('ultimateStamp'); }
+    if (ultimate) this.audio.play('ultimateStamp');
     this.audio.play('declare');
   }
 

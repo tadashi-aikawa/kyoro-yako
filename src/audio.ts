@@ -2,13 +2,13 @@ import type { MediaAssets } from './media-assets';
 
 export type Sound = 'shot' | 'hit' | 'graze' | 'kill' | 'bomb' | 'declare' | 'ultimateStamp' | 'ultimateShine' | 'capture' | 'item' | 'extend'
   | 'enemyShot' | 'jinraiShot' | 'jinraiCharge' | 'jinraiRecharge' | 'jinraiCrackle' | 'jinraiWarp' | 'laser' | 'thunder' | 'thunderBurst' | 'ninpo' | 'slash' | 'wind' | 'turn' | 'split' | 'sweepCharge' | 'sweepBurst' | 'prayerCharge' | 'owlRelease' | 'roseCharge' | 'roseBloom' | 'chappySnap' | 'caromTap' | 'fireworkRise' | 'fireworkGrandRise' | 'fireworkBoom';
-export const ULTIMATE_SHINE_DURATION = 1.05;
+const ULTIMATE_SHINE_DURATION = 1.05;
 // 周波数・秒数・波形・終端周波数・音量・最短間隔。
 // 常時鳴る自機ショットを抑え、敵の発射と仕掛けの切り替わりを聞き取れる比率にする。
 const tones: Record<Sound, [number, number, OscillatorType, number, number, number]> = {
   shot: [820, 0.035, 'triangle', 1107, 0.03, 0.07], hit: [95, 0.32, 'sawtooth', 40, 0.12, 0.025],
-  ultimateStamp: [150, 0.28, 'triangle', 52, 0.85, 0.12], // 周波数・波形は専用バッファで合成し、ここでは秒数・音量・最短間隔だけ使う。
-  ultimateShine: [1046.5, ULTIMATE_SHINE_DURATION, 'sine', 1046.5, 0.7, 0.3], // 風切り・衝撃・広がる残響を専用ステレオバッファで重ねる。
+  ultimateStamp: [150, 0.28, 'triangle', 52, 1, 0.12], // 周波数・波形は専用バッファで合成し、ここでは秒数・音量・最短間隔だけ使う。
+  ultimateShine: [1046.5, ULTIMATE_SHINE_DURATION, 'sine', 1046.5, 1, 0.3], // 風切り・衝撃・広がる残響を専用ステレオバッファで重ねる。
   graze: [1100, 0.045, 'sine', 1485, 0.12, 0.025], kill: [330, 0.12, 'triangle', 446, 0.12, 0.025],
   bomb: [125, 0.7, 'sawtooth', 40, 0.12, 0.025], declare: [220, 0.7, 'triangle', 880, 0.16, 0.3],
   capture: [880, 0.6, 'triangle', 1188, 0.12, 0.025], item: [950, 0.06, 'sine', 1283, 0.12, 0.025],
