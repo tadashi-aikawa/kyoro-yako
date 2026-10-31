@@ -1,0 +1,11 @@
+Built-in image_gen, transparent_background: true.
+Output: public/assets/cutins/claudine-bloom.webp. Lossy WebP q90, alpha q100.
+
+Use case: stylized-concept
+Asset type: NEW fullscreen ultimate-attack cut-in illustration for a Japanese bullet-hell game, landscape 3:2.
+Input images: image 1 is Claudine's approved identity, costume, proportions, and rendering reference. Image 2 is her face reference. Preserve her recognizable face, hair and clothes; draw a completely new pose.
+Primary request: クロディーヌが最終技「レスポンシブ・ブルーム」を解き放つ直前。「開花」を身体で表す構え。上体を軽くひねり、片手を胸元から外へ優雅に開き、もう一方の手の指先で空間に花の弧を描く。両目を開き、細めの優しい眼差し、口を閉じた大人の微笑み。手元からクリーム・珊瑚色・淡い青の光の花火が咲きかける。花束などの小道具は持たない。
+Composition: character on the right two thirds of a 3:2 canvas, face large and readable near the upper right third; head ornaments and hands inside the frame. Waist-up to upper thighs. Left quarter mostly empty dark transparent space for typography. Hair tips and jacket hem flow across the image to suggest an elegant release of power. Camera is close and dynamic, not the normal standing pose.
+Style: clean anime game illustration matching her reference identity; stylized proportions with head about 29 percent of standing height, mature narrow eyes. The hair is straight at the roots with slight waves only at the tips, modest hair volume, never all-over curls. Keep the ivory jacket, reddish brown high-neck top, fitted dark skirt with circuit embroidery, never trousers. Do not make the face infantile or angry. Restrained pearly and coral rim light; fine firework sparks around hands, face unobscured.
+Background: transparent cutout, no scenery, no frame or UI. Only a few fine arcing sparks and flowerlike lights around the hands. Transparent outside silhouette and sparks.
+Constraints: one character, natural anatomy, two hands with five fingers, no weapons, no extra limbs. No Japanese text, no lettering, no logos, no watermark. Text will be animated separately in code.

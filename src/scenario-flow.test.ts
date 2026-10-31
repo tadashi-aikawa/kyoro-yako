@@ -32,8 +32,9 @@ it('新規プレイは匿名の招待状とみみこの反応を読んでから�
   expect(dialogue('mimiko', 'minerva', 'before').some(line => line.text.includes('あなたが送ったの'))).toBe(true);
 });
 
-it.each([1, 2, 3, 4, 5])('%s階は前の技を終えてから吹き出しを読み、既存カットインと次の技へ進む', stage => {
+it.each([1, 2, 3, 4, 5])('%s階は前の技を終えてから吹き出しを読み、宣言と次の技へ進む', stage => {
   const game = new Game(); game.startStage(stage); game.startBoss(false, STAGES[stage - 1].phases.length - 2);
+  const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
   game.phaseHp = 0; game.update();
   expect(game.phaseIntro?.frame).toBe(0); expect(game.cutin).toBe(0); expect(game.phaseFrame).toBe(0);
   game.keys.add('KeyZ'); run(game, PHASE_MOVE_FRAMES); expect(game.shots.count).toBe(0);
@@ -48,7 +49,7 @@ it.each([1, 2, 3, 4, 5])('%s階は前の技を終えてから吹き出しを読�
   expect(game.battleCommentFrames).toBe(1); expect(game.phaseFrame).toBe(0); expect(game.cutin).toBe(0);
   expect(game.shots.count).toBe(0); expect(game.bullets.count).toBe(0); expect(game.jinraiLasers).toHaveLength(0);
   expect(game.phaseHp).toBe(game.phaseMaxHp);
-  game.keys.delete('KeyZ'); game.update();
+  play.mockClear(); game.keys.delete('KeyZ'); game.update();
   expect(game.phaseIntro).toBeUndefined(); expect(game.battleComment).toBeUndefined(); expect(game.phaseFrame).toBe(0);
   expect(game.cutin).toBe(stage === 3 || stage === 4 ? 0 : 100);
   if (stage === 3) {
@@ -57,6 +58,8 @@ it.each([1, 2, 3, 4, 5])('%s階は前の技を終えてから吹き出しを読�
     run(game, BLOOM_OPEN - BLOOM_CUTIN); expect(game.cutin).toBe(0);
   } else if (stage === 4) { run(game, DASH_CUTIN); expect(game.cutin).toBe(ULTIMATE_CUTIN_FRAMES); }
   else { run(game, 105); expect(game.phaseFrame).toBe(105); expect(game.cutin).toBe(0); }
+  if (stage === 4) run(game, 12);
+  if (stage >= 3) expect(play.mock.calls.filter(([sound]) => sound === 'ultimateStamp')).toHaveLength(2);
 });
 
 it('最終技前のリトライで演出とコメントを持ち越さない', () => {

@@ -32,7 +32,7 @@ import { Pool } from './pool';
 import { autoCollect, bulletContact, bulletSpeed, circlesHit, type Difficulty, deathbomb, density, FIELD, type ItemKind, MAX_BOMBS, MAX_POWER, newExtends, type PlayerId, pointValue, safeLoad, safeSave } from './rules';
 import { type BossId, midPhases, NAMES, type Phase, STAGES } from './stages';
 import { readRecords } from './story';
-import { ULTIMATE_CUTIN_FRAMES, ULTIMATE_SECOND_STAMP, ULTIMATE_TITLE } from './ultimate-cutin';
+import { ULTIMATE_CUTINS, ULTIMATE_SECOND_STAMP, ULTIMATE_TITLE, ultimateCueFrame, ultimateCutin } from './ultimate-cutin';
 
 export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'letter' | 'stage' | 'arrival' | 'transition' | 'dialogue' | 'gift' | 'departure' | 'clear' | 'pause' | 'gameover' | 'movie' | 'ending' | 'credits';
 type AfterBossMovie = 'jinrai-gift' | 'minerva-finale';
@@ -340,9 +340,11 @@ export class Game {
     else if (this.scene === 'dialogue' && (this.afterDialogue === 'boss' || this.afterDialogue === 'clear' || this.afterDialogue === 'gift')) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else if (this.phase && !this.midboss) cue = `boss-${STAGES[this.stage - 1].boss}` as BgmCue;
     else cue = STAGES[this.stage - 1].bgm;
-    const ultimateQuiet = this.boss === 'jinrai' && this.phase?.pattern === 'jinraiDash' && this.phaseFrame >= DASH_CUTIN - 12 && this.phaseFrame < DASH_CUTIN + ULTIMATE_SECOND_STAMP + 24;
+    const ultimate = !this.phaseIntro && ultimateCutin(this.boss, this.phase?.pattern);
+    const cutinStart = this.phase?.pattern === 'jinraiDash' ? DASH_CUTIN : this.phase?.pattern === 'final' ? BLOOM_CUTIN : 0;
+    const ultimateQuiet = ultimate && this.phaseFrame >= cutinStart - 12 && this.phaseFrame < cutinStart + ULTIMATE_SECOND_STAMP + 24;
     const multiplier = this.scene === 'credits' ? 1 - creditsFade(this.creditsFrame) : ultimateQuiet ? 0.1 : lastbossQuiet || postBossQuiet ? 0.35 : 1;
-    this.bgm.sync(cue, false, multiplier, this.scene === 'credits' ? 1 / 60 : this.phase?.pattern === 'jinraiDash' ? 0.18 : 1);
+    this.bgm.sync(cue, false, multiplier, this.scene === 'credits' ? 1 / 60 : ultimate ? 0.18 : 1);
   }
 
   private updateMenu(): void {
@@ -591,13 +593,15 @@ export class Game {
     this.stage = stage;
     this.stageFrame = 0;
     this.stageIntroFrame = this.presentation ? 0 : 180;
+    const boss = STAGES[stage - 1].boss;
+    const ultimate = ULTIMATE_CUTINS[boss as keyof typeof ULTIMATE_CUTINS];
+    if (ultimate && !this.images[`${boss}-ultimate`]) {
+      const image = new Image(); image.src = `${import.meta.env.BASE_URL}assets/cutins/${ultimate.id}.webp`;
+      this.images[`${boss}-ultimate`] = image;
+    }
     if (stage === 5) this.movies.preload(['lastboss', 'minerva-finale', ...ENDING_MOVIES]);
     if (stage === 4) {
       this.movies.preload(['jinrai-gift']);
-      if (!this.images['jinrai-ultimate']) {
-        const image = new Image(); image.src = `${import.meta.env.BASE_URL}assets/cutins/jinrai-issen.webp`;
-        this.images['jinrai-ultimate'] = image;
-      }
     }
     this.sceneryDistance = 0;
     this.midbossElapsedFrames = 0;
@@ -693,7 +697,8 @@ export class Game {
     this.px = Math.max(9, Math.min(FIELD.w - 9, this.px + dx));
     this.py = Math.max(12, Math.min(FIELD.h - 9, this.py + dy));
     reflowPlayer(this);
-    if (!canAttack || (this.phase?.pattern === 'jinraiDash' && this.phaseFrame >= DASH_CUTIN - 1 && this.phaseFrame < DASH_CUTIN + ULTIMATE_CUTIN_FRAMES)) return;
+    const cutinStart = this.phase?.pattern === 'jinraiDash' ? DASH_CUTIN : this.phase?.pattern === 'final' ? BLOOM_CUTIN : -1;
+    if (!canAttack || (ultimateCutin(this.boss, this.phase?.pattern) && (this.cutin > 0 || this.phaseFrame === cutinStart - 1))) return;
     if ((this.held('KeyZ') || this.autoshot) && this.frame % 5 === 0) this.fireShot(focus);
     if (this.just('KeyX') && this.bombs > 0 && this.bombFrames <= 0) this.useBomb();
   }
@@ -992,10 +997,16 @@ export class Game {
     if (phase.spell) {
       this.spellBonus = 1_000_000 + this.stage * 500_000;
       const delayed = phase.pattern === 'jinraiDash' || phase.pattern === 'final';
-      this.cutin = delayed ? 0 : 100;
-      this.flash = delayed ? 0 : 12;
-      if (!delayed) this.audio.play('declare');
+      if (!delayed) this.startCutin();
+      else { this.cutin = 0; this.flash = 0; }
     }
+  }
+
+  private startCutin(): void {
+    const ultimate = ultimateCutin(this.boss, this.phase?.pattern);
+    this.cutin = ultimate?.duration ?? 100; this.flash = ultimate ? 0 : 12;
+    if (ultimate) { this.bgm.sync(this.bgm.cue, false, 0.1, 0); this.audio.play('ultimateStamp'); }
+    this.audio.play('declare');
   }
 
   skipPhase(): void { if (this.phase && this.scene === 'stage') this.finishPhase(true); }
@@ -1087,14 +1098,19 @@ export class Game {
 
   private updateBoss(): void {
     const phase = this.phase!;
-    if (this.cutin > 0) this.cutin--;
+    const activeCutin = this.cutin > 0;
+    if (activeCutin) this.cutin--;
     this.phaseFrame++;
-    if (phase.pattern === 'final' && this.phaseFrame === BLOOM_CUTIN) { this.cutin = 100; this.flash = 12; this.audio.play('declare'); }
+    const ultimate = activeCutin && ultimateCutin(this.boss, phase.pattern);
+    if (ultimate) {
+      const age = ultimate.duration - this.cutin;
+      if (age === ULTIMATE_SECOND_STAMP) this.audio.play('ultimateStamp');
+      if (age === ultimateCueFrame(ultimate, ULTIMATE_TITLE)) this.audio.play(this.boss === 'jinrai' ? 'slash' : this.boss === 'claudine' ? 'roseBloom' : 'capture');
+    }
+    if (phase.pattern === 'final' && this.phaseFrame === BLOOM_CUTIN) this.startCutin();
     if (phase.pattern === 'jinraiDash') {
       if (this.phaseFrame === DASH_CHARGE_START) this.audio.play('jinraiCharge');
-      if (this.phaseFrame === DASH_CUTIN) { this.cutin = ULTIMATE_CUTIN_FRAMES; this.audio.play('declare'); this.audio.play('ultimateStamp'); }
-      if (this.phaseFrame === DASH_CUTIN + ULTIMATE_SECOND_STAMP) this.audio.play('ultimateStamp');
-      if (this.phaseFrame === DASH_CUTIN + ULTIMATE_TITLE) this.audio.play('slash');
+      if (this.phaseFrame === DASH_CUTIN) this.startCutin();
       if (this.phaseFrame === DASH_CHARGED) { this.audio.play('jinraiCrackle'); this.spark(...this.bossXY, '#ffe45c', 32); }
     }
     if (this.midboss) this.midbossElapsedFrames++;

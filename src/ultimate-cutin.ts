@@ -1,7 +1,19 @@
-// 迅雷一閃だけの試作。通常の100フレームのカットインとは別の時計で描く。
+// 描画は150フレームに正規化し、各ボスの既存の導入時間へ収める。
 export const ULTIMATE_CUTIN_FRAMES = 150;
 export const ULTIMATE_SECOND_STAMP = 12;
 export const ULTIMATE_TITLE = 64;
+
+export const ULTIMATE_CUTINS = {
+  jinrai: { id: 'jinrai-issen', pattern: 'jinraiDash', declaration: '奥義', title: '迅雷一閃', duration: 150, ink: '#f5d994', light: '#9b6c1d', dark: '#16100a', end: '#292014', streak: '#f6ce65', brightStreak: '#fff2b9', edge: '#d5a946' },
+  claudine: { id: 'claudine-bloom', pattern: 'final', declaration: '開花', title: 'レスポンシブ・ブルーム', duration: 100, ink: '#f1d4be', light: '#92556c', dark: '#20121d', end: '#20121d', streak: '#f1d4be', brightStreak: '#f1d4be', edge: '#efb3bc' },
+  minerva: { id: 'minerva-oracle', pattern: 'owlDawn', declaration: '神託', title: 'オウル・オブ・ミネルヴァ', duration: 100, ink: '#ffe4ab', light: '#9c8a50', dark: '#191a32', end: '#191a32', streak: '#ffe4ab', brightStreak: '#ffe4ab', edge: '#e6cf84' },
+} as const;
+export type UltimateCutin = typeof ULTIMATE_CUTINS[keyof typeof ULTIMATE_CUTINS];
+export function ultimateCutin(boss: string | undefined, pattern: string | undefined): UltimateCutin | undefined {
+  const spec = ULTIMATE_CUTINS[boss as keyof typeof ULTIMATE_CUTINS];
+  return spec?.pattern === pattern ? spec : undefined;
+}
+export function ultimateCueFrame(spec: UltimateCutin, frame: number): number { return Math.round(frame * spec.duration / ULTIMATE_CUTIN_FRAMES); }
 
 const FONT = '"YuMincho", "Yu Mincho", "Hiragino Mincho ProN", serif';
 const clamp = (value: number): number => Math.max(0, Math.min(1, value));
@@ -22,11 +34,12 @@ function glyph(c: CanvasRenderingContext2D, text: string, age: number, x: number
   c.restore();
 }
 
-export function drawUltimateCutin(c: CanvasRenderingContext2D, image: HTMLImageElement | undefined, remaining: number): void {
-  const age = ULTIMATE_CUTIN_FRAMES - remaining;
+export function drawUltimateCutin(c: CanvasRenderingContext2D, image: HTMLImageElement | undefined, remaining: number, spec: UltimateCutin): void {
+  const age = (spec.duration - remaining) * ULTIMATE_CUTIN_FRAMES / spec.duration;
   const reveal = easeOut((age - 28) / 22);
   const leave = easeOut((age - 130) / 20);
-  const stamp = age >= ULTIMATE_SECOND_STAMP ? age - ULTIMATE_SECOND_STAMP : age;
+  const secondStamp = ULTIMATE_SECOND_STAMP * ULTIMATE_CUTIN_FRAMES / spec.duration;
+  const stamp = age >= secondStamp ? age - secondStamp : age;
   const shake = Math.max(0, 5 - stamp) * Math.sin(age * 2.7);
   c.save();
   c.beginPath(); c.rect(0, 0, 640, 480); c.clip();
@@ -34,18 +47,18 @@ export function drawUltimateCutin(c: CanvasRenderingContext2D, image: HTMLImageE
   c.fillStyle = '#080805'; c.fillRect(0, 0, 640, 480);
   c.translate(shake - leave * 90, 0);
 
-  // 斜めの金の裂け目から人物を見せる。文字と絵は画像へ焼き込まない。
+  // 斜めの裂け目から人物を見せる。文字と絵は画像へ焼き込まない。
   c.save();
   c.beginPath();
   c.moveTo(640 - 720 * reveal, 22); c.lineTo(820, 22);
   c.lineTo(820, 458); c.lineTo(720 - 720 * reveal, 458); c.closePath(); c.clip();
   const light = c.createLinearGradient(120, 430, 580, 30);
-  light.addColorStop(0, '#16100a'); light.addColorStop(0.55, '#9b6c1d'); light.addColorStop(1, '#292014');
+  light.addColorStop(0, spec.dark); light.addColorStop(0.55, spec.light); light.addColorStop(1, spec.end);
   c.fillStyle = light; c.fillRect(0, 22, 820, 436);
   for (let i = 0; i < 19; i++) {
     const y = 28 + (i * 47) % 424;
     const x = (i * 139 - age * (9 + i % 4) + 4000) % 1000 - 180;
-    c.strokeStyle = i % 3 ? '#f6ce654a' : '#fff2b9aa'; c.lineWidth = i % 4 === 0 ? 2 : 0.7;
+    c.strokeStyle = i % 3 ? `${spec.streak}4a` : `${spec.brightStreak}aa`; c.lineWidth = i % 4 === 0 ? 2 : 0.7;
     c.beginPath(); c.moveTo(x, y); c.lineTo(x + 160, y - 38); c.stroke();
   }
   if (image?.complete && image.naturalWidth > 0) {
@@ -58,8 +71,9 @@ export function drawUltimateCutin(c: CanvasRenderingContext2D, image: HTMLImageE
   // 二拍の宣言は左上へ残し、顔と技名を別の領域に置く。
   const settle = easeOut((age - 28) / 18);
   c.save(); c.rotate(-0.07);
-  glyph(c, '奥', age, 160 - settle * 78, 140 - settle * 30, 118 - settle * 42, '#f5d994');
-  glyph(c, '義', age - ULTIMATE_SECOND_STAMP, 258 - settle * 132, 263 - settle * 60, 118 - settle * 42, '#f5d994');
+  const owl = spec.pattern === 'owlDawn';
+  glyph(c, spec.declaration[0], age, 160 - settle * 78, 140 + settle * (owl ? 68 : -30), 118 - settle * 42, spec.ink);
+  glyph(c, spec.declaration[1], age - secondStamp, 258 - settle * 132, 263 + settle * (owl ? 31 : -60), 118 - settle * 42, spec.ink);
   c.restore();
 
   if (age >= ULTIMATE_TITLE - 5) {
@@ -67,15 +81,17 @@ export function drawUltimateCutin(c: CanvasRenderingContext2D, image: HTMLImageE
     c.save(); c.globalAlpha *= open;
     c.fillStyle = '#080805e8';
     c.beginPath(); c.moveTo(0, 340); c.lineTo(800, 292); c.lineTo(800, 437); c.lineTo(0, 470); c.closePath(); c.fill();
-    c.strokeStyle = '#d5a946'; c.lineWidth = 1;
+    c.strokeStyle = spec.edge; c.lineWidth = 1;
     c.beginPath(); c.moveTo(0, 340); c.lineTo(800, 292); c.moveTo(0, 470); c.lineTo(800, 437); c.stroke();
     c.restore();
-    for (const [index, letter] of [...'迅雷一閃'].entries()) {
-      glyph(c, letter, age - ULTIMATE_TITLE - index * 7, 150 + index * 113, 388 - index * 5, 94, '#fff4d3');
+    const letters = [...spec.title], size = Math.min(94, 530 / letters.length);
+    const gap = Math.min(113, 530 / letters.length), interval = Math.min(7, 21 / (letters.length - 1));
+    for (const [index, letter] of letters.entries()) {
+      glyph(c, letter, age - ULTIMATE_TITLE - index * interval, 320 + (index - (letters.length - 1) / 2) * gap, 388 - index * Math.min(5, 40 / (letters.length - 1)), size, '#fff4d3');
     }
   }
 
-  // 最後の一閃で切り払い、攻撃前の稲妻オーラへ戻す。
+  // 光で切り払い、各ボスの構えへ戻す。
   if (age >= 126) {
     const slash = clamp((age - 126) / 10);
     c.strokeStyle = '#fff8d8'; c.lineWidth = (1 - slash) * 18;

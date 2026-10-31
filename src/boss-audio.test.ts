@@ -11,6 +11,25 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+it.each([[3, 9, 120, 'roseBloom'], [5, 10, 0, 'capture']] as const)('%s面の最終宣言は専用絵を読み、二拍と技名を既存の100フレームへ収める', (stage, phase, start, titleSound) => {
+  const game = new Game(); game.audio.volume = 0; game.invincible = true;
+  const events: [string, number][] = [];
+  vi.spyOn(game.audio, 'play').mockImplementation(sound => { events.push([sound, game.phaseFrame]); });
+  game.startStage(stage); game.startBoss(false, phase);
+  while (game.phaseFrame < start) game.update();
+  expect(game.cutin).toBe(100);
+  expect(game.images[`${game.boss}-ultimate`].src).toContain('/assets/cutins/');
+  const bombs = game.bombs;
+  game.keys.add('KeyZ');
+  while (game.phaseFrame < start + 100) {
+    game.update(); expect(game.shots.count).toBe(0); expect(game.bullets.count).toBe(0);
+  }
+  expect(game.phaseFrame).toBe(start + 100); expect(game.cutin).toBe(0); expect(game.bombs).toBe(bombs);
+  expect(events.filter(([sound]) => sound === 'ultimateStamp')).toEqual([['ultimateStamp', start], ['ultimateStamp', start + 12]]);
+  expect(events.filter(([sound]) => sound === titleSound)).toEqual([[titleSound, start + 43]]);
+  expect(game.bgm.sceneVolumeMultiplier).toBe(1);
+});
+
 it('奥・義の二拍だけBGMを下げ、ポーズ中も維持し、その後とリトライで元へ戻す', () => {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
   const sync = vi.spyOn(game.bgm, 'sync');

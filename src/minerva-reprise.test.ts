@@ -189,6 +189,7 @@ it('召喚中はダメージを受けず、最終技のショットとボムの�
   const game = fight(); game.phaseFrame = 104; game.update();
   expect(hit(game)).toBe(0);
   game.phaseFrame = game.minervaReprise!.startFrame + reprisePrepare(game.minervaReprise!);
+  game.cutin = 0; // 時計を召喚後へ飛ばしたので、宣言も終了した状態にする。
   expect(hit(game)).toBeCloseTo(20);
   const hp = game.phaseHp;
   keydown({ code: 'KeyX', repeat: false, preventDefault() {} }); game.update();

@@ -1,0 +1,11 @@
+Built-in image_gen, transparent_background: true.
+Output: public/assets/cutins/minerva-oracle.webp. Lossy WebP q90, alpha q100.
+
+Use case: stylized-concept
+Asset type: NEW fullscreen ultimate-attack cut-in illustration for a Japanese bullet-hell game, landscape 3:2.
+Input images: image 1 is Minerva's approved identity, costume, proportions and rendering reference. Image 2 is her face reference. Preserve her recognizable face, hairstyle, dress and jewelry; draw a completely new pose.
+Primary request: ミネルヴァが最終技「オウル・オブ・ミネルヴァ」を告げる「神託」の瞬間。片手で金の翼装飾のある本を開いて胸元へ抱え、もう一方の手を斜め上に差し伸べる。その手から1羽だけの金茶色のフクロウが翼を広げて飛び立とうとしている。顔は観客へ少し向け、優しく穏やかだが揺るがない眼差し、わずかな微笑み。祈りが形になった神聖な力の解放。
+Composition: character occupies the right two thirds of a 3:2 canvas; face large and readable in upper-right third. Waist-up to upper thighs, flowing hair and dress create a broad diagonal sweep. Owl near raised hand above her left shoulder, face and owl fully within frame, no wings across her face. Left quarter dark and mostly empty for typography. Close cinematic angle, different from ordinary standing pose.
+Style: clean anime game illustration matching references, stylized proportions with head about 29 percent of standing height. Brown hair and ivory flower ornament, blue teardrop jewelry, ivory Greek dress and gold details exactly as reference. Gentle horizontal or slightly downturned eyes, never upturned angry eyes or heavy eyeliner. Dress shoulder clasps remain at shoulders; no off-shoulder neckline. Golden morning rim light and a few pale violet star particles, no thick opaque glow over face.
+Background: genuinely transparent cutout, no scenery, no UI, no frame. Fine gold feathers and tiny star sparks may extend beyond silhouette.
+Constraints: one woman, one owl, one open book, natural anatomy, two hands with five fingers, no extra limbs. No Japanese text, no lettering, no logos, no watermark. Text will be animated separately in code.
