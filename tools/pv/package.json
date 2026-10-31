@@ -1,0 +1,7 @@
+{
+  "name": "kyoro-yako-pv",
+  "private": true,
+  "type": "module",
+  "scripts": { "render": "node export.mjs", "review": "node export.mjs --review-only", "verify": "node export.mjs --verify" },
+  "devDependencies": { "playwright": "1.60.0" }
+}
