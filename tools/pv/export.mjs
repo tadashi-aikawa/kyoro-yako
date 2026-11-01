@@ -20,6 +20,10 @@ const verify = args.includes('--verify');
 const preflightOnly = args.includes('--preflight-only');
 const backgroundTrial = args.includes('--bg-trial');
 const visibleBackgroundTrial = args.includes('--bg-visible');
+const compareBackgroundTrial = args.includes('--bg-compare');
+const reviewCut = value('--review-cut', null);
+if (args.includes('--review-cut') && (!reviewOnly || backgroundTrial || verify || preflightOnly || !board.cuts.some(c => c.id === reviewCut))) throw new Error('--review-cutは--review-onlyと有効なカットIDを指定してください');
+if (compareBackgroundTrial && (!backgroundTrial || visibleBackgroundTrial)) throw new Error('--bg-compareは--bg-trialと組み合わせ、--bg-visibleは外してください');
 if (visibleBackgroundTrial && !backgroundTrial) throw new Error('--bg-visibleは--bg-trialと組み合わせてください');
 if (backgroundTrial && (!reviewOnly || !args.includes('--name') || verify || preflightOnly)) throw new Error('--bg-trialは--review-only --nameと組み合わせてください');
 const sourceRef = value('--source-ref', null);
@@ -163,7 +167,12 @@ try {
   console.log(`事前検査: ${JSON.stringify(preflight)}`);
   if (backgroundTrial) {
     await mkdir(reviewDir, { recursive: true });
-    const samples = [
+    const samples = compareBackgroundTrial ? ['neo', 'minerva'].flatMap(id => [
+      [id, `${id}-0`, false, 0],
+      [id, `${id}-1`, true, 0.25, 1, 24],
+      [id, `${id}-2`, true, 0.45, 1.8, 24],
+      [id, `${id}-3`, true, 0.35, 1.5, 10],
+    ]) : [
       ['neo', 'neo-before', false, 0.25], ['minerva', 'minerva-before', false, 0.25],
       ...(visibleBackgroundTrial ? [
         ['neo', 'neo-vivid', true, 0.45, 1.8, 24], ['minerva', 'minerva-vivid', true, 0.45, 1.8, 24],
@@ -314,6 +323,18 @@ try {
     results.push({ presentation });
     await writeFile(path.join(out, 'verification.json'), JSON.stringify(results, null, 2));
     console.log(JSON.stringify(results, null, 2));
+  } else if (reviewCut) {
+    const index = board.cuts.findIndex(c => c.id === reviewCut), cut = board.cuts[index];
+    const end = Math.round((board.cuts[index + 1]?.start ?? board.duration) * board.fps) - 1;
+    const fullCut = await page.evaluate(n => window.pv.renderFrame(n), end);
+    if (fullCut.stats?.visibleHitFrames > 0 || fullCut.stats?.overlapFrames > 0) throw new Error(`${reviewCut}: 被弾表示または通常弾との接触候補を検出しました`);
+    const frame = Math.round((cut.start + cut.review) * board.fps);
+    const sample = await page.evaluate(n => window.pv.renderFrame(n), frame);
+    const data = await page.evaluate(() => window.pv.snapshot());
+    await mkdir(reviewDir, { recursive: true });
+    await writeFile(path.join(reviewDir, `${cut.id}.webp`), Buffer.from(data.split(',')[1], 'base64'));
+    await writeFile(path.join(reviewDir, `${cut.id}.report.json`), JSON.stringify({ source, cut, preflight, fullCut, sample }, null, 2));
+    console.log(`${cut.id}: ${JSON.stringify(fullCut.stats ?? {})}`);
   } else if (reviewOnly) {
     const sourceReview = path.join(reviewDir, 'source');
     await mkdir(sourceReview, { recursive: true });

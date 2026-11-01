@@ -24,6 +24,7 @@ export async function verifyPresentation(pv) {
     results.push({ id: cut.id, lineFade: true, fullLinesWithoutTyping: true });
   }
 
+  const characterStages = { gate: 1, neo: 1, etokichi: 5, obsidia: 2, chappy: 3, claudine: 3, jinrai: 4, minerva: 5 };
   for (const cut of board.cuts.filter(c => c.kind === 'character')) {
     const settled = await pv.renderFrame(Math.round((cut.start + cut.review) * fps));
     const f = settled.visual.field, p = settled.visual.portrait;
@@ -33,7 +34,12 @@ export async function verifyPresentation(pv) {
     const names = settled.textBounds.filter(t => t.role === 'name'), quotes = settled.textBounds.filter(t => t.role === 'quote');
     check(names.length === 1 && names[0].text === cut.name && quotes.length === 1 && quotes[0].text === cut.quote, `${cut.id}: 名前の横書き・セリフの全表示が不正`);
     check(names[0].x > f.width && names[0].y > 700 && quotes[0].y > names[0].bottom, `${cut.id}: 統一した名前・セリフの配置が不正`);
-    check(!settled.visual.background, `${cut.id}: 既定の背景が黒ではありません`);
+    const background = settled.visual.background, configured = board.presentation.characterBackground;
+    if (configured.enabled) {
+      check(background?.stage === characterStages[cut.id.replace(/-ult$/, '')], `${cut.id}: 背景の階が不一致`);
+      check(['opacity', 'brightness', 'blur'].every(key => background[key] === configured[key]), `${cut.id}: 背景の濃さ・明るさ・ぼかしが不一致`);
+    } else check(!background, `${cut.id}: 無効化した背景が表示されています`);
+    results.push({ id: cut.id, background: background ?? null });
     if (cut.presentationStart !== undefined) { results.push({ id: cut.id, unifiedLayout: true }); continue; }
     const nameAt = fx.portraitSlide + fx.nameDelay, quoteAt = nameAt + fx.nameDuration + fx.quoteDelay;
     const pose = await at(cut, fx.portraitSlide - 1 / fps), start = await at(cut, nameAt);

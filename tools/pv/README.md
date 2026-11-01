@@ -181,6 +181,30 @@ caffeinate -dimsu node tools/pv/export.mjs --verify
 
 キャラ紹介の背景だけを比較する場合は次を実行する。
 
+統一後のレイアウトで4案ずつ比較する場合:
+
+```sh
+node tools/pv/export.mjs --review-only --bg-trial --bg-compare --name bg-trial2 --source-ref HEAD
+```
+
+- 出力: `review/bg-trial2/neo-0.webp`〜`neo-3.webp`、`minerva-0.webp`〜`minerva-3.webp`と`report.json`。
+- 案0: 黒、光なし。
+- 案1: 明るさ1倍・25%・ぼかし24px。
+- 案2: 明るさ1.8倍・45%・ぼかし24px。
+- 案3: 明るさ1.5倍・35%・ぼかし10px。
+- 光: 案1〜3には立ち絵の後ろにキャラ色の光を置く。
+
+1カットの代表画像だけ更新する場合:
+
+```sh
+node tools/pv/export.mjs --review-only --review-cut jinrai --source-ref HEAD
+```
+
+- 出力: `review/jinrai.webp`と`jinrai.report.json`。カット全区間の被弾表示・通常弾接触候補が0であることを確認する。
+- 迅雷の通常技はフェーズ9の「花吹雪」。カット開始66.37秒と長さは維持する。
+
+以前の6枚構成の背景比較:
+
 ```sh
 node /Users/tadashi-aikawa/work/owlery-danmaku/tools/pv/export.mjs --review-only --bg-trial --name bg-trial --source-ref 8675bbf
 ```
@@ -191,7 +215,7 @@ node /Users/tadashi-aikawa/work/owlery-danmaku/tools/pv/export.mjs --review-only
   - 比較: 黒背景を同フレームで再描画して検査する。元の6枚と`report.json`は保持する。
 - 出力: `_Unversioned/pv/review/bg-trial/`の6枚と`report.json`。
   - 標準25%: `neo.webp`、`minerva.webp`。
-  - 現行の黒背景: `neo-before.webp`、`minerva-before.webp`。
+  - 比較用の黒背景: `neo-before.webp`、`minerva-before.webp`。
   - ネオの濃さ比較: `neo-light.webp`は15%、`neo-strong.webp`は30%。
 - フレーム: 絵コンテの`start + review`を使い、比較前後をそろえる。
   - 検査: プレイフィールド内のRGBAハッシュ、文字と立ち絵の配置が比較前後で一致すること。
@@ -206,10 +230,16 @@ node /Users/tadashi-aikawa/work/owlery-danmaku/tools/pv/export.mjs --review-only
 - 光は立ち絵の背後へ`cut.color`で描く。
   - 強さ: 中心の不透明度25%から、立ち絵の実表示高さの0.8倍の半径で透明になる。
 - `presentation.characterBackground`で背景を設定できる。
-  - `enabled: false`: 既定。背景と光を両方外す。storyboardのこの1か所を`true`へ切り替えて採用する。
-  - `opacity`: 背景の不透明度。既定値0.25、範囲0〜1。光の強さは変えない。
-  - `brightness`: ぼかす前の背景の明るさ倍率。既定値1、範囲0以上。
+  - `enabled: true`: 既定。採用した案2の背景とキャラ色の光を表示する。`false`で両方外す。
+  - `opacity`: 背景の不透明度。既定値0.45、範囲0〜1。光の強さは変えない。
+  - `brightness`: ぼかす前の背景の明るさ倍率。既定値1.8、範囲0以上。
   - `blur`: 出力座標でのぼかしpx。既定値24、範囲0以上。
+- 階は各カットの`capture.stage`を使う。通常技と最終技で共通。
+  - 1階: みみこ、ネオ。
+  - 2階: オブシディア。
+  - 3階: チャッピー、クロディーヌ。
+  - 4階: 迅雷。
+  - 5階: エトキチ、ミネルヴァ。
 
 ```sh
 # 全区間の代表フレームをCanvasから直接生成する。

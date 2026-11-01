@@ -287,12 +287,12 @@
       "layout": "jinrai",
       "name": "迅雷",
       "quote": "……ここからは、手加減なしや。",
-      "spell": "夜桜の簪",
+      "spell": "花吹雪",
       "portrait": "/assets/members/jinrai-stand.webp",
       "color": "#f3a5bd",
       "capture": {
         "stage": 4,
-        "phase": 3,
+        "phase": 9,
         "difficulty": "hard",
         "seed": 4403,
         "warmup": 340
@@ -399,7 +399,7 @@
   "presentation": {
     "fieldFeather": 50,
     "portraitHeight": 800,
-    "characterBackground": { "enabled": false, "opacity": 0.25, "brightness": 1, "blur": 24 }
+    "characterBackground": { "enabled": true, "opacity": 0.45, "brightness": 1.8, "blur": 24 }
   },
   "genreText": "owleryの仲間が待ち受ける弾幕シューティング"
 }
