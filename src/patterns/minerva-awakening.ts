@@ -6,7 +6,7 @@ export const AWAKENING_SILENCE = 60;
 export const AWAKENING_SPEECH = 264;
 export const AWAKENING_AURA = 60;
 export const AWAKENING_HOLD = 60;
-export const AWAKENING_LINE = 'これが最後よ。\n全力でいくわ。';
+export const AWAKENING_LINE = '……';
 export interface MinervaAwakening {
   stage: 'silence' | 'speech' | 'supply' | 'aura' | 'hold';
   frame: number;

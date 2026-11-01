@@ -1610,8 +1610,9 @@ export class Renderer {
     c.lineTo(tailX + 5, y + height); c.lineTo(bx, tipY); c.lineTo(tailX - 5, y + height);
     c.lineTo(x + 4, y + height); c.quadraticCurveTo(x, y + height, x, y + height - 4);
     c.lineTo(x, y + 4); c.quadraticCurveTo(x, y, x + 4, y); c.closePath(); c.fill(); c.stroke();
-    c.fillStyle = '#fff2dd'; c.textAlign = 'left'; c.textBaseline = 'top'; c.shadowBlur = 0;
-    rows.forEach((text, i) => { c.fillText(text, x + 8, y + 6 + i * 16); }); c.restore();
+    const silent = game.battleComment!.text === '……';
+    c.fillStyle = '#fff2dd'; c.textAlign = silent ? 'center' : 'left'; c.textBaseline = 'top'; c.shadowBlur = 0;
+    rows.forEach((text, i) => { c.fillText(text, silent ? x + width / 2 : x + 8, y + 6 + i * 16); }); c.restore();
   }
 
   private drawDialogue(game: Game): void {
