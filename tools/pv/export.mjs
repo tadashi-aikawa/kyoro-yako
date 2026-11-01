@@ -79,12 +79,12 @@ async function cleanOld() {
   }
 }
 
-async function contactSheet(directory, ids, name = 'contact', columns = 3) {
+async function contactSheet(directory, ids, name = 'contact', columns = 3, cell = { width: 640, height: 360 }) {
   if (!ids.length) return;
   const list = path.join(directory, `${name}.txt`);
   await writeFile(list, ids.map(id => `file '${id}.webp'`).join('\n'));
   await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', list,
-    '-vf', `scale=640:360,tile=${columns}x${Math.ceil(ids.length / columns)}:color=0x080817`, '-frames:v', '1', path.join(directory, `${name}.png`)]);
+    '-vf', `scale=${cell.width}:${cell.height},tile=${columns}x${Math.ceil(ids.length / columns)}:color=0x080817`, '-frames:v', '1', path.join(directory, `${name}.png`)]);
   await run('cwebp', ['-quiet', '-q', '90', path.join(directory, `${name}.png`), '-o', path.join(directory, `${name}.webp`)]);
   await unlink(list); await unlink(path.join(directory, `${name}.png`));
 }
@@ -268,6 +268,37 @@ try {
       return result;
     });
     results.push({ transitions });
+    const presentation = await page.evaluate(async () => {
+      const board = window.pv.board, fps = board.fps, fx = board.effects;
+      const ctx = document.querySelector('#pv').getContext('2d'), result = [];
+      const pixel = (x, y) => Array.from(ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data);
+      for (const cut of board.cuts.filter(c => c.kind === 'story')) {
+        const state = await window.pv.renderFrame(Math.round((cut.start + cut.review) * fps));
+        if (pixel(100, 100).join(',') !== '0,0,0,255' || state.visual.portrait.x >= 960 || state.textBounds.some(t => t.x < 960)) throw new Error(`${cut.id}: 黒背景・みみこ左・セリフ右が未反映です`);
+      }
+      for (const cut of board.cuts.filter(c => c.kind === 'character' && c.presentationStart === undefined)) {
+        const settled = await window.pv.renderFrame(Math.round((cut.start + cut.review) * fps));
+        const field = settled.visual.field, portrait = settled.visual.portrait, scale = field.height / 452;
+        const edges = [[field.x + 2 * scale, 540], [field.x + field.width - 2 * scale, 540],
+          [field.x + field.width / 2, field.y + 2 * scale], [field.x + field.width / 2, field.y + field.height - 2 * scale]];
+        const border = edges.map(([x, y]) => pixel(x, y));
+        if (field.y < 24 || field.y + field.height > 1056 || border.some(p => p[0] < 140 || p[1] < 130 || p[2] < 170)) throw new Error(`${cut.id}: フィールドの四辺を確認できません`);
+        if (Math.abs(portrait.height - board.presentation.portraitHeight) > 0.01 || Math.abs(portrait.y + portrait.height / 2 - 540) > 0.01) throw new Error(`${cut.id}: 立ち絵の高さ・上下中央が不一致です`);
+        const index = board.cuts.indexOf(cut), onset = Math.round(cut.start * fps) - window.pv.incomingFrames(index);
+        const nameAt = fx.portraitSlide + fx.nameDelay, quoteAt = nameAt + fx.quoteDelay;
+        const pose = await window.pv.renderFrame(onset + Math.round(fx.portraitSlide * fps) - 1);
+        const name = await window.pv.renderFrame(onset + Math.round((nameAt + 0.1) * fps));
+        const quote = await window.pv.renderFrame(onset + Math.round((quoteAt + 0.1) * fps));
+        if (pose.textBounds.length || !name.textBounds.some(t => t.role === 'name') || name.textBounds.some(t => t.role === 'quote') || !quote.textBounds.some(t => t.role === 'quote')) throw new Error(`${cut.id}: 立ち絵→名前→セリフの順になっていません`);
+        const early = name.textBounds.find(t => t.role === 'name'), final = settled.textBounds.find(t => t.role === 'name');
+        if (!(early.right - early.x > final.right - final.x && early.alpha < 1)) throw new Error(`${cut.id}: 名前の縮小・フェードが未反映です`);
+        const movingQuote = quote.textBounds.find(t => t.role === 'quote'), finalQuote = settled.textBounds.find(t => t.role === 'quote');
+        if (!(movingQuote.y > finalQuote.y && movingQuote.alpha < 1)) throw new Error(`${cut.id}: セリフの上昇・フェードが未反映です`);
+        result.push({ id: cut.id, field, border, portrait, stagedEntrance: true });
+      }
+      return result;
+    });
+    results.push({ presentation });
     await writeFile(path.join(out, 'verification.json'), JSON.stringify(results, null, 2));
     console.log(JSON.stringify(results, null, 2));
   } else if (reviewOnly) {
@@ -343,6 +374,9 @@ try {
         await unlink(`${still}.png`);
       };
       await extract('opening-genre', board.cuts.find(c => c.id === 'opening').review);
+      const story = board.cuts.find(c => c.id === 'letter'), fieldFit = board.cuts.find(c => c.id === 'neo');
+      await extract('story', story.start + story.review);
+      await extract('field-fit', fieldFit.start + fieldFit.review);
       await contactSheet(reviewStaging, ['rush-1', 'rush-2', 'rush-3'], 'rush', 3);
       const slide = board.cuts.find(c => c.id === 'neo');
       const onset = (Math.round(slide.start * board.fps) - Math.round(board.effects.crossfade * board.fps)) / board.fps;
@@ -353,6 +387,25 @@ try {
       }
       await contactSheet(reviewStaging, ids, 'slide-in', 5);
       for (const id of ids) await unlink(path.join(reviewStaging, `${id}.webp`));
+      const nameIds = [], nameAt = onset + board.effects.portraitSlide + board.effects.nameDelay;
+      for (let i = 0; i < 5; i++) {
+        const id = `name-motion-${i}`; nameIds.push(id);
+        await extract(id, nameAt + i * 0.1);
+      }
+      await contactSheet(reviewStaging, nameIds, 'name-motion', 5);
+      for (const id of nameIds) await unlink(path.join(reviewStaging, `${id}.webp`));
+      const portraits = [];
+      for (const id of ['gate', 'neo', 'etokichi', 'obsidia', 'chappy', 'claudine', 'jinrai', 'minerva']) {
+        const cut = board.cuts.find(c => c.id === id), portraitId = `portrait-height-${id}`;
+        const left = ['obsidia', 'claudine', 'etokichi', 'field-right'].includes(cut.layout);
+        const still = path.join(reviewStaging, portraitId); portraits.push(portraitId);
+        await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(cut.start + cut.review), '-i', temporaryVideo,
+          '-vf', `crop=994:1080:${left ? 0 : 926}:0`, '-frames:v', '1', `${still}.png`]);
+        await run('cwebp', ['-quiet', '-q', '94', `${still}.png`, '-o', `${still}.webp`]);
+        await unlink(`${still}.png`);
+      }
+      await contactSheet(reviewStaging, portraits, 'portrait-heights', 8, { width: 497, height: 540 });
+      for (const id of portraits) await unlink(path.join(reviewStaging, `${id}.webp`));
     }
     await contactSheet(reviewStaging, reviewIds);
     const elapsed = (performance.now() - started) / 1000;

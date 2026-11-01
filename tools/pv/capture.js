@@ -189,7 +189,7 @@ export class Capture {
     if (g.scene === 'movie') throw new Error(`${this.cut.id}: 撮影中に動画へ移行。カットを短くしてください`);
   }
 
-  drawTo(ctx, x) {
+  drawTo(ctx, x, y = 0, height = 1080, padding = 0) {
     const g = this.game;
     // 全幅カットインだけ別レイヤーへ描く。右パネルは一切コピーしない。
     const remaining = g.cutin;
@@ -197,6 +197,8 @@ export class Capture {
     this.renderer.draw(g);
     g.cutin = remaining;
     const r = this.ratio;
-    ctx.drawImage(this.canvas, FIELD.x * r, FIELD.y * r, FIELD.w * r, FIELD.h * r, x, 0, 1080 * FIELD.w / FIELD.h, 1080);
+    // 枠線はFIELDの外へ1px張り出す。紹介では周囲2pxも含め、四辺を残す。
+    const w = FIELD.w + padding * 2, h = FIELD.h + padding * 2;
+    ctx.drawImage(this.canvas, (FIELD.x - padding) * r, (FIELD.y - padding) * r, w * r, h * r, x, y, height * w / h, height);
   }
 }

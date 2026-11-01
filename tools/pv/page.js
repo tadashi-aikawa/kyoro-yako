@@ -1,6 +1,6 @@
 import initialBoard from './storyboard.json';
 import { Capture } from './capture.js';
-import { Composition, layouts } from './composition.js';
+import { Composition, layouts, fieldRect } from './composition.js';
 
 let board = initialBoard, composition, capture, last = -1;
 const states = new Map();
@@ -17,7 +17,8 @@ function validate(b) {
   if (b.width !== 1920 || b.height !== 1080 || b.fps !== 60) throw new Error('PVは1920×1080 / 60fps固定です');
   if (!Number.isFinite(b.duration) || b.duration <= 0) throw new Error('durationが不正です');
   for (const [key, value] of Object.entries(b.effects ?? {})) if (!Number.isFinite(value) || value < 0) throw new Error(`effects.${key}が不正です`);
-  for (const key of ['portraitSlide', 'textSlide', 'trioSlide', 'titleFade', 'genreFade']) if (!(b.effects?.[key] > 0)) throw new Error(`effects.${key}には正の秒数を指定してください`);
+  for (const key of ['portraitSlide', 'nameDuration', 'quoteDuration', 'storyFade', 'trioSlide', 'titleFade', 'genreFade']) if (!(b.effects?.[key] > 0)) throw new Error(`effects.${key}には正の秒数を指定してください`);
+  if (!(b.presentation?.fieldHeight > 0 && b.presentation.fieldHeight <= 1032 && b.presentation.fieldMargin >= 8 && b.presentation.portraitHeight > 0 && b.presentation.portraitHeight <= 1000)) throw new Error('presentationのフィールド・立ち絵サイズが不正です');
   if (b.cuts[0]?.start !== 0) throw new Error('先頭カットは0秒にしてください');
   const ids = new Set();
   for (let i = 0; i < b.cuts.length; i++) {
@@ -47,6 +48,7 @@ async function renderCut(index, frame) {
   if (!state) {
     const layer = document.createElement('canvas'); layer.width = board.width; layer.height = board.height;
     const renderer = new Composition(layer, board); renderer.images = composition.images;
+    renderer.portraitCrops = composition.portraitCrops;
     const shot = cut.capture ? new Capture(board.pixelRatio) : undefined;
     if (shot) await shot.begin(cut);
     state = { canvas: layer, composition: renderer, capture: shot };
@@ -82,7 +84,8 @@ async function renderFrame(frame) {
       const fieldOnly = next.kind === 'character' && next.presentationStart === current.cut.start;
       c.save();
       if (fieldOnly) {
-        c.beginPath(); c.rect(next.layout === 'claudine' ? 994.285714 : 0, 0, 1080 * 384 / 448, 1080); c.clip();
+        const field = fieldRect(next, board);
+        c.beginPath(); c.rect(field.x, field.y, field.width, field.height); c.clip();
       }
       c.globalAlpha = alpha; c.drawImage(incoming.canvas, 0, 0); c.restore();
       if (incoming.capture) captures.push({ id: next.id, stats: incoming.capture.stats });
@@ -90,7 +93,7 @@ async function renderFrame(frame) {
     }
   }
   last = frame;
-  return { cut: current.cut.id, frame, local: current.local, stats: capture?.stats, captures, transition, textBounds: composition.textBounds };
+  return { cut: current.cut.id, frame, local: current.local, stats: capture?.stats, captures, transition, textBounds: composition.textBounds, visual: current.composition.visual };
 }
 
 function base64(bytes) {

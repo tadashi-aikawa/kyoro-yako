@@ -4,6 +4,12 @@ import { randomGenerator } from './capture.js';
 const clamp = n => Math.max(0, Math.min(1, n));
 const ease = n => 1 - (1 - clamp(n)) ** 3;
 export const layouts = ['neo', 'obsidia', 'chappy', 'claudine', 'jinrai', 'etokichi', 'minerva', 'field-left', 'field-right', 'field-center'];
+const fieldOnRight = cut => ['obsidia', 'claudine', 'etokichi', 'field-right'].includes(cut.layout);
+export function fieldRect(cut, board) {
+  const height = board.presentation.fieldHeight, width = height * 388 / 452;
+  return { x: fieldOnRight(cut) ? 1920 - board.presentation.fieldMargin - width : board.presentation.fieldMargin,
+    y: (1080 - height) / 2, width, height, padding: 2 };
+}
 
 export class Composition {
   constructor(canvas, board) {
@@ -11,6 +17,7 @@ export class Composition {
     this.ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
     this.board = board;
     this.images = new Map();
+    this.portraitCrops = new Map();
     const random = randomGenerator(board.seed);
     this.stars = Array.from({ length: 170 }, () => [random() * 1920, random() * 1080, random() * 1.8 + 0.3, random() * 6.28]);
     this.textBounds = [];
@@ -27,10 +34,23 @@ export class Composition {
   async prepare() {
     await Promise.all([this.board.keyVisual, '/assets/members/mimiko-stand.webp', ...this.board.cuts.flatMap(c => [c.portrait, ...(c.members ?? []).map(m => m.image)]).filter(Boolean)].map(path => this.image(path)));
     await document.fonts.ready;
+    for (const path of new Set(['/assets/members/mimiko-stand.webp', ...this.board.cuts.map(c => c.portrait).filter(Boolean)])) {
+      const image = this.images.get(path), scan = document.createElement('canvas');
+      scan.width = image.width; scan.height = image.height;
+      const ctx = scan.getContext('2d'); ctx.drawImage(image, 0, 0);
+      const pixels = ctx.getImageData(0, 0, image.width, image.height).data;
+      let x0 = image.width, y0 = image.height, x1 = -1, y1 = -1;
+      for (let y = 0; y < image.height; y++) for (let x = 0; x < image.width; x++) {
+        if (pixels[(y * image.width + x) * 4 + 3] <= 12) continue;
+        x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+      }
+      if (x1 < x0) throw new Error(`立ち絵が透明です: ${path}`);
+      this.portraitCrops.set(path, { x: x0, y: y0, width: x1 - x0 + 1, height: y1 - y0 + 1 });
+    }
   }
 
   text(value, x, y, size, color = '#fff2da', width = 850, align = 'left', latin = false, shadow = { color: '#080817', blur: 8 }) {
-    if (!value) return;
+    if (!value || this.ctx.globalAlpha <= 0) return;
     const c = this.ctx;
     c.font = `${size}px ${latin ? this.board.latinFont : this.board.font}`;
     const measured = c.measureText(value).width;
@@ -40,7 +60,10 @@ export class Composition {
     c.fillStyle = color;
     const metrics = c.measureText(value);
     const left = align === 'center' ? x - metrics.width / 2 : align === 'right' ? x - metrics.width : x;
-    const bound = { text: value, x: left, y: y - metrics.actualBoundingBoxAscent, right: left + metrics.width, bottom: y + metrics.actualBoundingBoxDescent, size: actual };
+    const transform = c.getTransform();
+    const topLeft = transform.transformPoint({ x: left, y: y - metrics.actualBoundingBoxAscent });
+    const bottomRight = transform.transformPoint({ x: left + metrics.width, y: y + metrics.actualBoundingBoxDescent });
+    const bound = { text: value, x: topLeft.x, y: topLeft.y, right: bottomRight.x, bottom: bottomRight.y, size: actual, role: this.textRole, alpha: c.globalAlpha };
     this.textBounds.push(bound);
     if (bound.x < 24 || bound.y < 24 || bound.right > 1896 || bound.bottom > 1056) throw new Error(`文字がセーフエリア外: ${value}`);
     c.save(); c.shadowColor = shadow?.color ?? 'transparent'; c.shadowBlur = shadow?.blur ?? 0;
@@ -73,6 +96,13 @@ export class Composition {
     c.restore();
   }
 
+  standingPortrait(path, centerX, centerY, height) {
+    const crop = this.portraitCrops.get(path), width = height * crop.width / crop.height;
+    const bounds = { x: centerX - width / 2, y: centerY - height / 2, width, height };
+    this.ctx.drawImage(this.images.get(path), crop.x, crop.y, crop.width, crop.height, bounds.x, bounds.y, width, height);
+    this.visual.portrait = bounds;
+  }
+
   night(time, color = this.board.gold) {
     const c = this.ctx;
     c.fillStyle = this.board.night; c.fillRect(0, 0, 1920, 1080);
@@ -96,53 +126,55 @@ export class Composition {
 
   character(cut, local, capture) {
     const c = this.ctx, color = cut.color;
-    const right = ['obsidia', 'claudine', 'etokichi', 'field-right'].includes(cut.layout);
-    capture.drawTo(c, right ? 994.285714 : 0);
+    const right = fieldOnRight(cut), field = fieldRect(cut, this.board);
+    capture.drawTo(c, field.x, field.y, field.height, field.padding);
+    this.visual.field = field;
     const fx = this.board.effects;
     const enter = ease(local / fx.portraitSlide), drift = (1 - enter) * fx.portraitDistance * (right ? -1 : 1);
     c.save(); c.beginPath(); c.rect(right ? 0 : 926, 0, 994, 1080); c.clip(); c.translate(drift, 0);
-    switch (cut.layout) {
-      case 'obsidia': this.portrait(cut.portrait, 22, 110, 710, 1065); break;
-      case 'chappy': this.portrait(cut.portrait, 1410, 240, 440, 710); break;
-      case 'claudine': this.portrait(cut.portrait, -100, 20, 860, 1290); break;
-      case 'jinrai': this.portrait(cut.portrait, 1220, 100, 560, 840); break;
-      case 'etokichi': this.portrait(cut.portrait, 130, 195, 720, 680); break;
-      case 'minerva': this.portrait(cut.portrait, 1060, 65, 780, 1170); break;
-      default: this.portrait(cut.portrait, right ? 160 : 1215, 35, 700, 1050); break;
-    }
+    const center = { obsidia: 450, chappy: 1570, claudine: 450, jinrai: 1490, etokichi: 490, minerva: 1440 }[cut.layout] ?? (right ? 490 : 1460);
+    this.standingPortrait(cut.portrait, center, 540, this.board.presentation.portraitHeight);
     c.restore();
     // 顔を文字から離し、立ち絵の下端を暗幕に沈めて文字を読ませる。
     const shade = c.createLinearGradient(0, 720, 0, 1080);
     shade.addColorStop(0, '#08081700'); shade.addColorStop(0.7, '#080817eb'); shade.addColorStop(1, this.board.night);
     c.fillStyle = shade; c.fillRect(right ? 0 : 926, 720, 994, 360);
-    const textEnter = ease((local - fx.textDelay) / fx.textSlide);
-    c.save(); c.globalAlpha = textEnter;
-    c.translate((1 - textEnter) * fx.textDistance * (right ? -1 : 1), 0);
+    const nameAt = fx.portraitSlide + fx.nameDelay, quoteAt = nameAt + fx.quoteDelay;
+    const nameEnter = ease((local - nameAt) / fx.nameDuration), quoteEnter = ease((local - quoteAt) / fx.quoteDuration);
+    this.visual.motion = { portrait: enter, name: nameEnter, quote: quoteEnter };
+    const pivot = { chappy: [1010, 130], jinrai: [1110, 340], etokichi: [490, 130], minerva: [1835, 360] }[cut.layout] ?? [right ? 75 : 1010, 815];
+    const scale = 1 + (fx.nameScale - 1) * (1 - nameEnter);
+    c.save(); c.globalAlpha = nameEnter;
+    c.translate(...pivot); c.scale(scale, scale); c.translate(-pivot[0], -pivot[1]);
+    this.textRole = 'name';
     switch (cut.layout) {
       case 'obsidia':
-        this.text(cut.name, 75, 835, 104, color, 830);
-        this.paragraph(cut.quote, 75, 930, 34, 830); break;
+        this.text(cut.name, 75, 835, 104, color, 830); break;
       case 'chappy':
-        this.text(cut.name, 1010, 185, 98, color);
-        this.paragraph(cut.quote, 1010, 760, 36, 380); break;
+        this.text(cut.name, 1010, 130, 94, color); break;
       case 'claudine':
-        this.text(cut.name, 75, 825, 110, color, 830);
-        this.text(cut.quote, 75, 920, 34, '#fff2da', 830); break;
+        this.text(cut.name, 75, 825, 110, color, 830); break;
       case 'jinrai':
-        this.vertical(cut.name, 1110, 255, 150, color);
-        this.vertical(cut.quote, 1840, 160, 32); break;
+        this.vertical(cut.name, 1110, 255, 150, color); break;
       case 'etokichi':
-        this.text(cut.name, 490, 185, 110, color, 820, 'center');
-        this.text(cut.quote, 490, 920, 36, '#fff2da', 850, 'center'); break;
+        this.text(cut.name, 490, 130, 100, color, 820, 'center'); break;
       case 'minerva':
-        this.vertical(cut.name, 1835, 190, 78, color);
-        this.paragraph(cut.quote, 1010, 865, 34, 800); break;
-      default: {
-        const x = right ? 75 : 1010;
-        this.text(cut.name, x, 815, cut.layout === 'neo' ? 160 : 100, color, 830);
-        this.paragraph(cut.quote, x, 920, 36, 830);
-      }
+        this.vertical(cut.name, 1835, 190, 78, color); break;
+      default: this.text(cut.name, right ? 75 : 1010, 815, cut.layout === 'neo' ? 160 : 100, color, 830);
     }
+    c.restore();
+    c.save(); c.globalAlpha = quoteEnter; c.translate(0, (1 - quoteEnter) * fx.quoteDistance);
+    this.textRole = 'quote';
+    switch (cut.layout) {
+      case 'obsidia': this.paragraph(cut.quote, 75, 930, 34, 830); break;
+      case 'chappy': this.paragraph(cut.quote, 1010, 760, 36, 330); break;
+      case 'claudine': this.text(cut.quote, 75, 920, 34, '#fff2da', 830); break;
+      case 'jinrai': this.vertical(cut.quote, 1840, 160, 32); break;
+      case 'etokichi': this.text(cut.quote, 490, 990, 36, '#fff2da', 850, 'center'); break;
+      case 'minerva': this.paragraph(cut.quote, 1010, 865, 34, 800); break;
+      default: this.paragraph(cut.quote, right ? 75 : 1010, 920, 36, 830);
+    }
+    this.textRole = undefined;
     // 技名は撮影フェーズの照合にも使う。キャラ紹介では描かない。
     if (cut.kind !== 'character') this.text(cut.spell, right ? 75 : 1010, 1025, 48, '#fff2da', 830);
     c.restore();
@@ -162,7 +194,7 @@ export class Composition {
       c.fillStyle = member.background; c.fillRect(0, y, 1920, 360);
       const scale = 360 / member.cropHeight;
       c.drawImage(image, 0, member.cropY, image.width, member.cropHeight,
-        member.x, y, image.width * scale, 360);
+        960 - member.faceX * scale, y, image.width * scale, 360);
       c.restore();
     });
   }
@@ -172,6 +204,7 @@ export class Composition {
     // Canvasの描画状態と前フレームの画素を残さず、seekでも同じ合成順にする。
     c.reset();
     this.textBounds = [];
+    this.visual = {};
     this.night(time, cut.color);
     if (cut.kind === 'gameplay') {
       capture.drawTo(c, (1920 - 1080 * 384 / 448) / 2);
@@ -202,14 +235,18 @@ export class Composition {
       this.text(b.reading, 145, 575, 34, b.gold, 750);
       c.restore();
       c.save(); c.globalAlpha = clamp((local - b.effects.titleAt - b.effects.genreDelay) / b.effects.genreFade);
-      b.genreText.replace('、', '、\n').split('\n').forEach((line, i) => this.text(line, 140, 835 + i * 65, 42, '#fff2da', 850));
+      b.genreText.replace('弾幕', '\n弾幕').split('\n').forEach((line, i) => this.text(line, 140, 835 + i * 65, 42, '#fff2da', 850));
       c.restore();
       c.fillStyle = `rgba(0,0,0,${1 - clamp(local / 2.5)})`; c.fillRect(0, 0, 1920, 1080);
     } else if (cut.kind === 'story') {
-      this.keyVisual(time, 0.28);
-      this.portrait('/assets/members/mimiko-stand.webp', 1230, 275, 520, 520, 0.9);
+      const storyStart = b.cuts.find(cut => cut.kind === 'story').start;
+      const background = 1 - ease((time - storyStart) / b.effects.storyFade);
+      c.fillStyle = '#000'; c.fillRect(0, 0, 1920, 1080);
+      this.keyVisual(time, background);
+      this.visual.storyBackground = background;
+      this.standingPortrait('/assets/members/mimiko-stand.webp', 470, 540, 560);
       c.save(); c.globalAlpha = clamp(local / 0.55);
-      cut.text.forEach((line, i) => this.text(line, 130, 475 + i * 100, 48, '#fff2da', 1100));
+      cut.text.forEach((line, i) => this.text(line, 960, 475 + i * 100, 44, '#fff2da', 850));
       c.restore();
     } else if (cut.kind === 'dawn' || cut.kind === 'announcement') {
       const count = Math.round(b.ending.duration * b.fps);

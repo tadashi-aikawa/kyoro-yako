@@ -67,8 +67,10 @@
     {
       "id": "gate",
       "start": 20.12,
-      "kind": "gameplay-portrait",
+      "kind": "character",
       "layout": "field-right",
+      "name": "みみこ",
+      "quote": "それなら、あたしも本気でいくの。",
       "portrait": "/assets/members/mimiko-stand.webp",
       "color": "#e8c974",
       "capture": {
@@ -210,7 +212,7 @@
           "image": "/assets/cutins/claudine-bloom.webp",
           "start": 56.80,
           "direction": "left",
-          "x": 240,
+          "faceX": 940,
           "cropY": 100,
           "cropHeight": 480,
           "background": "#291f23"
@@ -219,7 +221,7 @@
           "image": "/assets/cutins/jinrai-issen.webp",
           "start": 57.33,
           "direction": "right",
-          "x": 120,
+          "faceX": 1140,
           "cropY": 100,
           "cropHeight": 480,
           "background": "#211a11"
@@ -228,7 +230,7 @@
           "image": "/assets/cutins/minerva-oracle.webp",
           "start": 57.86,
           "direction": "left",
-          "x": 175,
+          "faceX": 1035,
           "cropY": 100,
           "cropHeight": 480,
           "background": "#282017"
@@ -375,9 +377,13 @@
     "crossfade": 0.3,
     "portraitSlide": 0.4,
     "portraitDistance": 1000,
-    "textDelay": 0.15,
-    "textSlide": 0.25,
-    "textDistance": 48,
+    "nameDelay": 0,
+    "nameDuration": 0.3,
+    "nameScale": 1.08,
+    "quoteDelay": 0.2,
+    "quoteDuration": 0.3,
+    "quoteDistance": 24,
+    "storyFade": 2,
     "trioSlide": 0.18,
     "rushFlash": 0.05,
     "chorusFlash": 0.12,
@@ -386,5 +392,10 @@
     "genreDelay": 1.5,
     "genreFade": 1
   },
-  "genreText": "owleryの仲間が待ち受ける、弾幕シューティング。"
+  "presentation": {
+    "fieldHeight": 984,
+    "fieldMargin": 24,
+    "portraitHeight": 800
+  },
+  "genreText": "owleryの仲間が待ち受ける弾幕シューティング"
 }
