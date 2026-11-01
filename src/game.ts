@@ -23,7 +23,7 @@ import { type Thunderbolt, type Thunderstorm, thunderPosition } from './patterns
 import { dawnPosition, emitMinerva, eyeX, interviewPosition } from './patterns/minerva';
 import { updateStarFlightSource } from './patterns/minerva-flight';
 import { gravityScene } from './patterns/minerva-inquiry';
-import { REPRISE_FINAL_SECTION_CYCLE, REPRISES, type Reprise, repriseLocal, reprisePrepare, repriseView } from './patterns/minerva-reprise';
+import { REPRISES, type Reprise, repriseLocal, reprisePrepare, repriseView } from './patterns/minerva-reprise';
 import { type InterviewRing, interviewRingBlocksShot, updateInterviewRings } from './patterns/minerva-ring';
 import { MINERVA_OWL_SPRITES, MINERVA_SOLO_SPRITES } from './patterns/minerva-summon';
 import { emitNeo, inBog } from './patterns/neo';
@@ -142,6 +142,7 @@ export class Game {
   messageFrames = 0;
   battleComment?: Line;
   battleCommentFrames = 0;
+  battleCommentDuration = BATTLE_COMMENT_FRAMES;
   phaseIntro?: { frame: number; commentAt?: number; from: [number, number]; target: [number, number]; text: string };
   lines: Line[] = [];
   lineIndex = 0;
@@ -681,7 +682,8 @@ export class Game {
     if (!this.phase && !collecting) this.stageFrame++;
     if (this.invulnFrames > 0) this.invulnFrames--;
     if (this.bombFrames > 0) this.bombFrames--;
-    this.updatePlayer();
+    this.updatePlayer(!this.minervaReprise?.finale);
+    if (this.minervaReprise?.finale && this.pendingHit >= 0 && this.just('KeyX') && this.bombs > 0 && this.bombFrames <= 0) this.useBomb();
     if (this.bombFrames > 0) {
       this.clearBullets();
       if (this.frame % 10 === 0) {
@@ -819,9 +821,8 @@ export class Game {
 
   private updateBossContact(): void {
     if (!this.phase || this.phaseIntro || this.phaseFrame < 105 || this.cutin > 0 || this.pendingHit >= 0) return;
-    // オーラを見せる間と、その直後の召喚中は本体に触れても被弾しない。
-    if (this.phase.pattern === 'owlDawn' && this.minervaReprise?.cycle === REPRISE_FINAL_SECTION_CYCLE
-      && repriseLocal(this.phaseFrame, this.minervaReprise) < reprisePrepare(this.minervaReprise)) return;
+    // 本気への切替中は補給を受け取りに近づいても本体に触れて被弾しない。
+    if (this.phase.pattern === 'owlDawn' && this.minervaReprise?.finale) return;
     if ((issenScene(this)?.opacity ?? 1) < 1) return;
     const attack = this.attackContext();
     const targets = attack.phase?.pattern === 'jinraiClone' && (attack === this || attack.phaseFrame >= 105)
@@ -1032,9 +1033,9 @@ export class Game {
     this.startPhasePresentation();
   }
 
-  private showBattleComment(text: string): void {
+  showBattleComment(text: string, duration = BATTLE_COMMENT_FRAMES): void {
     if (this.boss) {
-      this.battleComment = { who: this.boss, text }; this.battleCommentFrames = BATTLE_COMMENT_FRAMES;
+      this.battleComment = { who: this.boss, text }; this.battleCommentFrames = duration; this.battleCommentDuration = duration;
     }
   }
 
@@ -1493,7 +1494,8 @@ export class Game {
     if (this.phase?.pattern === 'final' && this.phaseFrame < BLOOM_ATTACK) return;
     // 印とカットインを撃ち込みで飛ばせないよう、導入中はダメージを受けない。
     if (this.phase?.pattern === 'jinraiDash' && this.phaseFrame < DASH_ATTACK) return;
-    if (this.phase?.pattern === 'owlDawn' && this.minervaReprise && !this.minervaReprise.prayer && repriseLocal(this.phaseFrame, this.minervaReprise) < reprisePrepare(this.minervaReprise)) return;
+    if (this.phase?.pattern === 'owlDawn' && this.minervaReprise && (this.minervaReprise.finale
+      || !this.minervaReprise.prayer && repriseLocal(this.phaseFrame, this.minervaReprise) < reprisePrepare(this.minervaReprise))) return;
     this.phaseHp -= damage * (this.phase?.pattern === 'owlDawn' ? 2 / 3 : this.phase?.pattern === 'jinraiDash' ? 2 : 1);
   }
 

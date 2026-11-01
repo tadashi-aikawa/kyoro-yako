@@ -1,6 +1,7 @@
 import type { Game } from '../game';
 import { type ItemKind, MAX_POWER } from '../rules';
-import { emitReprise, REPRISE_HP_STEP, REPRISE_LAST_CYCLE, type Reprise, repriseDifficulty, repriseIndex, repriseLocal, reprisePosition } from './minerva-reprise';
+import { updateAwakening } from './minerva-awakening';
+import { emitReprise, REPRISE_FINAL_SECTION_CYCLE, REPRISE_HP_STEP, REPRISE_LAST_CYCLE, type Reprise, repriseDifficulty, repriseIndex, repriseLocal, reprisePosition } from './minerva-reprise';
 
 export const PRAYER_PERIOD = 360;
 export const PRAYER_CHARGE = 72;
@@ -29,7 +30,7 @@ export function emitDawn(game: Game): void {
   const previous = game.minervaReprise;
   if (game.bombFrames > 0) game.clearAttackEffects();
   // 前の技の超過ダメージを次の枠へ持ち込み、最後の祈りに約10%を残す。
-  if (!previous || previous.cycle < REPRISE_LAST_CYCLE && game.phaseHp <= game.phaseMaxHp * (1 - (previous.cycle + 1) * REPRISE_HP_STEP)) {
+  if (!previous || !previous.finale && previous.cycle < REPRISE_LAST_CYCLE && game.phaseHp <= game.phaseMaxHp * (1 - (previous.cycle + 1) * REPRISE_HP_STEP)) {
     const cycle = previous ? previous.cycle + 1 : 0;
     const prayer = cycle % 9 === 3 || cycle % 9 === 8;
     const entry = dawnPosition(game.phaseFrame - 1, previous);
@@ -38,10 +39,13 @@ export function emitDawn(game: Game): void {
     const index = prayer ? previous!.index : repriseIndex(seen);
     game.minervaReprise = { cycle, index, seen: prayer ? seen : [...seen, index], entry,
       startFrame: game.phaseFrame, prayer, supplied: false,
-      difficulty: repriseDifficulty(game.difficulty, cycle) };
+      difficulty: repriseDifficulty(game.difficulty, cycle),
+      finale: cycle === REPRISE_FINAL_SECTION_CYCLE ? { stage: 'silence', frame: -1, gifts: [] } : undefined };
     game.jinraiWindDirection = Math.random() < 0.5 ? -1 : 1;
+    if (cycle === REPRISE_FINAL_SECTION_CYCLE) { game.shots.clear(); game.clones.clear(); }
     if (!previous) game.audio.play('owlRelease');
   }
+  if (updateAwakening(game, game.minervaReprise!)) return;
   const cycle = game.minervaReprise!.cycle;
   const prayer = dawnPrayerStep(game.phaseFrame, game.minervaReprise);
   if (prayer === 0) { game.clearAttackEffects(); game.audio.play('prayerCharge'); }

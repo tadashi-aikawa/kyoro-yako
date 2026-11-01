@@ -4,7 +4,7 @@ import { drawBloomBackdrop, drawBloomBullet } from './claudine-render';
 import { CREDITS_ART, CREDITS_STAFF, CREDITS_STAFF_FRAMES, creditsFade, creditsScene } from './ending';
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
-import { BATTLE_COMMENT_FADE_FRAMES, BATTLE_COMMENT_FRAMES, BATTLE_COMMENT_REVEAL_FRAMES, PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
+import { BATTLE_COMMENT_FADE_FRAMES, BATTLE_COMMENT_REVEAL_FRAMES, PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
 import { drawIssen } from './jinrai-issen-render';
 import { drawMinervaAura } from './minerva-aura-render';
 import { notebookBomb, notebookBookmark, notebookFeather, notebookOwl, notebookPage, notebookStar } from './notebook-icons';
@@ -453,7 +453,7 @@ export class Renderer {
         const motionPose = updateBossMotion(this.bossMotion, `${game.boss}:${game.phase.name}`, game.frame, x);
         const pose = dash?.moving || dash?.hopping ? dash.direction > 0 ? 'right' : 'left' : motionPose;
         const solo = game.boss === 'minerva' && game.phase.pattern === 'owlDawn';
-        const finalPause = solo && repriseFinalPause(game.phaseFrame, game.minervaReprise);
+        const finalPause = solo && repriseFinalPause(game.minervaReprise);
         const summoning = solo && game.minervaReprise && !game.minervaReprise.prayer && repriseLocal(game.phaseFrame, game.minervaReprise) < reprisePrepare(game.minervaReprise);
         const casting = !finalPause && (!!summoning || !!game.galaxyFlash || sugarCasting(game) || isCasting(game.phase.kind, game.phaseFrame, game.bossCastFrame));
         const spriteId = bloom ? bloom.sprite : kissing ? 'jinrai-kiss' : bossSpriteId(game.boss, casting && !dash?.moving ? 'cast' : pose, game.frame);
@@ -492,13 +492,12 @@ export class Renderer {
     const attack = game.attackContext();
     if (!game.phaseIntro) {
       this.jinraiSpellTelegraphs(attack);
-      if (game.phase?.pattern !== 'owlDawn' || !repriseFinalPause(game.phaseFrame, game.minervaReprise)) this.stageTelegraphs(attack);
+      if (game.phase?.pattern !== 'owlDawn' || !repriseFinalPause(game.minervaReprise)) this.stageTelegraphs(attack);
       this.galaxyFlash(game);
       this.minervaTelegraphs(game);
       this.minervaSummon(game);
       this.obsidiaGraph(game);
     }
-    if (game.phaseIntro && game.battleComment && game.battleCommentFrames > 0 && (game.scene === 'stage' || (game.scene === 'pause' && game.resumeScene === 'stage'))) this.battleComment(game);
     game.bullets.forEach((b) => { if (!drawBloomBullet(c, game, b)) this.bullet(b); });
     for (const ring of game.interviewRings) this.interviewRing(ring);
     game.shots.forEach((shot) => {
@@ -517,6 +516,7 @@ export class Renderer {
     this.jinraiThunderbolts(game);
     if (game.bombFrames > 0) this.bombEffect(game);
     if (game.cutin > 0 && game.boss && !ultimateCutin(game.boss, game.phase?.pattern)) this.cutin(game);
+    if ((game.phaseIntro || game.minervaReprise?.finale?.stage === 'speech') && game.battleComment && game.battleCommentFrames > 0 && (game.scene === 'stage' || (game.scene === 'pause' && game.resumeScene === 'stage'))) this.battleComment(game);
     if (game.phase?.spell && !game.phaseIntro && game.cutin <= 20 && !(game.phase.pattern === 'jinraiDash' && game.phaseFrame < DASH_CUTIN) && !(game.phase.pattern === 'final' && game.phaseFrame < BLOOM_CUTIN)) {
       c.save();
       // 頭上を召喚の舞台に使う終符では、技名を読ませた後に帯を退ける。
@@ -1123,6 +1123,7 @@ export class Renderer {
 
   private minervaEcho(game: Game): void {
     if (game.phase?.pattern !== 'owlDawn' || !game.minervaReprise) return;
+    if (repriseFinalPause(game.minervaReprise)) return;
     const local = repriseLocal(game.phaseFrame, game.minervaReprise);
     if (dawnPrayerStep(game.phaseFrame, game.minervaReprise) >= 0) return;
     const summonStart = repriseSummonStart(game.minervaReprise);
@@ -1157,7 +1158,7 @@ export class Renderer {
     const owl = summonOwl(game.phaseFrame, x, y);
     const local = reprise ? repriseLocal(game.phaseFrame, reprise) : 0;
     const summonStart = reprise ? repriseSummonStart(reprise) : 0;
-    const summoning = reprise && !reprise.prayer && local >= summonStart && local < reprisePrepare(reprise);
+    const summoning = reprise && !reprise.prayer && !repriseFinalPause(reprise) && local >= summonStart && local < reprisePrepare(reprise);
     c.save();
     if (game.phaseFrame >= 105) {
       // 手元と使い魔を常につなぎ、離陸後も霊を呼ぶ媒体だと分かるようにする。
@@ -1446,7 +1447,7 @@ export class Renderer {
 
   private repriseCutin(game: Game): void {
     const reprise = game.minervaReprise;
-    if (game.phase?.pattern !== 'owlDawn' || !reprise || reprise.prayer) return;
+    if (game.phase?.pattern !== 'owlDawn' || !reprise || reprise.prayer || repriseFinalPause(reprise)) return;
     // 初回は離陸後、以後は召喚開始と同時に表示する。弾と予告は帯より手前に描く。
     const age = repriseLocal(game.phaseFrame, reprise) - repriseSummonStart(reprise);
     if (age < 0 || age >= 84) return;
@@ -1592,7 +1593,7 @@ export class Renderer {
 
   private battleComment(game: Game): void {
     const c = this.ctx, [bx, by] = game.bossXY;
-    const age = BATTLE_COMMENT_FRAMES - game.battleCommentFrames;
+    const age = game.battleCommentDuration - game.battleCommentFrames;
     const reveal = Math.min(1, age / BATTLE_COMMENT_REVEAL_FRAMES), fade = Math.min(1, game.battleCommentFrames / BATTLE_COMMENT_FADE_FRAMES);
     const ease = reveal * reveal * (3 - 2 * reveal);
     c.save(); c.globalAlpha = Math.min(ease, fade * fade * (3 - 2 * fade));

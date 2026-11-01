@@ -6,20 +6,19 @@ import { STAGES } from '../stages';
 import { emitClaudine } from './claudine';
 import { emitJinraiPattern } from './jinrai';
 import { CLONE_FIRST_CHARGE, jinraiCloneScene } from './jinrai-clone';
+import type { MinervaAwakening } from './minerva-awakening';
 import { OWL_RELEASE_FRAMES } from './minerva-summon';
 import { emitNeo } from './neo';
 import { emitObsidia, sweepPosition } from './obsidia';
 
 export const REPRISE_PREPARE = 60;
 export const REPRISE_FINAL_SECTION_CYCLE = 9;
-export const REPRISE_SILENT_FRAMES = 30;
-export const REPRISE_AURA_PREVIEW = 60;
 export const REPRISE_LAST_CYCLE = 12;
 export const REPRISE_HP_STEP = 0.075;
 const PATTERNS = ['enter', 'link', 'sweep', 'type', 'grid', 'jinraiKiss', 'jinraiSakura', 'jinraiClone', 'jinraiPetal'];
 export const REPRISES = STAGES.slice(0, 4).flatMap(stage => stage.phases
   .filter(phase => PATTERNS.includes(phase.pattern)).map(phase => ({ boss: stage.boss, phase })));
-export interface Reprise { cycle: number; index: number; seen: number[]; entry: [number, number]; startFrame: number; prayer: boolean; supplied: boolean; difficulty: Difficulty; }
+export interface Reprise { cycle: number; index: number; seen: number[]; entry: [number, number]; startFrame: number; prayer: boolean; supplied: boolean; difficulty: Difficulty; finale?: MinervaAwakening; }
 export function repriseIndex(seen: readonly number[], roll = Math.random()): number {
   // 祈りを挟んでも直前の再演を避け、未登場を優先する。全技は候補に残す。
   const weights = REPRISES.map((_, index) => index === seen.at(-1) ? 1 : seen.includes(index) ? 100 : 10000);
@@ -31,15 +30,14 @@ export function repriseIndex(seen: readonly number[], roll = Math.random()): num
   return REPRISES.length - 1;
 }
 export const repriseLocal = (frame: number, reprise: Reprise): number => Math.max(0, frame - reprise.startFrame);
-// 本気のオーラを先に見せ、霊・技名・移動は一拍待ってから始める。
+// 初回はフクロウの離陸後、それ以外は召喚だけを待つ。
 export function repriseSummonStart(reprise: Reprise): number {
-  return reprise.cycle === 0 ? OWL_RELEASE_FRAMES
-    : reprise.cycle === REPRISE_FINAL_SECTION_CYCLE ? REPRISE_SILENT_FRAMES + REPRISE_AURA_PREVIEW : 0;
+  return reprise.cycle === 0 ? OWL_RELEASE_FRAMES : 0;
 }
 export const reprisePrepare = (reprise: Reprise): number => repriseSummonStart(reprise) + REPRISE_PREPARE;
-export const repriseFinalPause = (frame: number, reprise?: Reprise): boolean => !!reprise
-  && reprise.cycle === REPRISE_FINAL_SECTION_CYCLE && repriseLocal(frame, reprise) < repriseSummonStart(reprise);
+export const repriseFinalPause = (reprise?: Reprise): boolean => !!reprise?.finale && reprise.finale.stage !== 'hold';
 function repriseFrame(frame: number, reprise: Reprise): number {
+  if (repriseFinalPause(reprise)) return 104;
   const elapsed = repriseLocal(frame, reprise) - reprisePrepare(reprise);
   // 花影は単身射撃の前置きを省き、召喚後すぐに分身を始める。召喚中の時計は進めない。
   return 105 + elapsed + (elapsed >= 0 && REPRISES[reprise.index].phase.pattern === 'jinraiClone' ? CLONE_FIRST_CHARGE - 105 : 0);
@@ -50,14 +48,14 @@ export function repriseDifficulty(difficulty: Difficulty, cycle: number): Diffic
 }
 
 export function reprisePosition(frame: number, reprise: Reprise, difficulty: Difficulty): [number, number] {
+  if (repriseFinalPause(reprise)) return reprise.entry;
   const local = repriseLocal(frame, reprise), { boss, phase } = REPRISES[reprise.index];
   const virtualFrame = Math.max(105, repriseFrame(frame, reprise));
   const clone = phase.pattern === 'jinraiClone' ? jinraiCloneScene(virtualFrame, phase.duration).bodies[0] : undefined;
   const target = clone ? [clone.x, clone.y] : phase.pattern === 'sweep' ? sweepPosition(virtualFrame, ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty))
     : boss === 'obsidia' ? obsidiaPosition(phase.pattern, virtualFrame, reprise.entry)
     : patternPosition(phase, virtualFrame, reprise.entry)!;
-  const pause = reprise.cycle === REPRISE_FINAL_SECTION_CYCLE ? repriseSummonStart(reprise) : 0;
-  const progress = Math.max(0, Math.min(1, (local - pause) / (reprisePrepare(reprise) - pause)));
+  const progress = Math.max(0, Math.min(1, local / reprisePrepare(reprise)));
   const ease = progress * progress * (3 - 2 * progress);
   return [reprise.entry[0] + (target[0] - reprise.entry[0]) * ease, reprise.entry[1] + (target[1] - reprise.entry[1]) * ease];
 }

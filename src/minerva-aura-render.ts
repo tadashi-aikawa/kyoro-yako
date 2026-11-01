@@ -1,13 +1,13 @@
 import type { Game } from './game';
 import { jinraiCloneScene } from './patterns/jinrai-clone';
-import { REPRISE_FINAL_SECTION_CYCLE, REPRISE_SILENT_FRAMES, repriseLocal } from './patterns/minerva-reprise';
+import { awakeningAura } from './patterns/minerva-awakening';
+import { REPRISE_FINAL_SECTION_CYCLE } from './patterns/minerva-reprise';
 import { FIELD } from './rules';
 
 export function drawMinervaAura(c: CanvasRenderingContext2D, game: Game): void {
   if (game.boss !== 'minerva' || game.phase?.pattern !== 'owlDawn' || game.phaseIntro
     || game.phaseHp <= 0 || !game.minervaReprise || game.minervaReprise.cycle < REPRISE_FINAL_SECTION_CYCLE) return;
-  const onset = game.minervaReprise.cycle === REPRISE_FINAL_SECTION_CYCLE
-    ? Math.max(0, Math.min(1, (repriseLocal(game.phaseFrame, game.minervaReprise) - REPRISE_SILENT_FRAMES) / 18)) : 1;
+  const onset = awakeningAura(game.minervaReprise);
   if (onset <= 0) return;
   const attack = game.attackContext();
   const opacity = onset * (attack.phase?.pattern === 'jinraiClone' && attack.phaseFrame >= 105

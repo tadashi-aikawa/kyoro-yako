@@ -52,6 +52,8 @@ it('ミネルヴァ最終技は指定HPでも借りる最初の技の難易度�
   expect(game.minervaReprise).toMatchObject({ cycle: 0, difficulty: 'normal' });
   expect(game.debugState.phaseHpRatio).toBeCloseTo(0.05);
   for (let i = 0; i < 12; i++) game.update();
+  expect(game.minervaReprise).toMatchObject({ cycle: 9, finale: { stage: 'silence' } });
+  for (let frame = 0; game.minervaReprise?.cycle !== 12 && frame < 2400; frame++) game.update();
   expect(game.minervaReprise).toMatchObject({ cycle: 12, prayer: true, difficulty: 'lunatic' });
 });
 
