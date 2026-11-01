@@ -25,7 +25,7 @@ export class Composition {
   }
 
   async prepare() {
-    await Promise.all([this.board.keyVisual, '/assets/members/mimiko-stand.webp', ...this.board.cuts.map(c => c.portrait).filter(Boolean)].map(path => this.image(path)));
+    await Promise.all([this.board.keyVisual, '/assets/members/mimiko-stand.webp', ...this.board.cuts.flatMap(c => [c.portrait, ...(c.members ?? []).map(m => m.image)]).filter(Boolean)].map(path => this.image(path)));
     await document.fonts.ready;
   }
 
@@ -116,46 +116,58 @@ export class Composition {
     shade.addColorStop(0, '#08081700'); shade.addColorStop(0.7, '#080817eb'); shade.addColorStop(1, this.board.night);
     c.fillStyle = shade; c.fillRect(right ? 0 : 926, 720, 994, 360);
     c.save(); c.globalAlpha = enter;
+    if (cut.kind === 'genre') {
+      this.paragraph(cut.text, 75, 825, 62, 830);
+      c.restore();
+      return;
+    }
     switch (cut.layout) {
       case 'obsidia':
-        this.text(cut.stageTitle, 75, 80, 30, color, 790);
-        this.vertical(cut.name, 840, 170, 83, color);
-        this.paragraph(cut.quote, 75, 875, 34, 790);
-        this.text(cut.spell, 75, 1025, 46, '#fff2da', 820); break;
+        this.text(cut.name, 75, 835, 104, color, 830);
+        this.paragraph(cut.quote, 75, 930, 34, 830); break;
       case 'chappy':
-        this.text(cut.stageTitle, 1010, 80, 30, color);
         this.text(cut.name, 1010, 185, 98, color);
-        this.paragraph(cut.quote, 1010, 760, 36, 380);
-        this.text(cut.spell, 1010, 1025, 46, '#fff2da', 820); break;
+        this.paragraph(cut.quote, 1010, 760, 36, 380); break;
       case 'claudine':
-        this.text(cut.stageTitle, 75, 80, 30, color);
         this.text(cut.name, 75, 825, 110, color, 830);
-        this.text(cut.quote, 75, 920, 34, '#fff2da', 830);
-        this.text(cut.spell, 75, 1025, 46, '#fff2da', 830); break;
+        this.text(cut.quote, 75, 920, 34, '#fff2da', 830); break;
       case 'jinrai':
-        this.text(cut.stageTitle, 1010, 70, 30, color);
         this.vertical(cut.name, 1110, 255, 150, color);
-        this.vertical(cut.quote, 1840, 160, 32);
-        this.text(cut.spell, 1060, 1025, 60, '#fff2da', 760); break;
+        this.vertical(cut.quote, 1840, 160, 32); break;
       case 'etokichi':
-        this.text(cut.stageTitle, 490, 65, 30, color, 820, 'center');
         this.text(cut.name, 490, 185, 110, color, 820, 'center');
-        this.text(cut.quote, 490, 920, 36, '#fff2da', 850, 'center');
-        this.text(cut.spell, 490, 1025, 44, '#fff2da', 850, 'center'); break;
+        this.text(cut.quote, 490, 920, 36, '#fff2da', 850, 'center'); break;
       case 'minerva':
-        this.text(cut.stageTitle, 1010, 70, 30, color);
         this.vertical(cut.name, 1835, 190, 78, color);
-        this.paragraph(cut.quote, 1010, 865, 34, 800);
-        this.text(cut.spell, 1010, 1025, 54, '#fff2da', 820); break;
+        this.paragraph(cut.quote, 1010, 865, 34, 800); break;
       default: {
         const x = right ? 75 : 1010;
-        this.text(cut.stageTitle, x, 80, 30, color, 830);
         this.text(cut.name, x, 815, cut.layout === 'neo' ? 160 : 100, color, 830);
         this.paragraph(cut.quote, x, 920, 36, 830);
-        this.text(cut.spell, x, 1025, 48, '#fff2da', 830);
       }
     }
+    // 技名は撮影フェーズの照合にも使う。キャラ紹介では描かない。
+    if (cut.kind !== 'character') this.text(cut.spell, right ? 75 : 1010, 1025, 48, '#fff2da', 830);
     c.restore();
+  }
+
+  cutinTrio(cut, local) {
+    const c = this.ctx;
+    c.fillStyle = this.board.night; c.fillRect(0, 0, 1920, 1080);
+    // 顔を含む横長の領域を各360pxへ縮小する。文字は重ねない。
+    cut.members.forEach((member, i) => {
+      const elapsed = local - (Math.round(member.start * this.board.fps) - Math.round(cut.start * this.board.fps)) / this.board.fps;
+      if (elapsed < 0) return;
+      const image = this.images.get(member.image), y = i * 360;
+      const shift = (1 - ease(elapsed / 0.25)) * 1920 * (member.direction === 'left' ? -1 : 1);
+      c.save(); c.beginPath(); c.rect(0, y, 1920, 360); c.clip();
+      c.translate(shift, 0);
+      c.fillStyle = member.background; c.fillRect(0, y, 1920, 360);
+      const scale = 360 / member.cropHeight;
+      c.drawImage(image, 0, member.cropY, image.width, member.cropHeight,
+        member.x, y, image.width * scale, 360);
+      c.restore();
+    });
   }
 
   async draw(cut, localFrame, durationFrames, capture) {
@@ -165,7 +177,8 @@ export class Composition {
     this.textBounds = [];
     this.night(time, cut.color);
     if (cut.capture) {
-      this.character(cut, local, capture);
+      const presentation = local + (Math.round(cut.start * b.fps) - Math.round((cut.presentationStart ?? cut.start) * b.fps)) / b.fps;
+      this.character(cut, presentation, capture);
       if (cut.kind === 'cutin') {
         const g = capture.game, spec = ultimateCutin(g.boss, g.phase?.pattern);
         if (!spec || g.cutin <= 0) throw new Error(`${cut.id}: 専用カットインの撮影可能時間を超えました`);
@@ -181,6 +194,8 @@ export class Composition {
         c.fillStyle = `rgba(255,255,255,${Math.max(capture.game.flash / 8, capture.game.whiteAlpha)})`;
         c.fillRect(0, 0, 1920, 1080);
       }
+    } else if (cut.kind === 'cutin-trio') {
+      this.cutinTrio(cut, local);
     } else if (cut.kind === 'opening') {
       this.keyVisual(local, clamp(local / 4));
       c.save(); c.globalAlpha = clamp((local - 3) / 3);
@@ -213,6 +228,10 @@ export class Composition {
         const remain = (durationFrames - localFrame) / b.fps;
         c.fillStyle = `rgba(0,0,0,${1 - clamp((remain - 1 / b.fps) / 1.5)})`; c.fillRect(0, 0, 1920, 1080);
       }
+    }
+    if (cut.flashIn) {
+      c.fillStyle = `rgba(255,255,255,${1 - clamp(local / cut.flashIn)})`;
+      c.fillRect(0, 0, 1920, 1080);
     }
   }
 }

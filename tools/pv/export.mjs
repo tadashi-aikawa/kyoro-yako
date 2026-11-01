@@ -64,6 +64,11 @@ async function cleanOld() {
   for (const name of await readdir(path.join(out, 'review'))) {
     if (/^(characters\.|chorus\.|structure\.|edit-|issen-sequence|source-|preview-|acceptance-|source$|announcement$|fix1-preview$)/.test(name) && name !== filename) await rm(path.join(out, 'review', name), { recursive: true, force: true });
   }
+  if (!partial && filename === 'kyoro-yako-pv') {
+    for (const id of ['gate', 'issen-cutin', 'issen', 'bloom-cutin', 'bloom', 'owl-cutin', 'owl', 'gold', 'defeat']) {
+      await rm(path.join(out, 'review', `${id}.webp`), { force: true });
+    }
+  }
 }
 
 async function contactSheet(directory, ids) {
@@ -121,7 +126,8 @@ try {
     if (server.exitCode !== null || i === 99) throw new Error(`Viteを起動できません: ${serverLog}`);
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  browser = await chromium.launch({ channel: 'chrome', headless: true });
+  // Renderer内の補助CanvasもCPU描画へ統一する。
+  browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--disable-accelerated-2d-canvas'] });
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1, colorScheme: 'dark' });
   page.setDefaultTimeout(120000);
   page.on('crash', () => { pageErrors.push('Chromeのページがクラッシュしました'); console.error(pageErrors.at(-1)); });
@@ -137,7 +143,7 @@ try {
     await writeFile(path.join(out, 'preflight.json'), JSON.stringify(preflight, null, 2));
   } else if (verify) {
     const results = [];
-    for (const id of ['neo', 'chappy', 'bloom', 'announcement']) {
+    for (const id of ['neo', 'chappy', 'trio', 'jinrai-ult', 'minerva-ult', 'announcement']) {
       const cut = board.cuts.find(c => c.id === id);
       const frame = Math.round((cut.start + cut.review) * board.fps);
       const snapshot = async f => {
@@ -167,10 +173,11 @@ try {
     const text = await page.evaluate(n => window.pv.renderFrame(n), Math.round((titleCut.start + 2) * board.fps));
     if (!text.textBounds.some(t => t.text === changed.release)) throw new Error('文言の変更が未反映');
     results.push({ timingEditable: true, textEditable: true });
-    for (const [id, duration] of [['issen-cutin', 4], ['chappy', 6]]) {
+    for (const [id, duration] of [['chappy', 6]]) {
       const invalid = structuredClone(board);
       invalid.duration = duration;
       invalid.cuts = [{ ...invalid.cuts.find(c => c.id === id), start: 0 }];
+      invalid.cuts[0].capture.holdHp = false;
       await page.evaluate(b => window.pv.configure(b), invalid);
       const error = await page.evaluate(async () => {
         try { await window.pv.preflight(); return ''; } catch (e) { return e.message; }
@@ -178,6 +185,49 @@ try {
       if (!error.includes(`事前検査 ${id}:`)) throw new Error(`${id}: 撮影時間超過を検出できません`);
       results.push({ id, overrunRejected: true, error });
     }
+    await page.evaluate(b => window.pv.configure(b), board);
+    const prayerCut = board.cuts.find(c => c.capture?.prayer);
+    const prayerEnd = Math.round(board.cuts[board.cuts.indexOf(prayerCut) + 1].start * board.fps) - 1;
+    const prayer = await page.evaluate(n => window.pv.renderFrame(n), prayerEnd);
+    if (prayer.stats.prayerCycle !== 12 || prayer.stats.prayerChargeFrames !== 71 || prayer.stats.prayerFireFrames !== 180 || prayer.stats.visibleHitFrames !== 0) throw new Error('最後の祈りの撮影検査に失敗しました');
+    results.push({ prayer: prayer.stats });
+    const trio = board.cuts.find(c => c.kind === 'cutin-trio');
+    const trioAudit = await page.evaluate(async cut => {
+      const result = [];
+      const ctx = document.querySelector('#pv').getContext('2d');
+      for (const [index, member] of cut.members.entries()) {
+        const first = Math.round(member.start * window.pv.board.fps);
+        const before = await window.pv.renderFrame(first - 1);
+        if (index > 0 && before.textBounds.length) throw new Error('3段カットインに文字が描かれています');
+        const sample = () => Array.from(ctx.getImageData(960, index * 360 + 180, 1, 1).data).join(',');
+        if (index > 0 && sample() !== '8,8,23,255') throw new Error('未登場の段がnight色ではありません');
+        const after = await window.pv.renderFrame(first + 15);
+        if (after.textBounds.length || sample() === '8,8,23,255') throw new Error('差し込み後の絵が表示されていません');
+        result.push({ start: member.start, settledFrame: first + 15 });
+      }
+      return result;
+    }, trio);
+    results.push({ trio: trioAudit });
+    const continuity = await page.evaluate(async () => {
+      const ctx = document.querySelector('#pv').getContext('2d');
+      const results = [];
+      for (const cut of window.pv.board.cuts.filter(c => c.presentationStart !== undefined)) {
+        const frame = Math.round(cut.start * window.pv.board.fps);
+        const x = cut.layout === 'claudine' ? 0 : 926;
+        await window.pv.renderFrame(frame - 1);
+        const before = ctx.getImageData(x, 0, 994, 1080).data;
+        await window.pv.renderFrame(frame);
+        const after = ctx.getImageData(x, 0, 994, 1080).data;
+        let delta = 0;
+        for (let i = 0; i < before.length; i++) if (i % 4 !== 3) delta += Math.abs(before[i] - after[i]);
+        const mean = delta / (994 * 1080 * 3);
+        // 星の微小な明滅とフィールド境界のアンチエイリアスだけを許す。
+        if (mean > 0.1) throw new Error(`${cut.id}: 技の切り替えで人物側の表示が変化しました: ${mean}`);
+        results.push({ id: cut.id, portraitPanelMeanDelta: mean });
+      }
+      return results;
+    });
+    results.push({ continuity });
     await writeFile(path.join(out, 'verification.json'), JSON.stringify(results, null, 2));
     console.log(JSON.stringify(results, null, 2));
   } else if (reviewOnly) {
@@ -212,7 +262,7 @@ try {
     // ChromeはCanvasの描画経路によってH.264の色レンジを切り替えることがある。
     // ffmpegで統一し、カット境界でプレイヤーの色変換が切り替わるのを防ぐ。
     mux.push('-map', '0:v:0', '-vf', 'scale=out_range=tv:out_color_matrix=bt709,format=yuv420p,setparams=range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709',
-      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-r', String(board.fps), '-fps_mode', 'cfr',
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-threads', '1', '-r', String(board.fps), '-fps_mode', 'cfr',
       '-color_range', 'tv', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709');
     if (hasMusic) mux.push('-map', '[music]', '-c:a', 'aac', '-b:a', '256k');
     else mux.push('-an');
@@ -232,6 +282,15 @@ try {
       if (at < 0 || at >= length) continue;
       reviewIds.push(cut.id);
       const still = path.join(reviewStaging, cut.id);
+      await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(at), '-i', temporaryVideo, '-frames:v', '1', `${still}.png`]);
+      await run('cwebp', ['-quiet', '-q', '94', `${still}.png`, '-o', `${still}.webp`]);
+      await unlink(`${still}.png`);
+    }
+    const trio = board.cuts.find(c => c.kind === 'cutin-trio');
+    if (trio) for (const [index, member] of trio.members.entries()) {
+      const at = (Math.round(member.start * board.fps) + 15 - from) / board.fps;
+      if (at < 0 || at >= length) continue;
+      const still = path.join(reviewStaging, `trio-${['top', 'middle', 'bottom'][index]}`);
       await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(at), '-i', temporaryVideo, '-frames:v', '1', `${still}.png`]);
       await run('cwebp', ['-quiet', '-q', '94', `${still}.png`, '-o', `${still}.webp`]);
       await unlink(`${still}.png`);

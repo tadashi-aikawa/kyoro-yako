@@ -88,7 +88,7 @@ async function encode(from = 0, to = Math.round(board.duration * board.fps)) {
   const config = {
     codec: 'avc1.64002a', width: board.width, height: board.height,
     framerate: board.fps, bitrate: board.bitrate, latencyMode: 'realtime',
-    hardwareAcceleration: 'prefer-hardware', avc: { format: 'annexb' },
+    hardwareAcceleration: 'prefer-software', avc: { format: 'annexb' },
   };
   if (!(await VideoEncoder.isConfigSupported(config)).supported) throw new Error('ChromeでH.264 WebCodecsが利用できません');
   let chunks = [], error, count = 0;
@@ -98,12 +98,21 @@ async function encode(from = 0, to = Math.round(board.duration * board.fps)) {
   });
   encoder.configure(config);
   const stats = new Map();
+  const auditFrames = new Set(board.cuts.flatMap(cut => [
+    ...Array.from({ length: 12 }, (_, i) => Math.round(cut.start * board.fps) + i),
+    Math.round((cut.start + cut.review) * board.fps),
+  ]));
+  const rgbaSha256 = [];
   try {
     for (let frame = from; frame < to; frame++) {
       const result = await renderFrame(frame);
       if (result.stats) stats.set(result.cut, structuredClone(result.stats));
       // Canvas由来のVideoFrameは描画内容によって色レンジが変わるため、RGBAへ固定する。
       const pixels = canvas.getContext('2d').getImageData(0, 0, board.width, board.height);
+      if (auditFrames.has(frame)) {
+        const digest = await crypto.subtle.digest('SHA-256', pixels.data);
+        rgbaSha256.push({ frame, hash: [...new Uint8Array(digest)].map(n => n.toString(16).padStart(2, '0')).join('') });
+      }
       const video = new VideoFrame(pixels.data, {
         format: 'RGBA', codedWidth: board.width, codedHeight: board.height,
         colorSpace: { primaries: 'bt709', transfer: 'iec61966-2-1', matrix: 'rgb', fullRange: true },
@@ -122,7 +131,7 @@ async function encode(from = 0, to = Math.round(board.duration * board.fps)) {
       }
     }
     if (count !== to - from) throw new Error(`出力フレーム数が不一致: ${count}`);
-    return { frames: count, stats: [...stats.values()], encoder: config };
+    return { frames: count, stats: [...stats.values()], encoder: config, rgbaSha256 };
   } finally { encoder.close(); }
 }
 

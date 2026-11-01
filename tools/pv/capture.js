@@ -6,6 +6,8 @@ import { STAGES } from '/src/stages.ts';
 import { CAROM_WARNING, yoyoPoint, yoyoStep, YOYO_WARNING, YOYO_FLIGHT } from '/src/patterns/chappy.ts';
 import { graphEdgeDistance, graphEdgeState, graphNodeState } from '/src/patterns/obsidia-graph.ts';
 import { ultimateCutin } from '/src/ultimate-cutin.ts';
+import { PRAYER_CHARGE, PRAYER_FIRE, PRAYER_PERIOD, dawnPrayerStep } from '/src/patterns/minerva-dawn.ts';
+import { REPRISE_HP_STEP } from '/src/patterns/minerva-reprise.ts';
 
 export function randomGenerator(seed) {
   let state = seed >>> 0;
@@ -100,6 +102,7 @@ export class Capture {
   }
 
   async begin(cut) {
+    this.heldHp = undefined;
     this.cut = cut;
     this.options = cut.capture;
     this.random = randomGenerator(this.options.seed);
@@ -131,6 +134,29 @@ export class Capture {
     this.frame = -1;
     this.stats = { id: cut.id, frames: 0, minBullets: Infinity, maxBullets: 0, visibleHitFrames: 0, overlapFrames: 0, cutinFrames: 0, defeatFrames: 0, phase: g.phase?.name, difficulty: p.difficulty, seed: p.seed };
     for (let i = 0; i < p.warmup; i++) this.step(false);
+    if (p.prayer) {
+      const { cycle, frame = 0 } = p.prayer;
+      if (p.stage !== 5 || p.phase !== 10 || p.midboss || ![3, 8, 12].includes(cycle)
+        || !Number.isInteger(frame) || frame < 0 || frame >= PRAYER_PERIOD) throw new Error(`${cut.id}: 祈りの指定が不正です`);
+      if (!g.minervaReprise || g.cutin > 0 || g.phaseFrame < 225 || g.minervaReprise.cycle >= cycle) throw new Error(`${cut.id}: warmupを離陸後・指定の祈りより前にしてください`);
+      // 本体のHP境界を通し、弾消去・祈りの時計・難易度の初期化を本体に任せる。
+      g.autoshot = false; g.shots.clear();
+      for (let next = g.minervaReprise.cycle + 1; next <= cycle; next++) {
+        g.phaseHp = g.phaseMaxHp * (1 - next * REPRISE_HP_STEP) - 0.000001;
+        this.step(false);
+        if (g.minervaReprise?.cycle !== next) throw new Error(`${cut.id}: 祈りへのHP境界遷移に失敗しました`);
+        // 本気区間の宣言・補給中は次のHP境界へ進めない。本体の演出を完走する。
+        let preparation = 0;
+        while (g.minervaReprise.finale && preparation++ < 1800) this.step(false);
+        if (g.minervaReprise.finale) throw new Error(`${cut.id}: 本気区間の準備が終了しませんでした`);
+      }
+      for (let i = 0; i < frame; i++) this.step(false);
+      this.stats.prayerCycle = cycle;
+      this.stats.prayerFrames = 0;
+      this.stats.prayerChargeFrames = 0;
+      this.stats.prayerFireFrames = 0;
+    }
+    if (p.holdHp) this.heldHp = g.phaseHp;
     this.frame = -1;
   }
 
@@ -138,6 +164,7 @@ export class Capture {
     const g = this.game, p = this.options;
     Math.random = this.random;
     if (this.frame % 2 === 0 || this.frame < 0) steer(g, this.level);
+    if (record && this.heldHp !== undefined) g.phaseHp = this.heldHp;
     if (record && p.defeatAt !== undefined && this.frame + 1 >= p.defeatAt && g.phase) g.phaseHp = Math.min(g.phaseHp, 1);
     g.update();
     this.frame++;
@@ -149,6 +176,13 @@ export class Capture {
     if (g.pendingHit >= 0 || g.hitDuringSpell || g.lives < 8 || g.invulnFrames > 0) s.visibleHitFrames++;
     if (g.cutin > 0 && ultimateCutin(g.boss, g.phase?.pattern)) s.cutinFrames++;
     if (g.postBoss) s.defeatFrames++;
+    if (p.prayer) {
+      if (!g.minervaReprise?.prayer || g.minervaReprise.cycle !== p.prayer.cycle) throw new Error(`${this.cut.id}: 指定した祈りを離れました`);
+      const step = dawnPrayerStep(g.phaseFrame, g.minervaReprise);
+      s.prayerFrames++;
+      if (step < PRAYER_CHARGE) s.prayerChargeFrames++;
+      else if (step < PRAYER_CHARGE + PRAYER_FIRE) s.prayerFireFrames++;
+    }
     if (g.bullets.objects.some(b => b.active && predict(b, 0, this.level) && Math.hypot(g.px - b.x, g.py - b.y) < b.radius + 2.5)) s.overlapFrames++;
     if (p.phase !== undefined && p.defeatAt === undefined && (!g.phase || g.phaseIndex !== p.phase)) throw new Error(`${this.cut.id}: 撮影中に指定フェーズが終了。warmupかカット長を短くしてください`);
     if (this.cut.kind === 'cutin' && !(g.cutin > 0 && ultimateCutin(g.boss, g.phase?.pattern))) throw new Error(`${this.cut.id}: 専用カットインの撮影可能時間を超えました`);

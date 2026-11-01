@@ -34,7 +34,32 @@ Viteを`127.0.0.1:5391`で自動起動する。終了時にはそのポートを
 
 ## 絵コンテ
 
-変更先は`storyboard.json`の1ファイル。
+既定の絵コンテは`storyboard.json`。
+
+- 26.50〜52.02秒は、ネオ・エトキチ・オブシディア・チャッピーを各6.38秒紹介する。
+- 52.02〜58.39秒の`cutin-trio`は、上・中・下の360pxの3段に絵だけを表示する。
+  - 時刻: 迅雷52.02秒、クロディーヌ54.41秒、ミネルヴァ56.80秒。
+  - 動き: 左・右・左から0.25秒で滑り込み、止まったら静止する。
+  - 切り出し: 各素材の顔を含む横長の領域を縦横比を保って段の高さへ縮める。
+- サビは迅雷・クロディーヌ・ミネルヴァの順で、各人の通常技と最終技を見せる。
+  - 表示: `presentationStart`を通常技の開始時刻にそろえ、技の切り替えで立ち絵と文字を再登場させない。
+  - 接続: サビ頭に0.12秒の白フラッシュを入れる。
+- `kind: character`の合成文字は名前とセリフだけ。
+  - 補足: `spell`はゲーム内のフェーズ照合にも使うため、データには残す。
+- `genre.text`が冒頭のジャンル紹介。
+- ミネルヴァの最終技は`capture.prayer: { cycle: 12, frame: 0 }`で最後の祈りを撮る。
+  - 準備: 離陸後までwarmupし、本体のHP境界を順に通して指定のサイクルへ入る。
+  - 本気区間: 宣言と補給の演出がある場合は、本体の更新で終了するまで待ってから次のHP境界へ進める。
+  - 維持: 祈りの準備以降は自動ショットを止める。溜めから連射、休みへ進む287フレームを撮影する。
+- チャッピーは撮影中だけ`capture.holdHp`でHPを保持する。
+  - 理由: 元のwarmupとショットを保ったまま6.38秒の尺を確保する。
+
+```sh
+caffeinate -dimsu node tools/pv/export.mjs --clean
+caffeinate -dimsu node tools/pv/export.mjs --verify
+```
+
+各段の差し込み完了フレームは`review/trio-top.webp`・`trio-middle.webp`・`trio-bottom.webp`、3段そろった代表フレームは`review/trio.webp`へ書き出す。
 
 | フィールド | 内容 |
 |---|---|
@@ -43,13 +68,18 @@ Viteを`127.0.0.1:5391`で自動起動する。終了時にはそのポートを
 | `cuts[].review` | カット内の代表フレームを切り出す秒数 |
 | `cuts[].kind` | 導入、物語、キャラ、戦闘などのカット種別 |
 | `cuts[].layout` | キャラごとの組み方。下表参照 |
-| `text`, `name`, `quote`, `spell`, `stageTitle` | 表示する文言 |
+| `text`, `name`, `quote` | 表示する文言 |
+| `spell` | 撮影フェーズの照合用。キャラ紹介には描かない |
+| `presentationStart`, `flashIn` | 立ち絵と文字の登場開始秒、カット頭の白フラッシュ秒数 |
+| `members[].start`, `direction`, `x`, `cropY`, `cropHeight` | 3段カットインの開始秒、入場方向、水平位置、素材の切り出し位置と高さ |
 | `portrait`, `keyVisual` | Viteの公開パスで指定する画像 |
 | `capture.stage`, `phase`, `midboss` | 面、0始まりのフェーズ、中ボス指定 |
 | `capture.warmup` | 撮影前に進めるゲーム更新回数。単位はフレーム |
 | `capture.difficulty`, `seed` | 難易度と乱数seed |
 | `capture.power`, `maxform` | 省略時Power4。最高形態はPower5とtrueを指定 |
 | `capture.defeatAt` | カット内の指定フレームからボスHPを1へ下げる |
+| `capture.holdHp` | 撮影中はwarmup終了時のHPを各更新前に復元する |
+| `capture.prayer` | stage 5・phase 10限定の祈り指定。`cycle`は3・8・12、`frame`は祈り内の0〜359 |
 | `music.path`, `segments`, `fadeOut`, `volume` | 音楽のパス、原曲の区間`[{from,to}, …]`、末尾フェード秒、音量 |
 | `music.crossfade` | 前区間の末尾を延長し、指数フェードアウトして重ねる秒数。既定0.2秒。0ならconcatで直結 |
 | `music.spliceFadeIn` | 後続区間の先頭の直線フェードイン秒数。既定0.001秒、上限0.005秒。44.1kHzの整数サンプルへ切り捨てる |
@@ -84,7 +114,7 @@ Viteを`127.0.0.1:5391`で自動起動する。終了時にはそのポートを
 | レイアウト | 組み方 |
 |---|---|
 | `neo` | フィールド左、右に大きな立ち絵、足元へ大きな横組みの名前 |
-| `obsidia` | フィールド右、左に立ち絵、余白の右端に縦組みの名前 |
+| `obsidia` | フィールド右、左に立ち絵、その下側に横書きの名前とセリフ |
 | `chappy` | フィールド左、右上へ横組みの名前、左下に細いセリフ段、右に小さめの全身 |
 | `claudine` | フィールド右、左の大きな立ち絵をトリミング、下端を暗幕に沈めて横組みの名前 |
 | `jinrai` | フィールド左、名前とセリフを立ち絵の両脇へ縦組み |
@@ -125,6 +155,7 @@ node /Users/tadashi-aikawa/work/owlery-danmaku/tools/pv/export.mjs --board /abso
 - `audio-check.mjs`はNode専用の検証ファイル。本体のVitestが拾わない名前にする。
 - `--clean`は旧中間物に加え、`review/source/`、`review/announcement/`、`review/fix1-preview/`と告知・fix1試写を掃除する。
   - 例外: 今回指定した出力名と入力絵コンテは保護する。
+  - 本編: 削除されたgate・個別カットイン・旧battle・gold・defeatの代表画像も掃除する。
 - 実時間が15分を超えた場合は警告を出す。正常な動画は保存する。
 
 すべての書き出しで、先に全カットを実ゲームでシミュレーションする。
@@ -152,8 +183,10 @@ GameとRendererを直接importし、`game.update()`を60fpsで進める。フレ
 - 乱数: カットごとにseed付きMulberry32へ差し替える。
 - 自動回避: 受入ハーネスの18候補探索を基に、未来の弾位置・書庫のグラフ・迅雷のレーザーを評価する。
 - 自機: 無敵、常時ショット、開始時の無敵点滅なし。
+  - 例外: 指定の祈りは自動ショットを止め、HPの進行を止める。
 - 描画: Rendererはpixel ratio 3。論理`384×448`のフィールドだけを高さ1080pxに拡大する。
   - 再現性: Canvasは`willReadFrequently: true`で作り、GPU描画の履歴による微小な画素差を避ける。
+  - 補助Canvas: Chromeの`--disable-accelerated-2d-canvas`で弾画像などもCPU描画へ統一する。
   - 合成: フレームごとに`reset()`し、前の描画状態を引き継がない。
   - 表示: 撮影専用Vite設定で開発用FPS表示を無効にする。
 - 専用カットイン: 本編の`drawUltimateCutin`を縦横比を維持した別レイヤーへ描く。
@@ -161,10 +194,12 @@ GameとRendererを直接importし、`game.update()`を60fpsで進める。フレ
   - パネル: このレイヤーには冒険ノートを含まない。
 - エンコード: CanvasのRGBA画素をWebCodecsへ渡してH.264 Annex Bを生成し、ffmpegでBT.709・YUV420・limited rangeに統一してMP4へ保存する。
   - 入力: RGBAとfull rangeを明示し、描画内容による色レンジの変化を防ぐ。
+  - 再現性: WebCodecsは`prefer-software`、仕上げのlibx264は1スレッドへ固定する。
+  - 監査: 各カット先頭12フレームと代表フレームのRGBA画素ハッシュをレポートの`rgbaSha256`へ記録する。
   - 仕上げ: libx264の`veryfast / CRF 18`を使用する。
   - 詳細: [W3C AVC WebCodecs Registration](https://www.w3.org/TR/webcodecs-avc-codec-registration/)
 - 朝空: ffmpegで固定時刻のフレームへデコードし、cwebpでWebPへ変換する。
 
 撮影監査は被弾表示・指定フェーズの継続・文字のセーフエリア・動画仕様をチェックする。`overlapFrames`は通常弾との幾何学的な接触候補を数える。専用ギミックの当たり判定全体を置き換える値ではない。
 
-最終確認には`review/`の静止画とMP4を使う。ハードウェアエンコーダーやフォントが異なる環境間のMP4のバイト一致は保証しない。
+最終確認には`review/`の静止画とMP4を使う。Chrome・ffmpeg・フォントが異なる環境間のMP4のバイト一致は保証しない。
