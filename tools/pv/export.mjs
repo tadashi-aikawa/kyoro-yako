@@ -19,6 +19,8 @@ const reviewOnly = args.includes('--review-only');
 const verify = args.includes('--verify');
 const preflightOnly = args.includes('--preflight-only');
 const highlightsOnly = args.includes('--highlights');
+const epithetTrial = args.includes('--epithet-trial');
+if (epithetTrial && (!reviewOnly || !args.includes('--name') || verify || preflightOnly)) throw new Error('--epithet-trialは--review-only --nameと組み合わせてください');
 if (highlightsOnly && (!reviewOnly || verify || preflightOnly)) throw new Error('--highlightsは--review-onlyと組み合わせてください');
 const backgroundTrial = args.includes('--bg-trial');
 const visibleBackgroundTrial = args.includes('--bg-visible');
@@ -165,12 +167,28 @@ try {
   await page.goto(`${url}/tools/pv/index.html?bgm=0`);
   await page.waitForFunction(() => window.pv?.ready);
   await page.evaluate(b => window.pv.configure(b), board);
-  const preflight = backgroundTrial || highlightsOnly ? [] : await page.evaluate(() => window.pv.preflight());
+  const preflight = backgroundTrial || highlightsOnly || epithetTrial ? [] : await page.evaluate(() => window.pv.preflight());
   console.log(`事前検査: ${JSON.stringify(preflight)}`);
   const highlights = highlightsOnly || verify || (!reviewOnly && !preflightOnly)
     ? await page.evaluate(async () => (await import('./highlight-check.js')).inspectHighlights(window.pv)) : [];
   if (!highlightsOnly) for (const result of highlights) if (result.errors.length) throw new Error(`${result.id}: ${result.errors.join(' / ')}`);
-  if (highlightsOnly) {
+  if (epithetTrial) {
+    const trialBoard = structuredClone(board); trialBoard.presentation.epithet = true;
+    await page.evaluate(b => window.pv.configure(b), trialBoard);
+    await mkdir(reviewDir, { recursive: true });
+    const ids = ['gate', 'neo', 'etokichi', 'obsidia', 'chappy', 'claudine', 'jinrai', 'minerva'], samples = [];
+    for (const id of ids) {
+      const cut = board.cuts.find(c => c.id === id), frame = Math.round((cut.start + cut.review) * board.fps);
+      const state = await page.evaluate(frame => window.pv.renderFrame(frame), frame);
+      if (!state.textBounds.some(t => t.role === 'epithet' && t.text === cut.epithet) || !state.textBounds.some(t => t.role === 'quote' && t.text === cut.quote)) throw new Error(`${id}: 通り名・セリフが出きっていません`);
+      const data = await page.evaluate(() => window.pv.snapshot());
+      await writeFile(path.join(reviewDir, `${id}.webp`), Buffer.from(data.split(',')[1], 'base64'));
+      samples.push({ id, frame, state });
+    }
+    await contactSheet(reviewDir, ids, 'contact', 4);
+    await writeFile(path.join(reviewDir, 'report.json'), JSON.stringify({ source, epithet: true, samples }, null, 2));
+    console.log(`通り名あり: ${ids.join(', ')} / ${reviewDir}`);
+  } else if (highlightsOnly) {
     await mkdir(reviewDir, { recursive: true });
     await writeFile(path.join(reviewDir, 'highlights.json'), JSON.stringify(highlights, null, 2));
     console.log(JSON.stringify(highlights, null, 2));
@@ -437,9 +455,9 @@ try {
       await extract('field-edge', fieldFit.start + fieldFit.review, `crop=260:1080:${fieldFit.portraitSide === 'left' ? 860 : 800}:0`);
       await extract('story-mood', story.start + story.review);
       await contactSheet(reviewStaging, ['gate', 'neo', 'etokichi', 'obsidia', 'chappy', 'claudine', 'jinrai', 'minerva'], 'layout-unified', 4);
+      await contactSheet(reviewStaging, ['neo', 'gate'], 'align', 2, { width: 960, height: 540 });
       await contactSheet(reviewStaging, ['rush-1', 'rush-2', 'rush-3'], 'rush', 3);
       const slide = board.cuts.find(c => c.id === 'neo');
-      const panelX = slide.portraitSide === 'left' ? 0 : 926;
       const onset = (Math.round(slide.start * board.fps) - Math.round(board.effects.crossfade * board.fps)) / board.fps;
       const ids = [];
       for (let i = 0; i < 5; i++) {
@@ -455,17 +473,20 @@ try {
       }
       await contactSheet(reviewStaging, nameIds, 'name-motion', 5);
       for (const id of nameIds) await unlink(path.join(reviewStaging, `${id}.webp`));
+      const right = board.cuts.find(c => c.id === 'gate');
+      const rightOnset = (Math.round(right.start * board.fps) - Math.round(board.effects.crossfade * board.fps)) / board.fps;
+      const rightNameAt = rightOnset + board.effects.portraitSlide + board.effects.nameDelay;
       const stampIds = [];
       for (let i = 0; i < 6; i++) {
         const id = `name-stamp-${i}`; stampIds.push(id);
-        await extract(id, nameAt + i * 0.05, `crop=994:1080:${panelX}:0`);
+        await extract(id, rightNameAt + i * 0.05, 'crop=994:1080:926:0');
       }
       await contactSheet(reviewStaging, stampIds, 'name-stamp', 6, { width: 497, height: 540 });
       for (const id of stampIds) await unlink(path.join(reviewStaging, `${id}.webp`));
-      const typeIds = [], quoteAt = nameAt + board.effects.nameDuration + board.effects.quoteDelay;
+      const typeIds = [], quoteAt = rightNameAt + board.effects.nameDuration + board.effects.quoteDelay;
       for (const [i, time] of [0.05, 0.15, 0.25].entries()) {
         const id = `typewriter-${i}`; typeIds.push(id);
-        await extract(id, quoteAt + time, `crop=994:500:${panelX}:580`);
+        await extract(id, quoteAt + time, 'crop=994:500:926:580');
       }
       await contactSheet(reviewStaging, typeIds, 'typewriter', 3, { width: 994, height: 500 });
       for (const id of typeIds) await unlink(path.join(reviewStaging, `${id}.webp`));

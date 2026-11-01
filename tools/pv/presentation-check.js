@@ -3,7 +3,7 @@ import { Composition, fieldRect } from './composition.js';
 export async function verifyPresentation(pv) {
   const board = pv.board, fps = board.fps, fx = board.effects, results = [];
   const ctx = document.querySelector('#pv').getContext('2d');
-  const at = (cut, seconds) => pv.renderFrame(Math.round(cut.start * fps) - pv.incomingFrames(board.cuts.indexOf(cut)) + Math.round(seconds * fps));
+  const at = (cut, seconds) => pv.renderFrame(Math.round(cut.start * fps) - pv.incomingFrames(board.cuts.findIndex(c => c.id === cut.id)) + Math.round(seconds * fps));
   const check = (condition, message) => { if (!condition) throw new Error(message); };
   const testCanvas = document.createElement('canvas'); testCanvas.width = 1920; testCanvas.height = 1080;
   const test = new Composition(testCanvas, board), field = fieldRect(null, board);
@@ -42,6 +42,19 @@ export async function verifyPresentation(pv) {
     const names = settled.textBounds.filter(t => t.role === 'name'), quotes = settled.textBounds.filter(t => t.role === 'quote');
     check(names.length === 1 && names[0].text === cut.name && quotes.length === 1 && quotes[0].text === cut.quote, `${cut.id}: 名前の横書き・セリフの全表示が不正`);
     check(names[0].x > panel.x && names[0].right < panel.x + panel.width && names[0].y > 700 && quotes[0].y > names[0].bottom, `${cut.id}: 統一した名前・セリフの配置が不正`);
+    const edge = left ? board.presentation.textInset : 1920 - board.presentation.textInset;
+    const textEdge = text => left ? text.x : text.right;
+    check(Math.abs(textEdge(names[0]) - edge) < 0.01 && Math.abs(textEdge(quotes[0]) - edge) < 0.01, `${cut.id}: 名前とセリフが画面端から同じ位置にそろっていません`);
+    check(settled.visual.textShade.edge === edge && settled.visual.textShade.align === panel.side, `${cut.id}: 文字の暗がりが揃えに追従していません`);
+    const epithets = settled.textBounds.filter(t => t.role === 'epithet');
+    const showEpithet = board.presentation.epithet === true && !!cut.epithet;
+    check(showEpithet ? epithets.length === 1 && epithets[0].text === cut.epithet : epithets.length === 0,
+      `${cut.id}: 本編の通り名が表示設定・文言と一致しません`);
+    if (showEpithet) {
+      check(Math.abs(epithets[0].size / names[0].size - 0.4) < 0.001 && Math.abs(textEdge(epithets[0]) - edge) < 0.01
+        && epithets[0].bottom < names[0].y && settled.visual.textShade.top <= epithets[0].y,
+      `${cut.id}: 通り名のサイズ・揃え・配置・暗がりが不正`);
+    }
     const background = settled.visual.background, configured = board.presentation.characterBackground;
     if (configured.enabled) {
       check(background?.stage === characterStages[cut.id.replace(/-ult$/, '')], `${cut.id}: 背景の階が不一致`);
@@ -58,6 +71,12 @@ export async function verifyPresentation(pv) {
     check(!pose.textBounds.length && start.visual.motion.nameScale === 1.6 && !start.textBounds.length, `${cut.id}: 立ち絵停止前に文字が出ています`);
     check(stamp.visual.motion.nameScale > 1 && stamp.textBounds[0].alpha < 1 && !stamp.textBounds.some(t => t.role === 'quote'), `${cut.id}: 名前の縮小・フェードが不正`);
     check(landed.visual.motion.nameScale === 1 && landed.visual.motion.impact > 0, `${cut.id}: 名前の着地が不正`);
+    const stampEdges = [];
+    for (const seconds of [0.05, 0.1, 0.15, 0.2, 0.25]) {
+      const state = await at(cut, nameAt + seconds), name = state.textBounds.find(t => t.role === 'name');
+      check(name && Math.abs(textEdge(name) - edge) < 0.01 && state.visual.textBlock.namePivot[0] === edge, `${cut.id}: 名前の縮小中に揃えた端が横滑りしています`);
+      stampEdges.push(textEdge(name));
+    }
     const typed = [];
     for (const seconds of [0.1, 0.2, 0.3]) {
       const state = await at(cut, quoteAt + seconds), quote = state.textBounds.find(t => t.role === 'quote');
@@ -66,8 +85,25 @@ export async function verifyPresentation(pv) {
       check(Math.abs(quote.x - quotes[0].x) < 0.01 && quote.size === quotes[0].size, `${cut.id}: タイプ途中で既出文字の位置・サイズが変化`);
       typed.push(quote.text);
     }
-    results.push({ id: cut.id, field: f, portrait: p, unifiedLayout: true, stamp: true, typed });
+    results.push({ id: cut.id, field: f, portrait: p, unifiedLayout: true, stampEdges, stamp: true, typed });
   }
+  const withEpithet = structuredClone(board); withEpithet.presentation.epithet = true;
+  await pv.configure(withEpithet);
+  const epithetResults = [];
+  for (const cut of withEpithet.cuts.filter(c => c.kind === 'character' && c.presentationStart === undefined)) {
+    const state = await pv.renderFrame(Math.round((cut.start + cut.review) * fps));
+    const name = state.textBounds.find(t => t.role === 'name'), epithet = state.textBounds.find(t => t.role === 'epithet');
+    const left = cut.portraitSide === 'left', edge = left ? name.x : name.right;
+    check(epithet?.text === cut.epithet && Math.abs(epithet.size / name.size - 0.4) < 0.001 && epithet.bottom < name.y,
+      `${cut.id}: 通り名の文言・0.4倍のサイズ・名前の上への配置が不正`);
+    check(Math.abs((left ? epithet.x : epithet.right) - edge) < 0.01, `${cut.id}: 通り名の揃えが名前と異なります`);
+    const moving = await at(cut, fx.portraitSlide + fx.nameDelay + 0.05);
+    const movingName = moving.textBounds.find(t => t.role === 'name'), movingEpithet = moving.textBounds.find(t => t.role === 'epithet');
+    check(movingEpithet.alpha === movingName.alpha && Math.abs((left ? movingEpithet.x : movingEpithet.right) - edge) < 0.01, `${cut.id}: 通り名が名前と一体で動いていません`);
+    epithetResults.push({ id: cut.id, size: epithet.size, edge, together: true });
+  }
+  results.push({ epithets: epithetResults });
+  await pv.configure(board);
   const announcement = board.cuts.find(c => c.kind === 'announcement');
   const announced = await at(announcement, 1.5);
   check(announced.textBounds.some(t => t.text === board.author && t.size < 48 && t.alpha === 1)

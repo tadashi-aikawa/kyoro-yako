@@ -158,7 +158,10 @@ export class Composition {
     const fx = this.board.effects;
     const left = cut.portraitSide === 'left', panelX = left ? 0 : field.width, panelWidth = 1920 - field.width;
     const enter = ease(local / fx.portraitSlide), drift = (1 - enter) * fx.portraitDistance * (left ? -1 : 1);
-    const center = panelX + panelWidth / 2, textX = panelX + 75;
+    const center = panelX + panelWidth / 2, inset = this.board.presentation.textInset ?? 75;
+    const edge = left ? inset : 1920 - inset, align = left ? 'left' : 'right';
+    const textWidth = panelWidth - inset * 2;
+    const showEpithet = this.board.presentation.epithet === true && !!cut.epithet;
     this.visual.panel = { x: panelX, width: panelWidth, side: left ? 'left' : 'right' };
     c.save(); c.beginPath(); c.rect(panelX, 0, panelWidth, 1080); c.clip(); c.translate(drift, 0);
     if (showBackground) {
@@ -169,29 +172,56 @@ export class Composition {
     this.standingPortrait(cut.portrait, center, 540, this.board.presentation.portraitHeight, cut.portraitWidth);
     c.restore();
     // 顔を文字から離し、立ち絵の下端を暗幕に沈めて文字を読ませる。
-    const shade = c.createLinearGradient(0, 720, 0, 1080);
+    const shadeTop = showEpithet ? 640 : 720;
+    if (!this.textShadeCanvas) this.textShadeCanvas = document.createElement('canvas');
+    const shadeCanvas = this.textShadeCanvas;
+    if (shadeCanvas.width !== Math.ceil(panelWidth) || shadeCanvas.height !== 1080 - shadeTop) {
+      shadeCanvas.width = Math.ceil(panelWidth); shadeCanvas.height = 1080 - shadeTop;
+    }
+    const shadeContext = shadeCanvas.getContext('2d'); shadeContext.reset();
+    const shade = shadeContext.createLinearGradient(0, 0, 0, shadeCanvas.height);
     shade.addColorStop(0, '#08081700'); shade.addColorStop(0.7, '#080817eb'); shade.addColorStop(1, this.board.night);
-    c.fillStyle = shade; c.fillRect(panelX, 720, panelWidth, 360);
+    shadeContext.fillStyle = shade; shadeContext.fillRect(0, 0, shadeCanvas.width, shadeCanvas.height);
+    const mask = shadeContext.createLinearGradient(left ? 0 : panelWidth, 0, left ? panelWidth : 0, 0);
+    mask.addColorStop(0, '#fff'); mask.addColorStop(0.75, '#fff'); mask.addColorStop(1, '#fff0');
+    shadeContext.globalCompositeOperation = 'destination-in'; shadeContext.fillStyle = mask;
+    shadeContext.fillRect(0, 0, shadeCanvas.width, shadeCanvas.height);
+    c.drawImage(shadeCanvas, panelX, shadeTop);
+    this.visual.textShade = { edge, align, top: shadeTop };
     const nameAt = fx.portraitSlide + fx.nameDelay, quoteAt = nameAt + fx.nameDuration + fx.quoteDelay;
     const nameAge = local - nameAt, nameEnter = ease(nameAge / fx.nameDuration);
     const scale = 1 + (fx.nameScale - 1) * (1 - nameEnter);
     const impact = nameAge >= fx.nameDuration ? 1 - clamp((nameAge - fx.nameDuration) / fx.nameImpact) : 0;
     const letters = [...cut.quote], count = Math.min(letters.length, Math.floor(Math.max(0, local - quoteAt) / fx.quoteCharacter + 1e-8));
     this.visual.motion = { portrait: enter, name: nameEnter, nameScale: scale, impact, quoteChars: count, quote: count / letters.length };
-    const pivot = [center, 825];
+    const pivot = [edge, 825];
+    const nameWidth = (panelWidth - inset - 24) / fx.nameScale;
+    c.letterSpacing = '0px'; c.font = `110px ${this.board.font}`;
+    const nameSize = Math.min(110, 110 * nameWidth / Math.max(1, c.measureText(cut.name).width));
+    c.font = `${nameSize}px ${this.board.font}`;
+    const epithetY = 825 - c.measureText(cut.name).actualBoundingBoxAscent - 18;
+    this.visual.textBlock = { edge, align, inset, namePivot: pivot, epithet: showEpithet, nameSize };
     c.save(); c.globalAlpha = clamp(nameAge / fx.nameDuration);
     c.translate(...pivot); c.scale(scale, scale); c.translate(-pivot[0], -pivot[1]);
     this.textRole = 'name';
-    const nameWidth = (panelWidth - 96) / fx.nameScale;
-    this.text(cut.name, center, 825, 110, color, nameWidth, 'center', false, { color: '#02020a', blur: 18, passes: 2 });
-    if (impact > 0) this.text(cut.name, center, 825, 110, color, nameWidth, 'center', false, { color, blur: 20 * impact });
+    this.text(cut.name, edge, 825, nameSize, color, nameWidth, align, false, { color: '#02020a', blur: 18, passes: 2 });
+    if (impact > 0) this.text(cut.name, edge, 825, nameSize, color, nameWidth, align, false, { color, blur: 20 * impact });
+    if (showEpithet) {
+      this.textRole = 'epithet';
+      const size = nameSize * 0.4, style = { spacing: size * 0.12 };
+      this.text(cut.epithet, edge, epithetY, size, color, nameWidth, align, false, { color: '#02020a', blur: 12, passes: 2 }, style);
+      if (impact > 0) this.text(cut.epithet, edge, epithetY, size, color, nameWidth, align, false, { color, blur: 20 * impact }, style);
+    }
     c.restore();
     c.save();
     this.textRole = 'quote';
     // 最終文の幅でサイズを決め、文字が増えても既出の文字を動かさない。
     c.letterSpacing = '0px'; c.font = `34px ${this.board.font}`;
-    const quoteSize = Math.min(34, 34 * 850 / Math.max(1, c.measureText(cut.quote).width));
-    this.text(letters.slice(0, count).join(''), textX, 920, quoteSize, '#fff2da', 850, 'left', false, { color: '#02020a', blur: 12, passes: 2 });
+    const quoteSize = Math.min(34, 34 * textWidth / Math.max(1, c.measureText(cut.quote).width));
+    c.font = `${quoteSize}px ${this.board.font}`;
+    const quoteWidth = c.measureText(cut.quote).width, textX = left ? edge : edge - quoteWidth;
+    this.visual.textBlock.quoteSlot = { x: textX, right: textX + quoteWidth, width: quoteWidth };
+    this.text(letters.slice(0, count).join(''), textX, 920, quoteSize, '#fff2da', textWidth, 'left', false, { color: '#02020a', blur: 12, passes: 2 });
     this.textRole = undefined;
     // 技名は撮影フェーズの照合にも使う。キャラ紹介では描かない。
     if (cut.kind !== 'character') this.text(cut.spell, textX, 1025, 48, '#fff2da', 830);

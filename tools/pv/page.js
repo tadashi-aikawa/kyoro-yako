@@ -20,6 +20,8 @@ function validate(b) {
   for (const key of ['portraitSlide', 'nameDuration', 'nameImpact', 'quoteCharacter', 'storyFade', 'storyLineFade', 'trioSlide', 'titleFade', 'genreFade']) if (!(b.effects?.[key] > 0)) throw new Error(`effects.${key}には正の秒数を指定してください`);
   if (!(b.presentation?.fieldFeather >= 40 && b.presentation.fieldFeather <= 60 && b.presentation.portraitHeight > 0 && b.presentation.portraitHeight <= 1000)) throw new Error('presentationのフェザー幅・立ち絵サイズが不正です');
   if (b.cuts[0]?.start !== 0) throw new Error('先頭カットは0秒にしてください');
+  if (b.presentation.epithet !== undefined && typeof b.presentation.epithet !== 'boolean') throw new Error('presentation.epithetは真偽値で指定してください');
+  if (b.presentation.textInset !== undefined && !(b.presentation.textInset >= 24 && b.presentation.textInset <= 150)) throw new Error('presentation.textInsetは24〜150pxで指定してください');
   const opacity = b.presentation.characterBackground?.opacity;
   if (opacity !== undefined && (!Number.isFinite(opacity) || opacity < 0 || opacity > 1)) throw new Error('characterBackground.opacityは0〜1で指定してください');
   for (const key of ['brightness', 'blur']) {
@@ -35,6 +37,7 @@ function validate(b) {
     if (cut.review < 0 || cut.review >= end - cut.start) throw new Error(`reviewはカット内の秒数にしてください: ${cut.id}`);
     if (cut.capture && !layouts.includes(cut.layout)) throw new Error(`未定義レイアウト: ${cut.layout}`);
     if (cut.portraitSide !== undefined && !['left', 'right'].includes(cut.portraitSide)) throw new Error(`portraitSideが不正: ${cut.id}`);
+    if (cut.epithet !== undefined && typeof cut.epithet !== 'string') throw new Error(`epithetは文字列で指定してください: ${cut.id}`);
   }
 }
 
