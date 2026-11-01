@@ -96,3 +96,66 @@ test('音楽区間の開始時刻と対応カットの時刻が違えば警告�
   assert.deepEqual(audioAlignmentWarnings(plan, [{ id: 'dawn', start: 2 }]), []);
   assert.match(audioAlignmentWarnings(plan, [{ id: 'dawn', start: 2.2 }])[0], /dawn/);
 });
+
+test('先行重ねは1小節・2小節とも原曲の一打を同じ整数サンプルへ固定する', () => {
+  for (const overlap of [1.595, 3.19]) {
+    const plan = audioPlan({ overlap, segments: [{ from: 0, to: 90.29 }, { from: 152.48, to: 163.60, cut: 'dawn' }] }, { duration: 101.4 });
+    const next = plan.sourceRanges[1];
+    assert.equal(next.pvStartSample + plan.overlapSamples, 3981789);
+    assert.equal(next.sourceStartSample + plan.overlapSamples, 6724368);
+    assert.equal(plan.contentDuration, 101.41);
+    assert.equal(plan.tailPadding, 0);
+    assert.deepEqual(audioAlignmentWarnings(plan, [{ id: 'dawn', start: 90.29 }]), []);
+  }
+});
+
+test('実PCMの等パワー重ねはゲイン二乗和1、一打で後続ゲイン1、先行ゲイン0になる', () => {
+  const plan = audioPlan({ segments: [{ from: 0, to: 2 }, { from: 4, to: 5 }], overlap: 0.5 }, { duration: 3 });
+  const rate = 44100, input = new Float32Array(6 * rate * 2);
+  for (let n = 0; n < 6 * rate; n++) input[n * 2 + (n < 3 * rate ? 0 : 1)] = 0.4;
+  const result = spawnSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'anullsrc=d=6',
+    '-f', 'f32le', '-ar', String(rate), '-ac', '2', '-i', 'pipe:0', '-filter_complex', plan.filter,
+    '-map', '[music]', '-ar', String(rate), '-c:a', 'pcm_f32le', '-f', 'f32le', 'pipe:1'],
+  { input: Buffer.from(input.buffer), timeout: 10000, killSignal: 'SIGKILL', maxBuffer: 4 * 1024 * 1024 });
+  assert.equal(result.status, 0, result.stderr.toString());
+  const samples = new Float32Array(result.stdout.buffer, result.stdout.byteOffset, result.stdout.length / 4);
+  for (let n = 0; n <= plan.overlapSamples; n++) {
+    const at = (1.5 * rate + n) * 2, angle = Math.PI * n / plan.overlapSamples / 2;
+    assert.ok(Math.abs(samples[at] - 0.4 * Math.cos(angle)) < 1e-6);
+    assert.ok(Math.abs(samples[at + 1] - 0.4 * Math.sin(angle)) < 1e-6);
+    assert.ok(Math.abs((samples[at] ** 2 + samples[at + 1] ** 2) / 0.16 - 1) < 1e-6);
+  }
+  assert.equal(samples[2 * rate * 2], 0);
+  assert.ok(Math.abs(samples[2 * rate * 2 + 1] - 0.4) < 1e-6);
+});
+
+test('先行重ねの試写は本編の同一PCMを切り出し、無効な重なりを拒否する', () => {
+  const config = { ...music, fadeOut: 0, overlap: 0.5 };
+  const full = pcm(audioPlan(config, { duration: 4 }));
+  const preview = pcm(audioPlan(config, { duration: 4, from: 1.2, to: 2.3, partial: true }));
+  assert.deepEqual(preview, full.subarray(Math.round(1.2 * 44100) * 2, Math.round(2.3 * 44100) * 2));
+  for (const overlap of [-1, NaN, 3]) assert.throws(() => audioPlan({ ...music, overlap }, { duration: 4 }), /overlap/);
+  assert.throws(() => audioPlan({ overlap: 1, segments: [{ from: 0, to: 2 }, { from: 0.5, to: 4 }] }, { duration: 5.5 }), /overlap/);
+});
+
+test('hsinは同相の大音量2区間を重ねても増幅せず、前後の音量と一打の位置を維持する', () => {
+  const rate = 44100, config = { segments: [{ from: 0, to: 2 }, { from: 4, to: 5 }], overlap: 0.5, overlapCurve: 'hsin' };
+  const plan = audioPlan(config, { duration: 3 });
+  const input = new Float32Array(6 * rate * 2);
+  for (let n = 0; n < 6 * rate; n++) {
+    input[n * 2] = 0.95;
+    input[n * 2 + 1] = n < 3 * rate ? 0 : 0.8;
+  }
+  const result = spawnSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'anullsrc=d=6',
+    '-f', 'f32le', '-ar', String(rate), '-ac', '2', '-i', 'pipe:0', '-filter_complex', plan.filter,
+    '-map', '[music]', '-c:a', 'pcm_f32le', '-f', 'f32le', 'pipe:1'],
+  { input: Buffer.from(input.buffer), timeout: 10000, killSignal: 'SIGKILL', maxBuffer: 4 * 1024 * 1024 });
+  assert.equal(result.status, 0, result.stderr.toString());
+  const samples = new Float32Array(result.stdout.buffer, result.stdout.byteOffset, result.stdout.length / 4);
+  assert.equal(samples.length, 3 * rate * 2);
+  for (let n = 0; n < 3 * rate; n++) assert.ok(Math.abs(samples[n * 2] - 0.95) < 1e-6);
+  assert.equal(samples[(1.5 * rate) * 2 + 1], 0);
+  assert.ok(Math.abs(samples[(1.75 * rate) * 2 + 1] - 0.4) < 1e-6);
+  assert.ok(Math.abs(samples[2 * rate * 2 + 1] - 0.8) < 1e-6);
+  assert.throws(() => audioPlan({ ...config, overlapCurve: 'invalid' }, { duration: 3 }), /overlapCurve/);
+});

@@ -28,7 +28,8 @@
         "cut": "dawn"
       }
     ],
-    "spliceFadeIn": 0.001,
+    "overlap": 1.595,
+    "overlapCurve": "hsin",
     "fadeOut": 3,
     "volume": 1
   },
