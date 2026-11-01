@@ -1,7 +1,7 @@
 import type { Game } from '../game';
 import { type ItemKind, MAX_POWER } from '../rules';
 import { updateAwakening } from './minerva-awakening';
-import { emitReprise, REPRISE_FINAL_SECTION_CYCLE, REPRISE_HP_STEP, REPRISE_LAST_CYCLE, type Reprise, repriseDifficulty, repriseIndex, repriseLocal, reprisePosition } from './minerva-reprise';
+import { emitReprise, prayerDifficulty, REPRISE_FINAL_SECTION_CYCLE, REPRISE_HP_STEP, REPRISE_LAST_CYCLE, type Reprise, repriseDifficulty, repriseIndex, repriseLocal, reprisePosition } from './minerva-reprise';
 
 export const PRAYER_PERIOD = 360;
 export const PRAYER_CHARGE = 72;
@@ -39,7 +39,7 @@ export function emitDawn(game: Game): void {
     const index = prayer ? previous!.index : repriseIndex(seen);
     game.minervaReprise = { cycle, index, seen: prayer ? seen : [...seen, index], entry,
       startFrame: game.phaseFrame, prayer, supplied: false,
-      difficulty: repriseDifficulty(game.difficulty, cycle),
+      difficulty: prayer ? prayerDifficulty(game.difficulty, cycle) : repriseDifficulty(game.difficulty, cycle),
       finale: cycle === REPRISE_FINAL_SECTION_CYCLE ? { stage: 'silence', frame: -1, gifts: [] } : undefined };
     game.jinraiWindDirection = Math.random() < 0.5 ? -1 : 1;
     if (cycle === REPRISE_FINAL_SECTION_CYCLE) { game.shots.clear(); game.clones.clear(); }
@@ -85,8 +85,8 @@ export function emitDawn(game: Game): void {
     const b = game.spawnBullet(x + Math.cos(angle) * 22, y + Math.sin(angle) * 22, Math.cos(angle) * speed, Math.sin(angle) * speed, i % 2 ? 1 : 2, 'orb');
     if (b) b.radius = 2.3;
   }
-  // 最後の祈りだけ反対の渦を重ねる。主渦を保ち、追加は半分の頻度にする。
-  if (game.bombFrames <= 0 && cycle === REPRISE_LAST_CYCLE && fireTime >= 72 && fireTime % ([4, 3, 2, 2][level] * 2) === 0) {
+  // 中盤と最後の祈りで反対の渦を重ねる。主渦を保ち、追加は半分の頻度にする。
+  if (game.bombFrames <= 0 && cycle >= 8 && fireTime >= 72 && fireTime % ([4, 3, 2, 2][level] * 2) === 0) {
     for (let i = 0; i < arms; i++) {
       const angle = Math.PI / 2 - rotation + (i + 0.5) * Math.PI * 2 / arms;
       const speed = [2.3, 2.7, 3.2, 3.7][level];

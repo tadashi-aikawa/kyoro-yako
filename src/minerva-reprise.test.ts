@@ -169,13 +169,14 @@ it('借りる技を3・4・3回と挟み、3回目の祈りをHP10%から撃破�
   expect(game.minervaReprise?.cycle).toBe(12); expect(game.minervaReprise?.prayer).toBe(true);
 });
 
-it.each(difficulties)('借りる技と祈りの%sは3区間で1段ずつ上げる', difficulty => {
+it.each(difficulties)('借りる技の%sは段階強化し、祈りは中盤まで選択難易度・最後だけ1段上にする', difficulty => {
   const stronger = { easy: 'normal', normal: 'hard', hard: 'lunatic', lunatic: 'lunatic' }[difficulty];
   const strongest = { easy: 'hard', normal: 'lunatic', hard: 'lunatic', lunatic: 'lunatic' }[difficulty];
   const game = fight('owlDawn', difficulty); game.phaseFrame = 104; game.update();
   for (let cycle = 0; cycle <= 12; cycle++) {
-    const expected = cycle >= 9 ? strongest : cycle >= 4 ? stronger : difficulty;
-    expect(repriseDifficulty(difficulty, cycle)).toBe(expected);
+    const borrowed = cycle >= 9 ? strongest : cycle >= 4 ? stronger : difficulty;
+    const expected = game.minervaReprise!.prayer ? cycle === 12 ? stronger : difficulty : borrowed;
+    expect(repriseDifficulty(difficulty, cycle)).toBe(borrowed);
     expect(game.minervaReprise?.difficulty).toBe(expected);
     expect(game.difficulty).toBe(difficulty);
     if (game.minervaReprise!.prayer) {
@@ -294,16 +295,28 @@ it('召喚中はダメージを受けず、最終技のショットとボムの�
   expect(hit(ordinary)).toBeCloseTo(30);
 });
 
-it('1・2回目の祈りは主渦だけ、最後の祈りは途中から逆回転の星弾も出す', () => {
+it.each(difficulties)('祈りの%sは1回目が1種、中盤と最後は途中から逆回転の星弾も出す', difficulty => {
+  const stronger = { easy: 'normal', normal: 'hard', hard: 'lunatic', lunatic: 'lunatic' }[difficulty];
   for (const cycle of [3, 8, 12]) {
-    const game = fight(); prayer(game, cycle);
+    const game = fight('owlDawn', difficulty); prayer(game, cycle);
+    const level = difficulties.indexOf((cycle === 12 ? stronger : difficulty) as Game['difficulty']);
+    const arms = [5, 7, 9, 11][level];
     while (dawnPrayerStep(game.phaseFrame, game.minervaReprise) < PRAYER_CHARGE + 72) {
       game.update();
       if (dawnPrayerStep(game.phaseFrame, game.minervaReprise) < PRAYER_CHARGE + 72) expect(game.bullets.objects.some(b => b.active && b.kind === 'star')).toBe(false);
     }
     const added = game.bullets.objects.filter(b => b.active && b.kind === 'star');
-    expect(added).toHaveLength(cycle === 12 ? 11 : 0);
-    if (added.length) expect(added[0].vx).toBeCloseTo(Math.cos(Math.PI / 2 - 72 * 0.027 + Math.PI / 11) * 3.7);
+    expect(added).toHaveLength(cycle >= 8 ? arms : 0);
+    if (added.length) {
+      const direction = cycle === 8 ? -1 : 1, speed = [2.3, 2.7, 3.2, 3.7][level];
+      expect(added[0].vx).toBeCloseTo(Math.cos(Math.PI / 2 - direction * 72 * 0.027 + Math.PI / arms) * speed);
+      expect(Math.hypot(added[0].vx, added[0].vy)).toBeCloseTo(speed);
+      const interval = [4, 3, 2, 2][level] * 2;
+      for (let frame = 1; frame <= interval; frame++) {
+        game.update();
+        expect(game.bullets.objects.filter(b => b.active && b.kind === 'star')).toHaveLength(arms * (frame < interval ? 1 : 2));
+      }
+    }
   }
 });
 

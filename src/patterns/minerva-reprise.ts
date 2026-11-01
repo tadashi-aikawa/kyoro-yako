@@ -42,10 +42,14 @@ function repriseFrame(frame: number, reprise: Reprise): number {
   // 花影は単身射撃の前置きを省き、召喚後すぐに分身を始める。召喚中の時計は進めない。
   return 105 + elapsed + (elapsed >= 0 && REPRISES[reprise.index].phase.pattern === 'jinraiClone' ? CLONE_FIRST_CHARGE - 105 : 0);
 }
-export function repriseDifficulty(difficulty: Difficulty, cycle: number): Difficulty {
+function raisedDifficulty(difficulty: Difficulty, steps: number): Difficulty {
   const levels = ['easy', 'normal', 'hard', 'lunatic'] as const;
-  return levels[Math.min(3, levels.indexOf(difficulty) + (cycle >= REPRISE_FINAL_SECTION_CYCLE ? 2 : cycle >= 4 ? 1 : 0))];
+  return levels[Math.min(3, levels.indexOf(difficulty) + steps)];
 }
+export const repriseDifficulty = (difficulty: Difficulty, cycle: number): Difficulty =>
+  raisedDifficulty(difficulty, cycle >= REPRISE_FINAL_SECTION_CYCLE ? 2 : cycle >= 4 ? 1 : 0);
+export const prayerDifficulty = (difficulty: Difficulty, cycle: number): Difficulty =>
+  raisedDifficulty(difficulty, cycle === REPRISE_LAST_CYCLE ? 1 : 0);
 
 export function reprisePosition(frame: number, reprise: Reprise, difficulty: Difficulty): [number, number] {
   if (repriseFinalPause(reprise)) return reprise.entry;
