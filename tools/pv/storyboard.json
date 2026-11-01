@@ -173,7 +173,7 @@
     {
       "id": "rush-1",
       "start": 52.02,
-      "kind": "gameplay",
+      "kind": "gameplay-columns",
       "layout": "field-center",
       "transition": "flash",
       "capture": {
@@ -187,7 +187,7 @@
     {
       "id": "rush-2",
       "start": 53.61,
-      "kind": "gameplay",
+      "kind": "gameplay-columns",
       "layout": "field-center",
       "transition": "flash",
       "capture": {
@@ -201,7 +201,7 @@
     {
       "id": "rush-3",
       "start": 55.21,
-      "kind": "gameplay",
+      "kind": "gameplay-columns",
       "layout": "field-center",
       "transition": "flash",
       "capture": {
@@ -268,7 +268,7 @@
         "warmup": 473
       },
       "review": 2,
-      "transition": "flash"
+      "transition": "crossfade"
     },
     {
       "id": "claudine-ult",
@@ -421,6 +421,7 @@
     "announcementAuthorAt": 0.6
   },
   "presentation": {
+    "rush": { "slide": 0.25, "trioBackdrop": true, "brightness": 0.3, "blur": 8, "dimDuration": 0.2 },
     "textInset": 75,
     "epithet": true,
     "fieldFeather": 50,

@@ -228,9 +228,16 @@ export class Composition {
     c.restore();
   }
 
-  cutinTrio(cut, local) {
+  cutinTrio(cut, local, columns) {
     const c = this.ctx;
     c.fillStyle = this.board.night; c.fillRect(0, 0, 1920, 1080);
+    const config = this.board.presentation.rush;
+    if (config.trioBackdrop) {
+      const dim = ease(local / config.dimDuration), brightness = 1 - (1 - config.brightness) * dim;
+      c.save(); c.filter = `brightness(${brightness}) blur(${config.blur * dim}px)`;
+      c.drawImage(columns.canvas, 0, 0); c.restore();
+      this.visual.rush = { columns: columns.columns, brightness, blur: config.blur * dim };
+    } else this.visual.rush = { columns: columns.columns, brightness: 0, blur: 0 };
     // 顔を含む横長の領域を各360pxへ縮小する。文字は重ねない。
     cut.members.forEach((member, i) => {
       const elapsed = local - (Math.round(member.start * this.board.fps) - Math.round(cut.start * this.board.fps)) / this.board.fps;
@@ -247,14 +254,17 @@ export class Composition {
     });
   }
 
-  async draw(cut, localFrame, durationFrames, capture, timelineTime = cut.start + localFrame / this.board.fps) {
+  async draw(cut, localFrame, durationFrames, capture, timelineTime = cut.start + localFrame / this.board.fps, columns) {
     const c = this.ctx, b = this.board, local = localFrame / b.fps, time = timelineTime;
     // Canvasの描画状態と前フレームの画素を残さず、seekでも同じ合成順にする。
     c.reset();
     this.textBounds = [];
     this.visual = {};
     this.night(time, cut.color);
-    if (cut.kind === 'gameplay') {
+    if (cut.kind === 'gameplay-columns') {
+      c.drawImage(columns.canvas, 0, 0);
+      this.visual.rush = { columns: columns.columns, brightness: 1, blur: 0 };
+    } else if (cut.kind === 'gameplay') {
       capture.drawTo(c, (1920 - 1080 * 384 / 448) / 2);
     } else if (cut.capture) {
       const presentation = local + (Math.round(cut.start * b.fps) - Math.round((cut.presentationStart ?? cut.start) * b.fps)) / b.fps;
@@ -275,7 +285,7 @@ export class Composition {
         c.fillRect(0, 0, 1920, 1080);
       }
     } else if (cut.kind === 'cutin-trio') {
-      this.cutinTrio(cut, local);
+      this.cutinTrio(cut, local, columns);
     } else if (cut.kind === 'opening') {
       this.keyVisual(local, clamp(local / 4));
       c.save(); c.globalAlpha = clamp((local - b.effects.titleAt) / b.effects.titleFade);
@@ -324,7 +334,7 @@ export class Composition {
         c.fillStyle = `rgba(0,0,0,${1 - clamp((remain - 1 / b.fps) / 1.5)})`; c.fillRect(0, 0, 1920, 1080);
       }
     }
-    const flash = cut.flashIn ?? (cut.transition === 'flash' ? (cut.kind === 'gameplay' ? b.effects.rushFlash : b.effects.chorusFlash) : 0);
+    const flash = cut.flashIn ?? (cut.transition === 'flash' ? (['gameplay', 'gameplay-columns'].includes(cut.kind) ? b.effects.rushFlash : b.effects.chorusFlash) : 0);
     if (flash) {
       c.fillStyle = `rgba(255,255,255,${1 - clamp(local / flash)})`;
       c.fillRect(0, 0, 1920, 1080);

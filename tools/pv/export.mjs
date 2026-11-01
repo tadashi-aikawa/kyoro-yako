@@ -35,11 +35,17 @@ if (args.includes('--source-ref') && (!sourceRef || sourceRef.startsWith('-'))) 
 const from = Math.round(Number(value('--from', '0')) * board.fps);
 const to = Math.round(Number(value('--to', String(board.duration))) * board.fps);
 const partial = from !== 0 || to !== Math.round(board.duration * board.fps);
+const rushPreview = args.includes('--rush-preview');
+if (rushPreview && (!partial || from !== 52 * board.fps || to !== 59 * board.fps || reviewOnly || verify)) throw new Error('--rush-previewは--from 52 --to 59で指定してください');
+if (args.includes('--rush-black')) {
+  if (!rushPreview) throw new Error('--rush-blackは--rush-previewと組み合わせてください');
+  board.presentation.rush.trioBackdrop = false;
+}
 const filename = value('--name', partial ? `preview-${from}-${to}` : 'kyoro-yako-pv');
 if (!/^[a-z0-9-]+$/.test(filename)) throw new Error('--nameは半角英小文字・数字・ハイフンで指定してください');
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('--portが不正です');
 if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to <= from || to > Math.round(board.duration * board.fps)) throw new Error('--from / --toが動画の範囲外です');
-const videoPath = path.join(out, `${filename}.mp4`);
+const videoPath = path.join(out, ...(rushPreview ? ['review', 'rush'] : []), `${filename}.mp4`);
 const reviewDir = path.join(out, 'review', args.includes('--name') || partial ? filename : '');
 const audio = audioPlan(board.music, { duration: board.duration, from: from / board.fps, to: to / board.fps, partial });
 const started = performance.now();
@@ -110,6 +116,7 @@ if (hasMusic) {
 }
 
 await mkdir(path.join(out, 'review'), { recursive: true });
+await mkdir(path.dirname(videoPath), { recursive: true });
 await mkdir(path.join(out, 'ending'), { recursive: true });
 // 朝空だけを固定時刻でデコード。動画の再生時計・seek完了時刻に依存しない。
 const ending = path.join(root, board.ending.path);
@@ -167,8 +174,12 @@ try {
   await page.goto(`${url}/tools/pv/index.html?bgm=0`);
   await page.waitForFunction(() => window.pv?.ready);
   await page.evaluate(b => window.pv.configure(b), board);
-  const preflight = backgroundTrial || highlightsOnly || epithetTrial ? [] : await page.evaluate(() => window.pv.preflight());
+  const preflight = backgroundTrial || highlightsOnly || epithetTrial ? [] : await page.evaluate(rush => window.pv.preflight(rush ? ['rush-1', 'rush-2', 'rush-3'] : undefined), rushPreview);
   console.log(`事前検査: ${JSON.stringify(preflight)}`);
+  if (rushPreview) {
+    const rush = await page.evaluate(async () => (await import('./rush-check.js')).verifyRush(window.pv));
+    await writeFile(path.join(out, `${filename}.rush-check.json`), JSON.stringify(rush, null, 2));
+  }
   const highlights = highlightsOnly || verify || (!reviewOnly && !preflightOnly)
     ? await page.evaluate(async () => (await import('./highlight-check.js')).inspectHighlights(window.pv)) : [];
   if (!highlightsOnly) for (const result of highlights) if (result.errors.length) throw new Error(`${result.id}: ${result.errors.join(' / ')}`);
@@ -306,7 +317,7 @@ try {
         const before = await window.pv.renderFrame(first - 1);
         if (index > 0 && before.textBounds.length) throw new Error('3段カットインに文字が描かれています');
         const sample = () => Array.from(ctx.getImageData(960, index * 360 + 180, 1, 1).data).join(',');
-        if (index > 0 && sample() !== '8,8,23,255') throw new Error('未登場の段がnight色ではありません');
+        if (index > 0 && !window.pv.board.presentation.rush.trioBackdrop && sample() !== '8,8,23,255') throw new Error('未登場の段がnight色ではありません');
         const settled = first + Math.ceil(window.pv.board.effects.trioSlide * window.pv.board.fps);
         const after = await window.pv.renderFrame(settled);
         if (after.textBounds.length || sample() === '8,8,23,255') throw new Error('差し込み後の絵が表示されていません');
@@ -315,6 +326,7 @@ try {
       return result;
     }, trio);
     results.push({ trio: trioAudit });
+    results.push({ rush: await page.evaluate(async () => (await import('./rush-check.js')).verifyRush(window.pv)) });
     const continuity = await page.evaluate(async () => {
       const ctx = document.querySelector('#pv').getContext('2d');
       const results = [];
@@ -457,6 +469,7 @@ try {
       await contactSheet(reviewStaging, ['gate', 'neo', 'etokichi', 'obsidia', 'chappy', 'claudine', 'jinrai', 'minerva'], 'layout-unified', 4);
       await contactSheet(reviewStaging, ['neo', 'gate'], 'align', 2, { width: 960, height: 540 });
       await contactSheet(reviewStaging, ['rush-1', 'rush-2', 'rush-3'], 'rush', 3);
+      await contactSheet(reviewStaging, ['rush-1', 'rush-2', 'rush-3', 'trio-top'], 'rush-columns', 2, { width: 960, height: 540 });
       const slide = board.cuts.find(c => c.id === 'neo');
       const onset = (Math.round(slide.start * board.fps) - Math.round(board.effects.crossfade * board.fps)) / board.fps;
       const ids = [];
@@ -524,12 +537,17 @@ try {
     if (source.srcCommit !== sourceAfter.srcCommit || source.diffSha256 !== sourceAfter.diffSha256) throw new Error('撮影中にsrcが変更されました。本編を置き換えず停止します。同じ本体で再実行してください');
     const report = { ...result, warnings, preflight, highlights, source, sourceAfter, musicSha256: hasMusic ? sha(await readFile(music)) : null,
       ffmpeg: (await run('ffmpeg', ['-version'])).split('\n')[0], audio: hasMusic ? audio : null,
-      board: boardPath, boardSha256: sha(await readFile(boardPath)), videoPath, elapsedSeconds: elapsed, hasMusic, chrome: browser.version(), probe };
+      board: boardPath, boardSha256: sha(JSON.stringify(board)), videoPath, elapsedSeconds: elapsed, hasMusic, chrome: browser.version(), probe };
     const reportStaging = path.join(staging, `${filename}.report.json`);
     await writeFile(reportStaging, JSON.stringify(report, null, 2));
     if (args.includes('--clean')) await cleanOld();
     await mkdir(reviewDir, { recursive: true });
-    for (const name of await readdir(reviewStaging)) await rename(path.join(reviewStaging, name), path.join(reviewDir, name));
+    for (const name of await readdir(reviewStaging)) {
+      if (name === 'rush-columns.webp') {
+        await mkdir(path.join(out, 'review/rush'), { recursive: true });
+        await rename(path.join(reviewStaging, name), path.join(out, 'review/rush/columns.webp'));
+      } else await rename(path.join(reviewStaging, name), path.join(reviewDir, name));
+    }
     await rename(temporaryVideo, videoPath);
     await rename(reportStaging, path.join(out, `${filename}.report.json`));
     if (args.includes('--keep-intermediate')) await rename(elementary, path.join(out, `${filename}.h264`));

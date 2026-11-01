@@ -1,15 +1,16 @@
 import initialBoard from './storyboard.json';
 import { Capture } from './capture.js';
 import { Composition, layouts, fieldRect } from './composition.js';
+import { RushColumns } from './rush-columns.js';
 
-let board = initialBoard, composition, capture, last = -1;
+let board = initialBoard, composition, capture, rush, last = -1;
 const states = new Map();
 const canvas = document.querySelector('#pv');
 
 function incomingFrames(index) {
   if (index === 0) return 0;
   const cut = board.cuts[index], previous = board.cuts[index - 1];
-  if (cut.transition === 'none' || cut.transition === 'flash' || previous.kind === 'gameplay' || previous.kind === 'cutin-trio') return 0;
+  if (cut.transition === 'none' || cut.transition === 'flash' || previous.kind === 'gameplay') return 0;
   return Math.round((cut.crossfade ?? board.effects.crossfade) * board.fps);
 }
 
@@ -20,6 +21,9 @@ function validate(b) {
   for (const key of ['portraitSlide', 'nameDuration', 'nameImpact', 'quoteCharacter', 'storyFade', 'storyLineFade', 'trioSlide', 'titleFade', 'genreFade']) if (!(b.effects?.[key] > 0)) throw new Error(`effects.${key}には正の秒数を指定してください`);
   if (!(b.presentation?.fieldFeather >= 40 && b.presentation.fieldFeather <= 60 && b.presentation.portraitHeight > 0 && b.presentation.portraitHeight <= 1000)) throw new Error('presentationのフェザー幅・立ち絵サイズが不正です');
   if (b.cuts[0]?.start !== 0) throw new Error('先頭カットは0秒にしてください');
+  if (!b.presentation.rush || typeof b.presentation.rush.trioBackdrop !== 'boolean'
+    || !(b.presentation.rush.slide > 0 && b.presentation.rush.dimDuration > 0)
+    || !(b.presentation.rush.brightness >= 0 && b.presentation.rush.brightness <= 1 && b.presentation.rush.blur >= 0)) throw new Error('presentation.rushが不正です');
   if (b.presentation.epithet !== undefined && typeof b.presentation.epithet !== 'boolean') throw new Error('presentation.epithetは真偽値で指定してください');
   if (b.presentation.textInset !== undefined && !(b.presentation.textInset >= 24 && b.presentation.textInset <= 150)) throw new Error('presentation.textInsetは24〜150pxで指定してください');
   const opacity = b.presentation.characterBackground?.opacity;
@@ -46,7 +50,7 @@ async function configure(next = board) {
   canvas.width = board.width; canvas.height = board.height;
   composition = new Composition(canvas, board);
   await composition.prepare();
-  capture = undefined; states.clear(); last = -1;
+  capture = undefined; rush = new RushColumns(board); states.clear(); last = -1;
 }
 
 async function renderCut(index, frame) {
@@ -59,7 +63,7 @@ async function renderCut(index, frame) {
     const layer = document.createElement('canvas'); layer.width = board.width; layer.height = board.height;
     const renderer = new Composition(layer, board); renderer.images = composition.images;
     renderer.portraitCrops = composition.portraitCrops;
-    const shot = cut.capture ? new Capture(board.pixelRatio) : undefined;
+    const shot = cut.capture && cut.kind !== 'gameplay-columns' ? new Capture(board.pixelRatio) : undefined;
     if (shot) await shot.begin(cut);
     state = { canvas: layer, composition: renderer, capture: shot };
     states.set(index, state);
@@ -71,20 +75,21 @@ async function renderCut(index, frame) {
       if (state.capture.frame < local) state.capture.drawTo(state.composition.ctx, 0);
     }
   }
-  await state.composition.draw(cut, local, end - first, state.capture, frame / board.fps);
-  return { ...state, cut, local };
+  const columns = cut.kind === 'gameplay-columns' || cut.kind === 'cutin-trio' ? await rush.render(frame) : undefined;
+  await state.composition.draw(cut, local, end - first, state.capture, frame / board.fps, columns);
+  return { ...state, cut, local, columns };
 }
 
 async function renderFrame(frame) {
   if (!Number.isInteger(frame) || frame < 0 || frame >= Math.round(board.duration * board.fps)) throw new Error(`frameが範囲外: ${frame}`);
-  if (frame <= last) states.clear();
+  if (frame <= last) { states.clear(); rush = new RushColumns(board); }
   const index = board.cuts.findLastIndex(cut => Math.round(cut.start * board.fps) <= frame);
   for (const key of states.keys()) if (key < index || key > index + 1) states.delete(key);
   const current = await renderCut(index, frame);
   capture = current.capture;
   const c = composition.ctx; c.reset(); c.drawImage(current.canvas, 0, 0);
   composition.textBounds = current.composition.textBounds;
-  const captures = current.capture ? [{ id: current.cut.id, stats: current.capture.stats }] : [];
+  const captures = current.capture ? [{ id: current.cut.id, stats: current.capture.stats }] : current.columns?.captures ?? [];
   let transition = null;
   if (index + 1 < board.cuts.length) {
     const next = board.cuts[index + 1], boundary = Math.round(next.start * board.fps), duration = incomingFrames(index + 1);
@@ -112,12 +117,15 @@ function base64(bytes) {
   return btoa(s);
 }
 
-async function preflight() {
+async function preflight(ids) {
   const results = [];
   for (let i = 0; i < board.cuts.length; i++) {
     const cut = board.cuts[i];
-    if (!cut.capture) continue;
-    const frames = Math.round((board.cuts[i + 1]?.start ?? board.duration) * board.fps) - Math.round(cut.start * board.fps) + incomingFrames(i);
+    if (!cut.capture || (ids && !ids.includes(cut.id))) continue;
+    const end = cut.kind === 'gameplay-columns'
+      ? board.cuts[board.cuts.findIndex(c => c.kind === 'cutin-trio') + 1].start
+      : board.cuts[i + 1]?.start ?? board.duration;
+    const frames = Math.round(end * board.fps) - Math.round(cut.start * board.fps) + incomingFrames(i);
     const candidate = new Capture(board.pixelRatio);
     await candidate.begin(cut);
     let available = 0, exhausted = false;
