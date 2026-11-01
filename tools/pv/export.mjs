@@ -283,7 +283,8 @@ try {
           [field.x + field.width / 2, field.y + 2 * scale], [field.x + field.width / 2, field.y + field.height - 2 * scale]];
         const border = edges.map(([x, y]) => pixel(x, y));
         if (field.y < 24 || field.y + field.height > 1056 || border.some(p => p[0] < 140 || p[1] < 130 || p[2] < 170)) throw new Error(`${cut.id}: フィールドの四辺を確認できません`);
-        if (Math.abs(portrait.height - board.presentation.portraitHeight) > 0.01 || Math.abs(portrait.y + portrait.height / 2 - 540) > 0.01) throw new Error(`${cut.id}: 立ち絵の高さ・上下中央が不一致です`);
+        const sizeMatches = cut.portraitWidth === undefined ? Math.abs(portrait.height - board.presentation.portraitHeight) < 0.01 : Math.abs(portrait.width - cut.portraitWidth) < 0.01;
+        if (!sizeMatches || Math.abs(portrait.y + portrait.height / 2 - 540) > 0.01) throw new Error(`${cut.id}: 立ち絵のサイズ・上下中央が不一致です`);
         const index = board.cuts.indexOf(cut), onset = Math.round(cut.start * fps) - window.pv.incomingFrames(index);
         const nameAt = fx.portraitSlide + fx.nameDelay, quoteAt = nameAt + fx.quoteDelay;
         const pose = await window.pv.renderFrame(onset + Math.round(fx.portraitSlide * fps) - 1);

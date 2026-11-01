@@ -96,8 +96,9 @@ export class Composition {
     c.restore();
   }
 
-  standingPortrait(path, centerX, centerY, height) {
-    const crop = this.portraitCrops.get(path), width = height * crop.width / crop.height;
+  standingPortrait(path, centerX, centerY, height, fitWidth) {
+    const crop = this.portraitCrops.get(path), width = fitWidth ?? height * crop.width / crop.height;
+    if (fitWidth !== undefined) height = width * crop.height / crop.width;
     const bounds = { x: centerX - width / 2, y: centerY - height / 2, width, height };
     this.ctx.drawImage(this.images.get(path), crop.x, crop.y, crop.width, crop.height, bounds.x, bounds.y, width, height);
     this.visual.portrait = bounds;
@@ -133,7 +134,7 @@ export class Composition {
     const enter = ease(local / fx.portraitSlide), drift = (1 - enter) * fx.portraitDistance * (right ? -1 : 1);
     c.save(); c.beginPath(); c.rect(right ? 0 : 926, 0, 994, 1080); c.clip(); c.translate(drift, 0);
     const center = { obsidia: 450, chappy: 1570, claudine: 450, jinrai: 1490, etokichi: 490, minerva: 1440 }[cut.layout] ?? (right ? 490 : 1460);
-    this.standingPortrait(cut.portrait, center, 540, this.board.presentation.portraitHeight);
+    this.standingPortrait(cut.portrait, center, 540, this.board.presentation.portraitHeight, cut.portraitWidth);
     c.restore();
     // 顔を文字から離し、立ち絵の下端を暗幕に沈めて文字を読ませる。
     const shade = c.createLinearGradient(0, 720, 0, 1080);

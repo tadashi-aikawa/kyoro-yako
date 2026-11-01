@@ -72,6 +72,7 @@
       "name": "みみこ",
       "quote": "それなら、あたしも本気でいくの。",
       "portrait": "/assets/members/mimiko-stand.webp",
+      "portraitWidth": 420,
       "color": "#e8c974",
       "capture": {
         "stage": 1,
@@ -109,6 +110,7 @@
       "quote": "今度はぼくも本気だよ、キチ！",
       "spell": "エトキチ・ペンタグラムノヴァ",
       "portrait": "/assets/members/etokichi-stand.webp",
+      "portraitWidth": 420,
       "color": "#fbd768",
       "capture": {
         "stage": 5,
