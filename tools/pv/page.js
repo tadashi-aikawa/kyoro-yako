@@ -34,6 +34,7 @@ function validate(b) {
     if (!Number.isFinite(cut.start) || end <= cut.start || cut.start < 0 || end > b.duration) throw new Error(`カット時刻の順序が不正: ${cut.id}`);
     if (cut.review < 0 || cut.review >= end - cut.start) throw new Error(`reviewはカット内の秒数にしてください: ${cut.id}`);
     if (cut.capture && !layouts.includes(cut.layout)) throw new Error(`未定義レイアウト: ${cut.layout}`);
+    if (cut.portraitSide !== undefined && !['left', 'right'].includes(cut.portraitSide)) throw new Error(`portraitSideが不正: ${cut.id}`);
   }
 }
 

@@ -20,12 +20,12 @@ test('ミックスをまたぐ試写は完成タイムラインの同じ音位�
   assert.equal(full.length, 4 * 44100 * 2);
 });
 
-test('B案は前区間だけを0.2秒延ばし、2区間目の頭を83.91秒に置く', () => {
-  const plan = audioPlan({ ...music, segments: [{ from: 0, to: 83.91 }, { from: 152.48, to: 170 }] }, { duration: 101.4 });
-  assert.ok(Math.abs(plan.contentDuration - 101.43) < 1e-8);
+test('20小節のサビは前区間だけを0.2秒延ばし、2区間目の頭を90.29秒に置く', () => {
+  const plan = audioPlan({ ...music, segments: [{ from: 0, to: 90.29 }, { from: 152.48, to: 163.60 }] }, { duration: 101.4 });
+  assert.ok(Math.abs(plan.contentDuration - 101.41) < 1e-8);
   assert.equal(plan.tailPadding, 0);
-  assert.deepEqual(plan.joins, [{ start: 83.91, end: 84.11, source: 152.48 }]);
-  assert.deepEqual(plan.sourceRanges, [{ from: 0, to: 84.11, pvStart: 0 }, { from: 152.48, to: 170, pvStart: 83.91 }]);
+  assert.deepEqual(plan.joins, [{ start: 90.29, end: 90.49000000000001, source: 152.48 }]);
+  assert.deepEqual(plan.sourceRanges, [{ from: 0, to: 90.49000000000001, pvStart: 0 }, { from: 152.48, to: 163.60, pvStart: 90.29 }]);
 });
 
 test('3区間でもクロスフェードによる開始時刻の前倒しが累積しない', () => {

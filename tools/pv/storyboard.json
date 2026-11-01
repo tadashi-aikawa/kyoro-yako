@@ -9,7 +9,7 @@
   "title": "梟楼夜航",
   "reading": "きょうろうやこう",
   "release": "2026年11月 公開予定",
-  "url": "tadashi-aikawa.github.io/kyoro-yako",
+  "author": "Tadashi Aikawa",
   "font": "\"Hiragino Mincho ProN\", \"Yu Mincho\", serif",
   "latinFont": "\"Hiragino Kaku Gothic ProN\", sans-serif",
   "night": "#080817",
@@ -20,11 +20,11 @@
     "segments": [
       {
         "from": 0,
-        "to": 83.91
+        "to": 90.29
       },
       {
         "from": 152.48,
-        "to": 170,
+        "to": 163.60,
         "cut": "dawn"
       }
     ],
@@ -87,6 +87,7 @@
       "start": 26.50,
       "kind": "character",
       "layout": "neo",
+      "portraitSide": "left",
       "name": "ネオ",
       "quote": "このキーで勝負しちゃおう！",
       "spell": "QWERTY流星群",
@@ -127,6 +128,7 @@
       "start": 39.26,
       "kind": "character",
       "layout": "obsidia",
+      "portraitSide": "left",
       "name": "オブシディア",
       "quote": "ここからは、わたくしも勝ちにいきますわ。",
       "spell": "グラフビューの天網",
@@ -245,6 +247,7 @@
       "start": 58.39,
       "kind": "character",
       "layout": "claudine",
+      "portraitSide": "left",
       "name": "クロディーヌ",
       "quote": "私の弾幕も見ていってください。",
       "spell": "タイポグラフィの雨",
@@ -255,16 +258,17 @@
         "phase": 3,
         "difficulty": "hard",
         "seed": 3303,
-        "warmup": 340
+        "warmup": 473
       },
       "review": 2,
       "transition": "flash"
     },
     {
       "id": "claudine-ult",
-      "start": 62.38,
+      "start": 63.97,
       "kind": "character",
       "layout": "claudine",
+      "portraitSide": "left",
       "name": "クロディーヌ",
       "quote": "私の弾幕も見ていってください。",
       "spell": "レスポンシブ・ブルーム",
@@ -275,14 +279,15 @@
         "phase": 9,
         "difficulty": "hard",
         "seed": 3309,
-        "warmup": 650
+        "warmup": 1030,
+        "holdHp": true
       },
-      "review": 2,
+      "review": 3.5,
       "presentationStart": 58.39
     },
     {
       "id": "jinrai",
-      "start": 66.37,
+      "start": 70.35,
       "kind": "character",
       "layout": "jinrai",
       "name": "迅雷",
@@ -301,7 +306,7 @@
     },
     {
       "id": "jinrai-ult",
-      "start": 70.35,
+      "start": 74.34,
       "kind": "character",
       "layout": "jinrai",
       "name": "迅雷",
@@ -314,16 +319,19 @@
         "phase": 10,
         "difficulty": "hard",
         "seed": 4410,
-        "warmup": 400
+        "warmup": 790,
+        "holdHp": true
       },
       "review": 2,
-      "presentationStart": 66.37
+      "presentationStart": 70.35
     },
     {
       "id": "minerva",
-      "start": 74.34,
+      "start": 82.31,
+      "crossfade": 0.1,
       "kind": "character",
       "layout": "minerva",
+      "portraitSide": "left",
       "name": "ミネルヴァ",
       "quote": "今夜は、あなたと本気で勝負してみたかったの。",
       "spell": "パノプティコン",
@@ -340,9 +348,10 @@
     },
     {
       "id": "minerva-ult",
-      "start": 79.13,
+      "start": 86.30,
       "kind": "character",
       "layout": "minerva",
+      "portraitSide": "left",
       "name": "ミネルヴァ",
       "quote": "今夜は、あなたと本気で勝負してみたかったの。",
       "spell": "オウル・オブ・ミネルヴァ",
@@ -360,17 +369,17 @@
         }
       },
       "review": 1.6,
-      "presentationStart": 74.34
+      "presentationStart": 82.31
     },
     {
       "id": "dawn",
-      "start": 83.91,
+      "start": 90.29,
       "kind": "dawn",
       "review": 1
     },
     {
       "id": "announcement",
-      "start": 86.30,
+      "start": 92.68,
       "kind": "announcement",
       "review": 3.5
     }
@@ -394,7 +403,10 @@
     "titleAt": 3,
     "titleFade": 3,
     "genreDelay": 1.5,
-    "genreFade": 1
+    "genreFade": 1,
+    "announcementFade": 0.6,
+    "announcementDateAt": 0.3,
+    "announcementAuthorAt": 0.6
   },
   "presentation": {
     "fieldFeather": 50,

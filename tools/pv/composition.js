@@ -8,7 +8,7 @@ export const layouts = ['neo', 'obsidia', 'chappy', 'claudine', 'jinrai', 'etoki
 export function fieldRect(cut, board) {
   // 本体の枠線はFIELDの内側へ1px入る。その1pxを除き、縦横比を保つ。
   const height = 1080, width = height * 382 / 446;
-  return { x: 0, y: 0, width, height, padding: -1, feather: board.presentation.fieldFeather };
+  return { x: cut?.portraitSide === 'left' ? 1920 - width : 0, y: 0, width, height, padding: -1, feather: board.presentation.fieldFeather };
 }
 
 export class Composition {
@@ -104,7 +104,8 @@ export class Composition {
     if (fitWidth !== undefined) height = width * crop.height / crop.width;
     const bounds = { x: centerX - width / 2, y: centerY - height / 2, width, height };
     this.ctx.drawImage(this.images.get(path), crop.x, crop.y, crop.width, crop.height, bounds.x, bounds.y, width, height);
-    this.visual.portrait = bounds;
+    const position = this.ctx.getTransform().transformPoint(bounds);
+    this.visual.portrait = { ...bounds, x: position.x, y: position.y };
   }
 
   night(time, color = this.board.gold) {
@@ -137,7 +138,8 @@ export class Composition {
     c.reset();
     capture.drawTo(c, 0, 0, field.height, field.padding);
     c.globalCompositeOperation = 'destination-in';
-    const mask = c.createLinearGradient(field.width - field.feather, 0, field.width, 0);
+    const mask = field.x > 0 ? c.createLinearGradient(field.feather, 0, 0, 0)
+      : c.createLinearGradient(field.width - field.feather, 0, field.width, 0);
     mask.addColorStop(0, '#fff'); mask.addColorStop(1, '#fff0');
     c.fillStyle = mask; c.fillRect(0, 0, this.fieldCanvas.width, field.height);
     this.ctx.drawImage(this.fieldCanvas, field.x, field.y);
@@ -154,9 +156,11 @@ export class Composition {
     this.drawField(capture, field);
     this.visual.field = field;
     const fx = this.board.effects;
-    const enter = ease(local / fx.portraitSlide), drift = (1 - enter) * fx.portraitDistance;
-    const center = (field.width + 1920) / 2, textX = field.width + 75;
-    c.save(); c.beginPath(); c.rect(field.width, 0, 1920 - field.width, 1080); c.clip(); c.translate(drift, 0);
+    const left = cut.portraitSide === 'left', panelX = left ? 0 : field.width, panelWidth = 1920 - field.width;
+    const enter = ease(local / fx.portraitSlide), drift = (1 - enter) * fx.portraitDistance * (left ? -1 : 1);
+    const center = panelX + panelWidth / 2, textX = panelX + 75;
+    this.visual.panel = { x: panelX, width: panelWidth, side: left ? 'left' : 'right' };
+    c.save(); c.beginPath(); c.rect(panelX, 0, panelWidth, 1080); c.clip(); c.translate(drift, 0);
     if (showBackground) {
       const crop = this.portraitCrops.get(cut.portrait);
       const height = cut.portraitWidth === undefined ? this.board.presentation.portraitHeight : cut.portraitWidth * crop.height / crop.width;
@@ -167,7 +171,7 @@ export class Composition {
     // 顔を文字から離し、立ち絵の下端を暗幕に沈めて文字を読ませる。
     const shade = c.createLinearGradient(0, 720, 0, 1080);
     shade.addColorStop(0, '#08081700'); shade.addColorStop(0.7, '#080817eb'); shade.addColorStop(1, this.board.night);
-    c.fillStyle = shade; c.fillRect(field.width, 720, 1920 - field.width, 360);
+    c.fillStyle = shade; c.fillRect(panelX, 720, panelWidth, 360);
     const nameAt = fx.portraitSlide + fx.nameDelay, quoteAt = nameAt + fx.nameDuration + fx.quoteDelay;
     const nameAge = local - nameAt, nameEnter = ease(nameAge / fx.nameDuration);
     const scale = 1 + (fx.nameScale - 1) * (1 - nameEnter);
@@ -178,7 +182,7 @@ export class Composition {
     c.save(); c.globalAlpha = clamp(nameAge / fx.nameDuration);
     c.translate(...pivot); c.scale(scale, scale); c.translate(-pivot[0], -pivot[1]);
     this.textRole = 'name';
-    const nameWidth = Math.min(center - field.width - 48, 1896 - center) * 2 / fx.nameScale;
+    const nameWidth = (panelWidth - 96) / fx.nameScale;
     this.text(cut.name, center, 825, 110, color, nameWidth, 'center', false, { color: '#02020a', blur: 18, passes: 2 });
     if (impact > 0) this.text(cut.name, center, 825, 110, color, nameWidth, 'center', false, { color, blur: 20 * impact });
     c.restore();
@@ -274,13 +278,17 @@ export class Composition {
       const sky = await this.image(`/_Unversioned/pv/ending/${String(index + 1).padStart(4, '0')}.webp`);
       c.drawImage(sky, 0, 0, 1920, 1080);
       if (cut.kind === 'announcement') {
-        c.save(); c.globalAlpha = clamp(local / 0.8);
+        c.save(); c.globalAlpha = clamp(local / b.effects.announcementFade);
         c.fillStyle = '#10142540'; c.fillRect(0, 0, 1920, 1080);
         const titleShadow = { color: '#160f25', blur: 20, offsetY: 4, passes: 2 };
         this.text(b.title, 960, 465, 160, '#fff0cd', 1600, 'center', false, titleShadow);
         this.text(b.reading, 960, 535, 32, '#2a2338', 1600, 'center', false, null);
+        c.restore();
+        c.save(); c.globalAlpha = clamp((local - b.effects.announcementDateAt) / b.effects.announcementFade);
         this.text(b.release, 960, 690, 48, '#2a2338', 1600, 'center', false, null);
-        this.text(b.url, 960, 790, 34, '#2a2338', 1600, 'center', true, null);
+        c.restore();
+        c.save(); c.globalAlpha = clamp((local - b.effects.announcementAuthorAt) / b.effects.announcementFade);
+        this.text(b.author, 960, 790, 34, '#2a2338', 1600, 'center', true, null);
         c.restore();
         const remain = (durationFrames - localFrame) / b.fps;
         c.fillStyle = `rgba(0,0,0,${1 - clamp((remain - 1 / b.fps) / 1.5)})`; c.fillRect(0, 0, 1920, 1080);

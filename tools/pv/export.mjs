@@ -18,6 +18,8 @@ const url = `http://127.0.0.1:${port}`;
 const reviewOnly = args.includes('--review-only');
 const verify = args.includes('--verify');
 const preflightOnly = args.includes('--preflight-only');
+const highlightsOnly = args.includes('--highlights');
+if (highlightsOnly && (!reviewOnly || verify || preflightOnly)) throw new Error('--highlightsは--review-onlyと組み合わせてください');
 const backgroundTrial = args.includes('--bg-trial');
 const visibleBackgroundTrial = args.includes('--bg-visible');
 const compareBackgroundTrial = args.includes('--bg-compare');
@@ -163,9 +165,29 @@ try {
   await page.goto(`${url}/tools/pv/index.html?bgm=0`);
   await page.waitForFunction(() => window.pv?.ready);
   await page.evaluate(b => window.pv.configure(b), board);
-  const preflight = backgroundTrial ? [] : await page.evaluate(() => window.pv.preflight());
+  const preflight = backgroundTrial || highlightsOnly ? [] : await page.evaluate(() => window.pv.preflight());
   console.log(`事前検査: ${JSON.stringify(preflight)}`);
-  if (backgroundTrial) {
+  const highlights = highlightsOnly || verify || (!reviewOnly && !preflightOnly)
+    ? await page.evaluate(async () => (await import('./highlight-check.js')).inspectHighlights(window.pv)) : [];
+  if (!highlightsOnly) for (const result of highlights) if (result.errors.length) throw new Error(`${result.id}: ${result.errors.join(' / ')}`);
+  if (highlightsOnly) {
+    await mkdir(reviewDir, { recursive: true });
+    await writeFile(path.join(reviewDir, 'highlights.json'), JSON.stringify(highlights, null, 2));
+    console.log(JSON.stringify(highlights, null, 2));
+    for (const result of highlights) {
+      if (result.errors.length) throw new Error(`${result.id}: ${result.errors.join(' / ')}`);
+      const name = { claudine: 'claudine-rain', 'claudine-ult': 'bloom-final', 'jinrai-ult': 'issen-sequence' }[result.id];
+      const ids = [];
+      for (const [i, frame] of result.samples.entries()) {
+        const id = `${name}-${i}`; ids.push(id);
+        await page.evaluate(n => window.pv.renderFrame(n), frame);
+        const data = await page.evaluate(() => window.pv.snapshot());
+        await writeFile(path.join(reviewDir, `${id}.webp`), Buffer.from(data.split(',')[1], 'base64'));
+      }
+      await contactSheet(reviewDir, ids, name, ids.length);
+      for (const id of ids) await unlink(path.join(reviewDir, `${id}.webp`));
+    }
+  } else if (backgroundTrial) {
     await mkdir(reviewDir, { recursive: true });
     const samples = compareBackgroundTrial ? ['neo', 'minerva'].flatMap(id => [
       [id, `${id}-0`, false, 0],
@@ -280,7 +302,7 @@ try {
       const results = [];
       for (const cut of window.pv.board.cuts.filter(c => c.presentationStart !== undefined)) {
         const frame = Math.round(cut.start * window.pv.board.fps);
-        const x = 926;
+        const x = cut.portraitSide === 'left' ? 0 : 926;
         await window.pv.renderFrame(frame - 1);
         const before = ctx.getImageData(x, 0, 994, 1080).data;
         await window.pv.renderFrame(frame);
@@ -321,6 +343,7 @@ try {
       return verifyPresentation(window.pv);
     });
     results.push({ presentation });
+    results.push({ highlights });
     await writeFile(path.join(out, 'verification.json'), JSON.stringify(results, null, 2));
     console.log(JSON.stringify(results, null, 2));
   } else if (reviewCut) {
@@ -411,11 +434,12 @@ try {
       const story = board.cuts.find(c => c.id === 'letter'), fieldFit = board.cuts.find(c => c.id === 'neo');
       await extract('story', story.start + story.review);
       await extract('field-fit', fieldFit.start + fieldFit.review);
-      await extract('field-edge', fieldFit.start + fieldFit.review, 'crop=260:1080:800:0');
+      await extract('field-edge', fieldFit.start + fieldFit.review, `crop=260:1080:${fieldFit.portraitSide === 'left' ? 860 : 800}:0`);
       await extract('story-mood', story.start + story.review);
       await contactSheet(reviewStaging, ['gate', 'neo', 'etokichi', 'obsidia', 'chappy', 'claudine', 'jinrai', 'minerva'], 'layout-unified', 4);
       await contactSheet(reviewStaging, ['rush-1', 'rush-2', 'rush-3'], 'rush', 3);
       const slide = board.cuts.find(c => c.id === 'neo');
+      const panelX = slide.portraitSide === 'left' ? 0 : 926;
       const onset = (Math.round(slide.start * board.fps) - Math.round(board.effects.crossfade * board.fps)) / board.fps;
       const ids = [];
       for (let i = 0; i < 5; i++) {
@@ -434,14 +458,14 @@ try {
       const stampIds = [];
       for (let i = 0; i < 6; i++) {
         const id = `name-stamp-${i}`; stampIds.push(id);
-        await extract(id, nameAt + i * 0.05, 'crop=994:1080:926:0');
+        await extract(id, nameAt + i * 0.05, `crop=994:1080:${panelX}:0`);
       }
       await contactSheet(reviewStaging, stampIds, 'name-stamp', 6, { width: 497, height: 540 });
       for (const id of stampIds) await unlink(path.join(reviewStaging, `${id}.webp`));
       const typeIds = [], quoteAt = nameAt + board.effects.nameDuration + board.effects.quoteDelay;
       for (const [i, time] of [0.05, 0.15, 0.25].entries()) {
         const id = `typewriter-${i}`; typeIds.push(id);
-        await extract(id, quoteAt + time, 'crop=994:500:926:580');
+        await extract(id, quoteAt + time, `crop=994:500:${panelX}:580`);
       }
       await contactSheet(reviewStaging, typeIds, 'typewriter', 3, { width: 994, height: 500 });
       for (const id of typeIds) await unlink(path.join(reviewStaging, `${id}.webp`));
@@ -450,12 +474,22 @@ try {
         const cut = board.cuts.find(c => c.id === id), portraitId = `portrait-height-${id}`;
         const still = path.join(reviewStaging, portraitId); portraits.push(portraitId);
         await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(cut.start + cut.review), '-i', temporaryVideo,
-          '-vf', 'crop=994:1080:926:0', '-frames:v', '1', `${still}.png`]);
+          '-vf', `crop=994:1080:${cut.portraitSide === 'left' ? 0 : 926}:0`, '-frames:v', '1', `${still}.png`]);
         await run('cwebp', ['-quiet', '-q', '94', `${still}.png`, '-o', `${still}.webp`]);
         await unlink(`${still}.png`);
       }
       await contactSheet(reviewStaging, portraits, 'portrait-heights', 8, { width: 497, height: 540 });
       for (const id of portraits) await unlink(path.join(reviewStaging, `${id}.webp`));
+      for (const highlight of highlights) {
+        const name = { claudine: 'claudine-rain', 'claudine-ult': 'bloom-final', 'jinrai-ult': 'issen-sequence' }[highlight.id];
+        const ids = [];
+        for (const [i, frame] of highlight.samples.entries()) {
+          const id = `${name}-${i}`; ids.push(id);
+          await extract(id, frame / board.fps);
+        }
+        await contactSheet(reviewStaging, ids, name, ids.length);
+        for (const id of ids) await unlink(path.join(reviewStaging, `${id}.webp`));
+      }
     }
     await contactSheet(reviewStaging, reviewIds);
     const elapsed = (performance.now() - started) / 1000;
@@ -467,7 +501,7 @@ try {
     probe.format.filename = videoPath;
     const sourceAfter = await sourceVersion();
     if (source.srcCommit !== sourceAfter.srcCommit || source.diffSha256 !== sourceAfter.diffSha256) throw new Error('撮影中にsrcが変更されました。本編を置き換えず停止します。同じ本体で再実行してください');
-    const report = { ...result, warnings, preflight, source, sourceAfter, musicSha256: hasMusic ? sha(await readFile(music)) : null,
+    const report = { ...result, warnings, preflight, highlights, source, sourceAfter, musicSha256: hasMusic ? sha(await readFile(music)) : null,
       ffmpeg: (await run('ffmpeg', ['-version'])).split('\n')[0], audio: hasMusic ? audio : null,
       board: boardPath, boardSha256: sha(await readFile(boardPath)), videoPath, elapsedSeconds: elapsed, hasMusic, chrome: browser.version(), probe };
     const reportStaging = path.join(staging, `${filename}.report.json`);
