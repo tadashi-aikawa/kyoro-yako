@@ -33,35 +33,31 @@ function prayer(game: Game, cycle = 3): void {
   expect(game.minervaReprise?.prayer).toBe(true);
 }
 
-it.each(difficulties)('借りる9技は%sで元の仕掛けを動かし、HP境界で全て片付く', difficulty => {
-  expect(REPRISES).toHaveLength(9);
-  expect(new Set(REPRISES.map(source => source.boss)).size).toBe(4);
-  for (const [index, source] of REPRISES.entries()) {
-    vi.spyOn(Math, 'random').mockReturnValue((index + 0.5) / REPRISES.length);
-    const game = fight('owlDawn', difficulty); game.phaseFrame = 104;
-    const actualPhase = game.phase;
-    let bullets = 0, lasers = 0, nodes = 0, maxMove = 0;
-    let previous = game.bossXY;
-    for (let local = 0; local < OWL_RELEASE_FRAMES + REPRISE_PREPARE + 1200; local++) {
-      game.update();
-      expect(game.phase).toBe(actualPhase); expect(game.boss).toBe('minerva');
-      expect(game.phase?.duration).toBe(Infinity); expect(game.minervaReprise?.cycle).toBe(0);
-      expect(game.minervaReprise?.index).toBe(index);
-      const position = game.bossXY;
-      maxMove = Math.max(maxMove, Math.hypot(position[0] - previous[0], position[1] - previous[1])); previous = position;
-      bullets = Math.max(bullets, game.bullets.count); lasers = Math.max(lasers, game.jinraiLasers.length); nodes = Math.max(nodes, game.graphNodes.length);
-      expect(game.bullets.count, source.phase.name).toBeLessThan(1000);
-      game.bullets.forEach(b => { expect(Number.isFinite(b.x) && Number.isFinite(b.y), source.phase.name).toBe(true); });
-      if (local < reprisePrepare(game.minervaReprise!)) expect(game.bullets.count).toBe(0);
-    }
-    if (source.phase.pattern !== 'jinraiClone') expect(maxMove, source.phase.name).toBeLessThan(8);
-    expect(bullets + lasers + nodes, source.phase.name).toBeGreaterThan(0);
-    if (source.phase.pattern === 'link') expect(nodes).toBeGreaterThan(15);
-    next(game);
-    expect(game.minervaReprise?.cycle).toBe(1);
-    expect(game.bullets.count).toBe(0); expect(game.graphNodes).toHaveLength(0); expect(game.jinraiLasers).toHaveLength(0);
-    vi.restoreAllMocks();
+// 9技を1ケースにまとめるとCIで時間切れになるため、難易度と技ごとに検証する。
+it.each(difficulties.flatMap(difficulty => REPRISES.map((source, index) => ({ difficulty, pattern: source.phase.pattern, source, index }))))('借りる技 $pattern は $difficulty で元の仕掛けを動かし、HP境界で全て片付く', ({ difficulty, source, index }) => {
+  vi.spyOn(Math, 'random').mockReturnValue((index + 0.5) / REPRISES.length);
+  const game = fight('owlDawn', difficulty); game.phaseFrame = 104;
+  const actualPhase = game.phase;
+  let bullets = 0, lasers = 0, nodes = 0, maxMove = 0;
+  let previous = game.bossXY;
+  for (let local = 0; local < OWL_RELEASE_FRAMES + REPRISE_PREPARE + 1200; local++) {
+    game.update();
+    expect(game.phase).toBe(actualPhase); expect(game.boss).toBe('minerva');
+    expect(game.phase?.duration).toBe(Infinity); expect(game.minervaReprise?.cycle).toBe(0);
+    expect(game.minervaReprise?.index).toBe(index);
+    const position = game.bossXY;
+    maxMove = Math.max(maxMove, Math.hypot(position[0] - previous[0], position[1] - previous[1])); previous = position;
+    bullets = Math.max(bullets, game.bullets.count); lasers = Math.max(lasers, game.jinraiLasers.length); nodes = Math.max(nodes, game.graphNodes.length);
+    expect(game.bullets.count, source.phase.name).toBeLessThan(1000);
+    game.bullets.forEach(b => { expect(Number.isFinite(b.x) && Number.isFinite(b.y), source.phase.name).toBe(true); });
+    if (local < reprisePrepare(game.minervaReprise!)) expect(game.bullets.count).toBe(0);
   }
+  if (source.phase.pattern !== 'jinraiClone') expect(maxMove, source.phase.name).toBeLessThan(8);
+  expect(bullets + lasers + nodes, source.phase.name).toBeGreaterThan(0);
+  if (source.phase.pattern === 'link') expect(nodes).toBeGreaterThan(15);
+  next(game);
+  expect(game.minervaReprise?.cycle).toBe(1);
+  expect(game.bullets.count).toBe(0); expect(game.graphNodes).toHaveLength(0); expect(game.jinraiLasers).toHaveLength(0);
 }, 10_000);
 
 it('抽選はHP切替ごとに行い、ごく低確率の連続も選べる。時間やボムでは切り替えない', () => {
@@ -112,6 +108,7 @@ it('祈りでは登場履歴を増やさず、最終技やステージのやり�
 });
 
 it('借りる技をVim以外の9技に絞る', () => {
+  expect(new Set(REPRISES.map(source => source.boss)).size).toBe(4);
   expect(REPRISES.map(source => source.phase.pattern)).toEqual([
     'enter', 'link', 'sweep', 'type', 'grid', 'jinraiKiss', 'jinraiSakura', 'jinraiClone', 'jinraiPetal',
   ]);
