@@ -18,6 +18,10 @@ const url = `http://127.0.0.1:${port}`;
 const reviewOnly = args.includes('--review-only');
 const verify = args.includes('--verify');
 const preflightOnly = args.includes('--preflight-only');
+const backgroundTrial = args.includes('--bg-trial');
+const visibleBackgroundTrial = args.includes('--bg-visible');
+if (visibleBackgroundTrial && !backgroundTrial) throw new Error('--bg-visibleは--bg-trialと組み合わせてください');
+if (backgroundTrial && (!reviewOnly || !args.includes('--name') || verify || preflightOnly)) throw new Error('--bg-trialは--review-only --nameと組み合わせてください');
 const sourceRef = value('--source-ref', null);
 if (args.includes('--source-ref') && (!sourceRef || sourceRef.startsWith('-'))) throw new Error('--source-refにコミットを指定してください');
 const from = Math.round(Number(value('--from', '0')) * board.fps);
@@ -103,7 +107,7 @@ await mkdir(path.join(out, 'ending'), { recursive: true });
 const ending = path.join(root, board.ending.path);
 const signature = sha(await readFile(ending)) + JSON.stringify(board.ending) + board.fps;
 const signaturePath = path.join(out, 'ending/signature.txt');
-if (!await exists(signaturePath) || await readFile(signaturePath, 'utf8') !== signature) {
+if (!backgroundTrial && (!await exists(signaturePath) || await readFile(signaturePath, 'utf8') !== signature)) {
   await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(board.ending.offset), '-i', ending,
     '-an', '-t', String(board.ending.duration), '-vf', `fps=${board.fps},scale=1920:1080`,
     path.join(out, 'ending/%04d.png')]);
@@ -155,9 +159,44 @@ try {
   await page.goto(`${url}/tools/pv/index.html?bgm=0`);
   await page.waitForFunction(() => window.pv?.ready);
   await page.evaluate(b => window.pv.configure(b), board);
-  const preflight = await page.evaluate(() => window.pv.preflight());
+  const preflight = backgroundTrial ? [] : await page.evaluate(() => window.pv.preflight());
   console.log(`事前検査: ${JSON.stringify(preflight)}`);
-  if (preflightOnly) {
+  if (backgroundTrial) {
+    await mkdir(reviewDir, { recursive: true });
+    const samples = [
+      ['neo', 'neo-before', false, 0.25], ['minerva', 'minerva-before', false, 0.25],
+      ...(visibleBackgroundTrial ? [
+        ['neo', 'neo-vivid', true, 0.45, 1.8, 24], ['minerva', 'minerva-vivid', true, 0.45, 1.8, 24],
+        ['neo', 'neo-sharp', true, 0.35, 1.5, 10], ['minerva', 'minerva-sharp', true, 0.35, 1.5, 10],
+      ] : [
+        ['neo', 'neo', true, 0.25], ['minerva', 'minerva', true, 0.25],
+        ['neo', 'neo-light', true, 0.15], ['neo', 'neo-strong', true, 0.3],
+      ]),
+    ];
+    const results = [], baselines = new Map();
+    for (const [id, name, enabled, opacity, brightness = 1, blur = 24] of samples) {
+      const trialBoard = structuredClone(board);
+      trialBoard.presentation.characterBackground = { enabled, opacity, brightness, blur };
+      await page.evaluate(b => window.pv.configure(b), trialBoard);
+      const cut = board.cuts.find(c => c.id === id);
+      const frame = Math.round((cut.start + cut.review) * board.fps);
+      const result = await page.evaluate(async frame => {
+        const state = await window.pv.renderFrame(frame);
+        const field = state.visual.field, ctx = document.querySelector('#pv').getContext('2d');
+        const data = ctx.getImageData(Math.ceil(field.x), Math.ceil(field.y), Math.floor(field.width) - 1, Math.floor(field.height) - 1).data;
+        const digest = await crypto.subtle.digest('SHA-256', data);
+        const fieldHash = Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('');
+        return { image: window.pv.snapshot(), state, fieldHash };
+      }, frame);
+      const layout = JSON.stringify({ text: result.state.textBounds, portrait: result.state.visual.portrait });
+      if (!enabled) baselines.set(id, { fieldHash: result.fieldHash, layout });
+      else if (baselines.get(id).fieldHash !== result.fieldHash || baselines.get(id).layout !== layout) throw new Error(`${name}: 背景以外のプレイ映像・文字・立ち絵配置が変化しました`);
+      if (!visibleBackgroundTrial || enabled) await writeFile(path.join(reviewDir, `${name}.webp`), Buffer.from(result.image.split(',')[1], 'base64'));
+      results.push({ name, frame, enabled, opacity, brightness, blur, fieldHash: result.fieldHash, state: result.state });
+      console.log(`${name}: frame=${frame}, background=${enabled ? opacity : 'before'}, brightness=${brightness}, blur=${blur}, field=${result.fieldHash}`);
+    }
+    await writeFile(path.join(reviewDir, visibleBackgroundTrial ? 'report-visible.json' : 'report.json'), JSON.stringify({ source, samples: results }, null, 2));
+  } else if (preflightOnly) {
     await writeFile(path.join(out, 'preflight.json'), JSON.stringify(preflight, null, 2));
   } else if (verify) {
     const results = [];
@@ -232,7 +271,7 @@ try {
       const results = [];
       for (const cut of window.pv.board.cuts.filter(c => c.presentationStart !== undefined)) {
         const frame = Math.round(cut.start * window.pv.board.fps);
-        const x = cut.layout === 'claudine' ? 0 : 926;
+        const x = 926;
         await window.pv.renderFrame(frame - 1);
         const before = ctx.getImageData(x, 0, 994, 1080).data;
         await window.pv.renderFrame(frame);
@@ -269,35 +308,8 @@ try {
     });
     results.push({ transitions });
     const presentation = await page.evaluate(async () => {
-      const board = window.pv.board, fps = board.fps, fx = board.effects;
-      const ctx = document.querySelector('#pv').getContext('2d'), result = [];
-      const pixel = (x, y) => Array.from(ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data);
-      for (const cut of board.cuts.filter(c => c.kind === 'story')) {
-        const state = await window.pv.renderFrame(Math.round((cut.start + cut.review) * fps));
-        if (pixel(100, 100).join(',') !== '0,0,0,255' || state.visual.portrait.x >= 960 || state.textBounds.some(t => t.x < 960)) throw new Error(`${cut.id}: 黒背景・みみこ左・セリフ右が未反映です`);
-      }
-      for (const cut of board.cuts.filter(c => c.kind === 'character' && c.presentationStart === undefined)) {
-        const settled = await window.pv.renderFrame(Math.round((cut.start + cut.review) * fps));
-        const field = settled.visual.field, portrait = settled.visual.portrait, scale = field.height / 452;
-        const edges = [[field.x + 2 * scale, 540], [field.x + field.width - 2 * scale, 540],
-          [field.x + field.width / 2, field.y + 2 * scale], [field.x + field.width / 2, field.y + field.height - 2 * scale]];
-        const border = edges.map(([x, y]) => pixel(x, y));
-        if (field.y < 24 || field.y + field.height > 1056 || border.some(p => p[0] < 140 || p[1] < 130 || p[2] < 170)) throw new Error(`${cut.id}: フィールドの四辺を確認できません`);
-        const sizeMatches = cut.portraitWidth === undefined ? Math.abs(portrait.height - board.presentation.portraitHeight) < 0.01 : Math.abs(portrait.width - cut.portraitWidth) < 0.01;
-        if (!sizeMatches || Math.abs(portrait.y + portrait.height / 2 - 540) > 0.01) throw new Error(`${cut.id}: 立ち絵のサイズ・上下中央が不一致です`);
-        const index = board.cuts.indexOf(cut), onset = Math.round(cut.start * fps) - window.pv.incomingFrames(index);
-        const nameAt = fx.portraitSlide + fx.nameDelay, quoteAt = nameAt + fx.quoteDelay;
-        const pose = await window.pv.renderFrame(onset + Math.round(fx.portraitSlide * fps) - 1);
-        const name = await window.pv.renderFrame(onset + Math.round((nameAt + 0.1) * fps));
-        const quote = await window.pv.renderFrame(onset + Math.round((quoteAt + 0.1) * fps));
-        if (pose.textBounds.length || !name.textBounds.some(t => t.role === 'name') || name.textBounds.some(t => t.role === 'quote') || !quote.textBounds.some(t => t.role === 'quote')) throw new Error(`${cut.id}: 立ち絵→名前→セリフの順になっていません`);
-        const early = name.textBounds.find(t => t.role === 'name'), final = settled.textBounds.find(t => t.role === 'name');
-        if (!(early.right - early.x > final.right - final.x && early.alpha < 1)) throw new Error(`${cut.id}: 名前の縮小・フェードが未反映です`);
-        const movingQuote = quote.textBounds.find(t => t.role === 'quote'), finalQuote = settled.textBounds.find(t => t.role === 'quote');
-        if (!(movingQuote.y > finalQuote.y && movingQuote.alpha < 1)) throw new Error(`${cut.id}: セリフの上昇・フェードが未反映です`);
-        result.push({ id: cut.id, field, border, portrait, stagedEntrance: true });
-      }
-      return result;
+      const { verifyPresentation } = await import('./presentation-check.js');
+      return verifyPresentation(window.pv);
     });
     results.push({ presentation });
     await writeFile(path.join(out, 'verification.json'), JSON.stringify(results, null, 2));
@@ -368,9 +380,9 @@ try {
       await unlink(`${still}.png`);
     }
     if (!partial && filename === 'kyoro-yako-pv') {
-      const extract = async (id, at) => {
+      const extract = async (id, at, filter) => {
         const still = path.join(reviewStaging, id);
-        await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(at), '-i', temporaryVideo, '-frames:v', '1', `${still}.png`]);
+        await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(at), '-i', temporaryVideo, ...(filter ? ['-vf', filter] : []), '-frames:v', '1', `${still}.png`]);
         await run('cwebp', ['-quiet', '-q', '94', `${still}.png`, '-o', `${still}.webp`]);
         await unlink(`${still}.png`);
       };
@@ -378,6 +390,9 @@ try {
       const story = board.cuts.find(c => c.id === 'letter'), fieldFit = board.cuts.find(c => c.id === 'neo');
       await extract('story', story.start + story.review);
       await extract('field-fit', fieldFit.start + fieldFit.review);
+      await extract('field-edge', fieldFit.start + fieldFit.review, 'crop=260:1080:800:0');
+      await extract('story-mood', story.start + story.review);
+      await contactSheet(reviewStaging, ['gate', 'neo', 'etokichi', 'obsidia', 'chappy', 'claudine', 'jinrai', 'minerva'], 'layout-unified', 4);
       await contactSheet(reviewStaging, ['rush-1', 'rush-2', 'rush-3'], 'rush', 3);
       const slide = board.cuts.find(c => c.id === 'neo');
       const onset = (Math.round(slide.start * board.fps) - Math.round(board.effects.crossfade * board.fps)) / board.fps;
@@ -395,13 +410,26 @@ try {
       }
       await contactSheet(reviewStaging, nameIds, 'name-motion', 5);
       for (const id of nameIds) await unlink(path.join(reviewStaging, `${id}.webp`));
+      const stampIds = [];
+      for (let i = 0; i < 6; i++) {
+        const id = `name-stamp-${i}`; stampIds.push(id);
+        await extract(id, nameAt + i * 0.05, 'crop=994:1080:926:0');
+      }
+      await contactSheet(reviewStaging, stampIds, 'name-stamp', 6, { width: 497, height: 540 });
+      for (const id of stampIds) await unlink(path.join(reviewStaging, `${id}.webp`));
+      const typeIds = [], quoteAt = nameAt + board.effects.nameDuration + board.effects.quoteDelay;
+      for (const [i, time] of [0.05, 0.15, 0.25].entries()) {
+        const id = `typewriter-${i}`; typeIds.push(id);
+        await extract(id, quoteAt + time, 'crop=994:500:926:580');
+      }
+      await contactSheet(reviewStaging, typeIds, 'typewriter', 3, { width: 994, height: 500 });
+      for (const id of typeIds) await unlink(path.join(reviewStaging, `${id}.webp`));
       const portraits = [];
       for (const id of ['gate', 'neo', 'etokichi', 'obsidia', 'chappy', 'claudine', 'jinrai', 'minerva']) {
         const cut = board.cuts.find(c => c.id === id), portraitId = `portrait-height-${id}`;
-        const left = ['obsidia', 'claudine', 'etokichi', 'field-right'].includes(cut.layout);
         const still = path.join(reviewStaging, portraitId); portraits.push(portraitId);
         await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(cut.start + cut.review), '-i', temporaryVideo,
-          '-vf', `crop=994:1080:${left ? 0 : 926}:0`, '-frames:v', '1', `${still}.png`]);
+          '-vf', 'crop=994:1080:926:0', '-frames:v', '1', `${still}.png`]);
         await run('cwebp', ['-quiet', '-q', '94', `${still}.png`, '-o', `${still}.webp`]);
         await unlink(`${still}.png`);
       }

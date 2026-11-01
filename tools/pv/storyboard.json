@@ -72,7 +72,7 @@
       "name": "みみこ",
       "quote": "それなら、あたしも本気でいくの。",
       "portrait": "/assets/members/mimiko-stand.webp",
-      "portraitWidth": 420,
+      "portraitWidth": 500,
       "color": "#e8c974",
       "capture": {
         "stage": 1,
@@ -110,7 +110,7 @@
       "quote": "今度はぼくも本気だよ、キチ！",
       "spell": "エトキチ・ペンタグラムノヴァ",
       "portrait": "/assets/members/etokichi-stand.webp",
-      "portraitWidth": 420,
+      "portraitWidth": 500,
       "color": "#fbd768",
       "capture": {
         "stage": 5,
@@ -380,12 +380,14 @@
     "portraitSlide": 0.4,
     "portraitDistance": 1000,
     "nameDelay": 0,
-    "nameDuration": 0.3,
-    "nameScale": 1.08,
-    "quoteDelay": 0.2,
-    "quoteDuration": 0.3,
-    "quoteDistance": 24,
+    "nameDuration": 0.25,
+    "nameScale": 1.6,
+    "nameImpact": 0.1,
+    "quoteDelay": 0,
+    "quoteCharacter": 0.03,
     "storyFade": 2,
+    "storyLineFade": 1,
+    "storyDrift": 10,
     "trioSlide": 0.18,
     "rushFlash": 0.05,
     "chorusFlash": 0.12,
@@ -395,9 +397,9 @@
     "genreFade": 1
   },
   "presentation": {
-    "fieldHeight": 984,
-    "fieldMargin": 24,
-    "portraitHeight": 800
+    "fieldFeather": 50,
+    "portraitHeight": 800,
+    "characterBackground": { "enabled": false, "opacity": 0.25, "brightness": 1, "blur": 24 }
   },
   "genreText": "owleryの仲間が待ち受ける弾幕シューティング"
 }

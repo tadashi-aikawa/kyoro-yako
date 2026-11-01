@@ -46,6 +46,7 @@ Viteを`127.0.0.1:5391`で自動起動する。終了時にはそのポートを
   - 文言: 句読点を付けず、「弾幕」の前で改行する。
 - 13.74秒に手紙、16.93秒に上階への物語、20.12秒にみみこの紹介を置く。
   - 物語: みみこを左、セリフを右へ置く。手紙の開始から2秒で鍵絵を黒へ落とし、次の物語も黒を維持する。
+  - セリフ: ウェイト300の明朝、字間4.4px、行間140px、青みの白`#dfe4f0`。各行を1秒ずつ順にフェードし、10pxだけ上へ漂わせる。
   - みみこの紹介: ステージ1道中を背景に、名前と本体のセリフを表示する。
 - 26.50〜52.02秒は、ネオ・エトキチ・オブシディア・チャッピーを各6.38秒紹介する。
 - 52.02・53.61・55.21秒にステージ2・3・4の道中を中央へ大きく表示する。
@@ -65,14 +66,18 @@ Viteを`127.0.0.1:5391`で自動起動する。終了時にはそのポートを
   - 例外: 道中3連打と3段カットインの接続にはクロスフェードを掛けない。
   - 通常技から最終技: プレイフィールドだけをクロスフェードし、人物側を維持する。
 - キャラの立ち絵は外側から0.4秒で入る。
-  - 名前: 立ち絵の停止後に、1.08倍から等倍へ0.3秒で縮小しながらフェードインする。
-  - セリフ: 名前の開始から0.2秒遅れて、下24pxから0.3秒で上昇しながらフェードインする。
+  - 名前: 立ち絵の停止後に、1.6倍から等倍へ0.25秒で縮小しながらフェードインする。着地で0.1秒の光をにじませる。
+  - セリフ: 名前の着地直後から1文字30msのタイプライターで出す。カーソルは付けず、既出文字の位置・サイズは固定する。
   - 基準: 登場演出もクロスフェードの開始時刻から進める。
 - 縦長6人の立ち絵は、透明余白を除いた高さ800pxで上下中央に置く。
   - 測定: alphaが12/255を超える範囲を素材ごとに取得し、縦横比を維持する。元画像は編集しない。
-  - みみこ・エトキチの紹介: `portraitWidth: 420`で幅をそろえる。縦長6人の実表示幅の中央値約419pxを基準とし、中心位置は維持する。
-- 紹介のフィールドは、384×448の全体と枠線の周囲2pxを高さ984pxへ縮め、上下48pxの余白を置く。
-  - 四辺: 本体の枠線はFIELDの外側へ1px張り出すため、その部分も撮影に含める。
+  - みみこ・エトキチの紹介: `portraitWidth: 500`で幅をそろえ、上下中央を維持する。
+- 紹介のフィールドは画面左端から高さ1080pxいっぱいに置く。
+  - 枠除去: 本体の枠線が内側へ入る1pxを四辺から除き、382×446の内容を縦横比のまま拡大する。幅は約925px。
+  - 境界: 右端50pxを透明へフェザーする。左・上・下に余白を置かない。
+- 全員の立ち絵と文字をフィールド右側へ統一する。
+  - 名前: 立ち絵の中心に合わせ、下側のベースライン825pxへ横書きで重ねる。サイズ110pxを基本に、拡大中も収まる幅へ調整する。
+  - セリフ: ベースライン920pxへ置く。下側の暗幕と文字の形に沿った影で可読性を保つ。
 - ミネルヴァの最終技は`capture.prayer: { cycle: 12, frame: 0 }`で最後の祈りを撮る。
   - 準備: 離陸後までwarmupし、本体のHP境界を順に通して指定のサイクルへ入る。
   - 本気区間: 宣言と補給の演出がある場合は、本体の更新で終了するまで待ってから次のHP境界へ進める。
@@ -91,9 +96,14 @@ caffeinate -dimsu node tools/pv/export.mjs --verify
 - `review/rush.webp`: 道中3カットを左からステージ2・3・4の順に並べる。
 - `review/slide-in.webp`: ネオの登場開始から0.0・0.1・0.2・0.3・0.4秒を左から並べる。
 - `review/story.webp`: 手紙の鍵絵が黒へ落ちた状態。
-- `review/field-fit.webp`: ネオの紹介。フィールドの四辺を含む。
+- `review/field-fit.webp`: ネオの紹介。縦いっぱいのフィールドと右端のフェザーを含む。
 - `review/portrait-heights.webp`: みみこ・ネオ・エトキチ・オブシディア・チャッピー・クロディーヌ・迅雷・ミネルヴァの順で人物側を並べる。
 - `review/name-motion.webp`: ネオの名前の登場開始から0.1秒刻みで5枚を並べる。
+- `review/layout-unified.webp`: 8人の紹介を2段4列に並べる。
+- `review/field-edge.webp`: ネオのフィールド右端周辺260×1080pxを切り出す。
+- `review/name-stamp.webp`: 名前の登場開始から0.05秒刻みで6枚を並べる。
+- `review/typewriter.webp`: セリフ開始後0.05・0.15・0.25秒の3枚を並べる。
+- `review/story-mood.webp`: letterの2行目が出きった代表フレーム。
 
 | フィールド | 内容 |
 |---|---|
@@ -101,12 +111,12 @@ caffeinate -dimsu node tools/pv/export.mjs --verify
 | `cuts[].start` | そのカットへの切り替えが完了する小節頭の秒数 |
 | `cuts[].review` | カット内の代表フレームを切り出す秒数 |
 | `cuts[].kind` | 導入、物語、キャラ、戦闘などのカット種別 |
-| `cuts[].layout` | キャラごとの組み方。下表参照 |
+| `cuts[].layout` | 既存カットの識別。紹介の配置は全員共通。下表参照 |
 | `text`, `name`, `quote` | 表示する文言 |
 | `spell` | 撮影フェーズの照合用。キャラ紹介には描かない |
 | `presentationStart`, `flashIn` | 通常技のstartを指定して人物の再登場を抑止、カット頭の白フラッシュ秒数 |
 | `effects` | 各演出の既定値。下表参照 |
-| `presentation.fieldHeight`, `fieldMargin`, `portraitHeight` | 紹介フィールドの高さ984px、画面の左右端から24px、立ち絵の実体の高さ800px |
+| `presentation.fieldFeather`, `portraitHeight` | フィールド右端のフェザー50px、立ち絵の実体の高さ800px |
 | `cuts[].transition`, `crossfade` | `flash`または`none`でクロスフェードを除外。`crossfade`で秒数を上書き |
 | `members[].start`, `direction`, `faceX`, `cropY`, `cropHeight` | 3段カットインの開始秒、入場方向、素材内の顔の中心X座標、切り出し位置と高さ |
 | `portrait`, `keyVisual` | Viteの公開パスで指定する画像 |
@@ -131,9 +141,10 @@ caffeinate -dimsu node tools/pv/export.mjs --verify
 |---|---|
 | `crossfade` | 0.3秒 |
 | `portraitSlide`, `portraitDistance` | 0.4秒、1000px |
-| `nameDelay`, `nameDuration`, `nameScale` | 立ち絵の停止から0秒遅延、0.3秒、1.08倍から等倍 |
-| `quoteDelay`, `quoteDuration`, `quoteDistance` | 名前から0.2秒遅延、0.3秒、下24pxから上昇 |
+| `nameDelay`, `nameDuration`, `nameScale`, `nameImpact` | 立ち絵の停止から0秒遅延、0.25秒、1.6倍から等倍、着地の光0.1秒 |
+| `quoteDelay`, `quoteCharacter` | 名前の着地から0秒遅延、1文字0.03秒 |
 | `storyFade` | 手紙の開始から2秒で黒へフェード |
+| `storyLineFade`, `storyDrift` | 各行のフェード1秒、上昇10px |
 | `trioSlide` | 0.18秒 |
 | `rushFlash`, `chorusFlash` | 0.05秒、0.12秒 |
 | `titleAt`, `titleFade` | 3秒から、3秒でフェード |
@@ -163,17 +174,42 @@ caffeinate -dimsu node tools/pv/export.mjs --verify
 
 | レイアウト | 組み方 |
 |---|---|
-| `neo` | フィールド左、右に大きな立ち絵、足元へ大きな横組みの名前 |
-| `obsidia` | フィールド右、左に立ち絵、その下側に横書きの名前とセリフ |
-| `chappy` | フィールド左、右上へ横組みの名前、人物パネルの左下に細いセリフ段、右に全身 |
-| `claudine` | フィールド右、左の立ち絵の下端を暗幕に沈めて横組みの名前 |
-| `jinrai` | フィールド左、名前とセリフを立ち絵の両脇へ縦組み |
-| `etokichi` | フィールド右、左側の上に名前、中央に丸い立ち絵、下にセリフ |
-| `minerva` | フィールド左、右に大きな立ち絵、右端に縦組みの名前、下端を暗幕に沈めてセリフ |
-| `field-left`, `field-right` | フィールドの左右を指定し、反対側へ上下中央の立ち絵と名前・セリフ |
+| キャラ名のlayoutと`field-left`・`field-right` | フィールド左、右に上下中央の立ち絵、下側に横書きの名前・セリフ |
 | `field-center` | 道中3連打用。高さ1080pxのフィールドを中央に置き、両脇を夜空にする |
 
 ## 短い試写と受入
+
+キャラ紹介の背景だけを比較する場合は次を実行する。
+
+```sh
+node /Users/tadashi-aikawa/work/owlery-danmaku/tools/pv/export.mjs --review-only --bg-trial --name bg-trial --source-ref 8675bbf
+```
+
+- `--bg-visible`を追加すると、明るさを上げた4枚と`report-visible.json`を生成する。
+  - `neo-vivid.webp`、`minerva-vivid.webp`: 明るさ1.8倍、濃さ45%、ぼかし24px。
+  - `neo-sharp.webp`、`minerva-sharp.webp`: 明るさ1.5倍、濃さ35%、ぼかし10px。
+  - 比較: 黒背景を同フレームで再描画して検査する。元の6枚と`report.json`は保持する。
+- 出力: `_Unversioned/pv/review/bg-trial/`の6枚と`report.json`。
+  - 標準25%: `neo.webp`、`minerva.webp`。
+  - 現行の黒背景: `neo-before.webp`、`minerva-before.webp`。
+  - ネオの濃さ比較: `neo-light.webp`は15%、`neo-strong.webp`は30%。
+- フレーム: 絵コンテの`start + review`を使い、比較前後をそろえる。
+  - 検査: プレイフィールド内のRGBAハッシュ、文字と立ち絵の配置が比較前後で一致すること。
+- 試写モードではMP4を生成しない。
+  - 範囲: ネオとミネルヴァの代表フレームのみ。全カットの長さ検査は通常の`--preflight-only`を使う。
+- 背景は`Renderer.drawField()`が呼ぶ`drawScenery()`をPV側から直接呼ぶ。
+  - 対象: `kind: character`。みみこの`gate`、サビの通常技・最終技を含む。
+  - 表示: その階の道中背景を縦横比を保って全画面へ拡大し、プレイフィールドの外側へ敷く。
+  - ぼかし: 出力座標で`blur(24px)`を掛ける。周囲96pxの余白を描いてから切り出す。
+  - 参照: [Canvasのガウスぼかし仕様](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/filter)。
+  - 時計: 道中の固定位置を使う。通常技から最終技へ切り替わっても背景は変わらない。
+- 光は立ち絵の背後へ`cut.color`で描く。
+  - 強さ: 中心の不透明度25%から、立ち絵の実表示高さの0.8倍の半径で透明になる。
+- `presentation.characterBackground`で背景を設定できる。
+  - `enabled: false`: 既定。背景と光を両方外す。storyboardのこの1か所を`true`へ切り替えて採用する。
+  - `opacity`: 背景の不透明度。既定値0.25、範囲0〜1。光の強さは変えない。
+  - `brightness`: ぼかす前の背景の明るさ倍率。既定値1、範囲0以上。
+  - `blur`: 出力座標でのぼかしpx。既定値24、範囲0以上。
 
 ```sh
 # 全区間の代表フレームをCanvasから直接生成する。
@@ -209,12 +245,14 @@ node /Users/tadashi-aikawa/work/owlery-danmaku/tools/pv/export.mjs --board /abso
   - 本編: 削除されたgenre・conversation・個別カットイン・旧battle・gold・defeatの代表画像も掃除する。
 - 実時間が15分を超えた場合は警告を出す。正常な動画は保存する。
 
-すべての書き出しで、先に全カットを実ゲームでシミュレーションする。
+通常の書き出しで、先に全カットを実ゲームでシミュレーションする。
 
 - 必要フレーム数に加え、最大300フレーム先まで余裕を調べる。
 - フェーズ終了・専用カットイン終了・動画遷移が必要尺より早ければ、MP4生成前に停止する。
 - 撃破カットは指定尺だけを検査する。
 - レポートには事前検査、`src/`のコミット・未コミット差分、音源SHA-256、ffmpegバージョンも記録する。
+- `pnpm check`は撮影が終了してから実行する。
+  - 理由: `--source-ref`の一時コピーに含まれるテストをVitestが拾うため。
 
 合成ページのAPI:
 

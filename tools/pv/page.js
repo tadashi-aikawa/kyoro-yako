@@ -17,9 +17,15 @@ function validate(b) {
   if (b.width !== 1920 || b.height !== 1080 || b.fps !== 60) throw new Error('PVは1920×1080 / 60fps固定です');
   if (!Number.isFinite(b.duration) || b.duration <= 0) throw new Error('durationが不正です');
   for (const [key, value] of Object.entries(b.effects ?? {})) if (!Number.isFinite(value) || value < 0) throw new Error(`effects.${key}が不正です`);
-  for (const key of ['portraitSlide', 'nameDuration', 'quoteDuration', 'storyFade', 'trioSlide', 'titleFade', 'genreFade']) if (!(b.effects?.[key] > 0)) throw new Error(`effects.${key}には正の秒数を指定してください`);
-  if (!(b.presentation?.fieldHeight > 0 && b.presentation.fieldHeight <= 1032 && b.presentation.fieldMargin >= 8 && b.presentation.portraitHeight > 0 && b.presentation.portraitHeight <= 1000)) throw new Error('presentationのフィールド・立ち絵サイズが不正です');
+  for (const key of ['portraitSlide', 'nameDuration', 'nameImpact', 'quoteCharacter', 'storyFade', 'storyLineFade', 'trioSlide', 'titleFade', 'genreFade']) if (!(b.effects?.[key] > 0)) throw new Error(`effects.${key}には正の秒数を指定してください`);
+  if (!(b.presentation?.fieldFeather >= 40 && b.presentation.fieldFeather <= 60 && b.presentation.portraitHeight > 0 && b.presentation.portraitHeight <= 1000)) throw new Error('presentationのフェザー幅・立ち絵サイズが不正です');
   if (b.cuts[0]?.start !== 0) throw new Error('先頭カットは0秒にしてください');
+  const opacity = b.presentation.characterBackground?.opacity;
+  if (opacity !== undefined && (!Number.isFinite(opacity) || opacity < 0 || opacity > 1)) throw new Error('characterBackground.opacityは0〜1で指定してください');
+  for (const key of ['brightness', 'blur']) {
+    const value = b.presentation.characterBackground?.[key];
+    if (value !== undefined && (!Number.isFinite(value) || value < 0)) throw new Error(`characterBackground.${key}は0以上で指定してください`);
+  }
   const ids = new Set();
   for (let i = 0; i < b.cuts.length; i++) {
     const cut = b.cuts[i], end = b.cuts[i + 1]?.start ?? b.duration;

@@ -1,14 +1,14 @@
 import { drawUltimateCutin, ultimateCutin } from '/src/ultimate-cutin.ts';
 import { randomGenerator } from './capture.js';
+import { CharacterBackground } from './character-background.js';
 
 const clamp = n => Math.max(0, Math.min(1, n));
 const ease = n => 1 - (1 - clamp(n)) ** 3;
 export const layouts = ['neo', 'obsidia', 'chappy', 'claudine', 'jinrai', 'etokichi', 'minerva', 'field-left', 'field-right', 'field-center'];
-const fieldOnRight = cut => ['obsidia', 'claudine', 'etokichi', 'field-right'].includes(cut.layout);
 export function fieldRect(cut, board) {
-  const height = board.presentation.fieldHeight, width = height * 388 / 452;
-  return { x: fieldOnRight(cut) ? 1920 - board.presentation.fieldMargin - width : board.presentation.fieldMargin,
-    y: (1080 - height) / 2, width, height, padding: 2 };
+  // 本体の枠線はFIELDの内側へ1px入る。その1pxを除き、縦横比を保つ。
+  const height = 1080, width = height * 382 / 446;
+  return { x: 0, y: 0, width, height, padding: -1, feather: board.presentation.fieldFeather };
 }
 
 export class Composition {
@@ -18,6 +18,7 @@ export class Composition {
     this.board = board;
     this.images = new Map();
     this.portraitCrops = new Map();
+    this.characterBackground = new CharacterBackground();
     const random = randomGenerator(board.seed);
     this.stars = Array.from({ length: 170 }, () => [random() * 1920, random() * 1080, random() * 1.8 + 0.3, random() * 6.28]);
     this.textBounds = [];
@@ -49,13 +50,14 @@ export class Composition {
     }
   }
 
-  text(value, x, y, size, color = '#fff2da', width = 850, align = 'left', latin = false, shadow = { color: '#080817', blur: 8 }) {
+  text(value, x, y, size, color = '#fff2da', width = 850, align = 'left', latin = false, shadow = { color: '#080817', blur: 8 }, style = {}) {
     if (!value || this.ctx.globalAlpha <= 0) return;
     const c = this.ctx;
-    c.font = `${size}px ${latin ? this.board.latinFont : this.board.font}`;
+    c.letterSpacing = `${style.spacing ?? 0}px`;
+    c.font = `${style.weight ?? 400} ${size}px ${latin ? this.board.latinFont : this.board.font}`;
     const measured = c.measureText(value).width;
     const actual = Math.min(size, size * width / Math.max(1, measured));
-    c.font = `${actual}px ${latin ? this.board.latinFont : this.board.font}`;
+    c.font = `${style.weight ?? 400} ${actual}px ${latin ? this.board.latinFont : this.board.font}`;
     c.textAlign = align; c.textBaseline = 'alphabetic';
     c.fillStyle = color;
     const metrics = c.measureText(value);
@@ -75,6 +77,7 @@ export class Composition {
   paragraph(value, x, y, size, width, color = '#fff2da') {
     if (!value) return;
     const c = this.ctx; c.font = `${size}px ${this.board.font}`;
+    c.letterSpacing = '0px';
     let line = '', row = 0;
     for (const char of value) {
       if (c.measureText(line + char).width > width && line && !'。、！？）」』'.includes(char)) { this.text(line, x, y + row++ * size * 1.65, size, color, width); line = ''; }
@@ -125,59 +128,69 @@ export class Composition {
     c.restore();
   }
 
+  drawField(capture, field) {
+    if (!this.fieldCanvas) this.fieldCanvas = document.createElement('canvas');
+    if (this.fieldCanvas.width !== Math.ceil(field.width) || this.fieldCanvas.height !== field.height) {
+      this.fieldCanvas.width = Math.ceil(field.width); this.fieldCanvas.height = field.height;
+    }
+    const c = this.fieldCanvas.getContext('2d', { willReadFrequently: true });
+    c.reset();
+    capture.drawTo(c, 0, 0, field.height, field.padding);
+    c.globalCompositeOperation = 'destination-in';
+    const mask = c.createLinearGradient(field.width - field.feather, 0, field.width, 0);
+    mask.addColorStop(0, '#fff'); mask.addColorStop(1, '#fff0');
+    c.fillStyle = mask; c.fillRect(0, 0, this.fieldCanvas.width, field.height);
+    this.ctx.drawImage(this.fieldCanvas, field.x, field.y);
+  }
+
   character(cut, local, capture) {
-    const c = this.ctx, color = cut.color;
-    const right = fieldOnRight(cut), field = fieldRect(cut, this.board);
-    capture.drawTo(c, field.x, field.y, field.height, field.padding);
+    const c = this.ctx, color = cut.color, field = fieldRect(cut, this.board);
+    const background = this.board.presentation.characterBackground ?? {};
+    const showBackground = background.enabled === true && cut.kind === 'character';
+    if (showBackground) {
+      this.characterBackground.draw(c, cut.capture.stage, field, background);
+      this.visual.background = { stage: cut.capture.stage, opacity: background.opacity ?? 0.25, brightness: background.brightness ?? 1, blur: background.blur ?? 24 };
+    }
+    this.drawField(capture, field);
     this.visual.field = field;
     const fx = this.board.effects;
-    const enter = ease(local / fx.portraitSlide), drift = (1 - enter) * fx.portraitDistance * (right ? -1 : 1);
-    c.save(); c.beginPath(); c.rect(right ? 0 : 926, 0, 994, 1080); c.clip(); c.translate(drift, 0);
-    const center = { obsidia: 450, chappy: 1570, claudine: 450, jinrai: 1490, etokichi: 490, minerva: 1440 }[cut.layout] ?? (right ? 490 : 1460);
+    const enter = ease(local / fx.portraitSlide), drift = (1 - enter) * fx.portraitDistance;
+    const center = (field.width + 1920) / 2, textX = field.width + 75;
+    c.save(); c.beginPath(); c.rect(field.width, 0, 1920 - field.width, 1080); c.clip(); c.translate(drift, 0);
+    if (showBackground) {
+      const crop = this.portraitCrops.get(cut.portrait);
+      const height = cut.portraitWidth === undefined ? this.board.presentation.portraitHeight : cut.portraitWidth * crop.height / crop.width;
+      this.characterBackground.glow(c, color, center, 540, height);
+    }
     this.standingPortrait(cut.portrait, center, 540, this.board.presentation.portraitHeight, cut.portraitWidth);
     c.restore();
     // 顔を文字から離し、立ち絵の下端を暗幕に沈めて文字を読ませる。
     const shade = c.createLinearGradient(0, 720, 0, 1080);
     shade.addColorStop(0, '#08081700'); shade.addColorStop(0.7, '#080817eb'); shade.addColorStop(1, this.board.night);
-    c.fillStyle = shade; c.fillRect(right ? 0 : 926, 720, 994, 360);
-    const nameAt = fx.portraitSlide + fx.nameDelay, quoteAt = nameAt + fx.quoteDelay;
-    const nameEnter = ease((local - nameAt) / fx.nameDuration), quoteEnter = ease((local - quoteAt) / fx.quoteDuration);
-    this.visual.motion = { portrait: enter, name: nameEnter, quote: quoteEnter };
-    const pivot = { chappy: [1010, 130], jinrai: [1110, 340], etokichi: [490, 130], minerva: [1835, 360] }[cut.layout] ?? [right ? 75 : 1010, 815];
+    c.fillStyle = shade; c.fillRect(field.width, 720, 1920 - field.width, 360);
+    const nameAt = fx.portraitSlide + fx.nameDelay, quoteAt = nameAt + fx.nameDuration + fx.quoteDelay;
+    const nameAge = local - nameAt, nameEnter = ease(nameAge / fx.nameDuration);
     const scale = 1 + (fx.nameScale - 1) * (1 - nameEnter);
-    c.save(); c.globalAlpha = nameEnter;
+    const impact = nameAge >= fx.nameDuration ? 1 - clamp((nameAge - fx.nameDuration) / fx.nameImpact) : 0;
+    const letters = [...cut.quote], count = Math.min(letters.length, Math.floor(Math.max(0, local - quoteAt) / fx.quoteCharacter + 1e-8));
+    this.visual.motion = { portrait: enter, name: nameEnter, nameScale: scale, impact, quoteChars: count, quote: count / letters.length };
+    const pivot = [center, 825];
+    c.save(); c.globalAlpha = clamp(nameAge / fx.nameDuration);
     c.translate(...pivot); c.scale(scale, scale); c.translate(-pivot[0], -pivot[1]);
     this.textRole = 'name';
-    switch (cut.layout) {
-      case 'obsidia':
-        this.text(cut.name, 75, 835, 104, color, 830); break;
-      case 'chappy':
-        this.text(cut.name, 1010, 130, 94, color); break;
-      case 'claudine':
-        this.text(cut.name, 75, 825, 110, color, 830); break;
-      case 'jinrai':
-        this.vertical(cut.name, 1110, 255, 150, color); break;
-      case 'etokichi':
-        this.text(cut.name, 490, 130, 100, color, 820, 'center'); break;
-      case 'minerva':
-        this.vertical(cut.name, 1835, 190, 78, color); break;
-      default: this.text(cut.name, right ? 75 : 1010, 815, cut.layout === 'neo' ? 160 : 100, color, 830);
-    }
+    const nameWidth = Math.min(center - field.width - 48, 1896 - center) * 2 / fx.nameScale;
+    this.text(cut.name, center, 825, 110, color, nameWidth, 'center', false, { color: '#02020a', blur: 18, passes: 2 });
+    if (impact > 0) this.text(cut.name, center, 825, 110, color, nameWidth, 'center', false, { color, blur: 20 * impact });
     c.restore();
-    c.save(); c.globalAlpha = quoteEnter; c.translate(0, (1 - quoteEnter) * fx.quoteDistance);
+    c.save();
     this.textRole = 'quote';
-    switch (cut.layout) {
-      case 'obsidia': this.paragraph(cut.quote, 75, 930, 34, 830); break;
-      case 'chappy': this.paragraph(cut.quote, 1010, 760, 36, 330); break;
-      case 'claudine': this.text(cut.quote, 75, 920, 34, '#fff2da', 830); break;
-      case 'jinrai': this.vertical(cut.quote, 1840, 160, 32); break;
-      case 'etokichi': this.text(cut.quote, 490, 990, 36, '#fff2da', 850, 'center'); break;
-      case 'minerva': this.paragraph(cut.quote, 1010, 865, 34, 800); break;
-      default: this.paragraph(cut.quote, right ? 75 : 1010, 920, 36, 830);
-    }
+    // 最終文の幅でサイズを決め、文字が増えても既出の文字を動かさない。
+    c.letterSpacing = '0px'; c.font = `34px ${this.board.font}`;
+    const quoteSize = Math.min(34, 34 * 850 / Math.max(1, c.measureText(cut.quote).width));
+    this.text(letters.slice(0, count).join(''), textX, 920, quoteSize, '#fff2da', 850, 'left', false, { color: '#02020a', blur: 12, passes: 2 });
     this.textRole = undefined;
     // 技名は撮影フェーズの照合にも使う。キャラ紹介では描かない。
-    if (cut.kind !== 'character') this.text(cut.spell, right ? 75 : 1010, 1025, 48, '#fff2da', 830);
+    if (cut.kind !== 'character') this.text(cut.spell, textX, 1025, 48, '#fff2da', 830);
     c.restore();
   }
 
@@ -246,9 +259,15 @@ export class Composition {
       this.keyVisual(time, background);
       this.visual.storyBackground = background;
       this.standingPortrait('/assets/members/mimiko-stand.webp', 470, 540, 560);
-      c.save(); c.globalAlpha = clamp(local / 0.55);
-      cut.text.forEach((line, i) => this.text(line, 960, 475 + i * 100, 44, '#fff2da', 850));
-      c.restore();
+      this.visual.storyLines = [];
+      cut.text.forEach((line, i) => {
+        const alpha = clamp((local - i * b.effects.storyLineFade) / b.effects.storyLineFade);
+        const y = 460 + i * 140 + (1 - alpha) * b.effects.storyDrift;
+        this.visual.storyLines.push({ text: line, alpha, y });
+        c.save(); c.globalAlpha = alpha;
+        this.text(line, 960, y, 44, '#dfe4f0', 870, 'left', false, { color: '#bdc9e355', blur: 6 }, { weight: 300, spacing: 4.4 });
+        c.restore();
+      });
     } else if (cut.kind === 'dawn' || cut.kind === 'announcement') {
       const count = Math.round(b.ending.duration * b.fps);
       const index = cut.kind === 'announcement' ? count - 1 : Math.min(count - 1, localFrame);
