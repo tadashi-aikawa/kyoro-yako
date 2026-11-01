@@ -1,10 +1,11 @@
 import { AudioBank } from './audio';
 import { type BgmCue, BgmPlayer } from './bgm';
-import { CAST_GAP, MOTION_SPRITES } from './boss-motion';
+import { CAST_GAP } from './boss-motion';
 import { patternPosition } from './boss-movement';
 import { BATTLE_COMMENTS, dialogue, ENDINGS, FINAL_COMMENTS, INTRO_LINES, type Line, midDialogue } from './dialogue';
 import { CREDITS_FADE_FRAMES, CREDITS_FIN_FRAME, CREDITS_ROLL_FRAMES, creditsFade, ENDING_EXIT_FRAMES, ENDING_LINE_FADE, ENDING_LINE_GAP, ENDING_READ_FRAMES } from './ending';
-import { ENEMY_ROOMS, enemyFireFrames } from './enemy-design';
+import { enemyFireFrames } from './enemy-design';
+import { GameImages } from './game-images';
 import type { GameMedia } from './game-media';
 import { ENDING_MOVIES, MOVIES, type MovieName, MoviePlayer } from './movies';
 import { obsidiaPosition } from './obsidia-movement';
@@ -25,7 +26,6 @@ import { updateStarFlightSource } from './patterns/minerva-flight';
 import { gravityScene } from './patterns/minerva-inquiry';
 import { REPRISES, type Reprise, repriseLocal, reprisePrepare, repriseView } from './patterns/minerva-reprise';
 import { type InterviewRing, interviewRingBlocksShot, updateInterviewRings } from './patterns/minerva-ring';
-import { MINERVA_OWL_SPRITES, MINERVA_SOLO_SPRITES } from './patterns/minerva-summon';
 import { emitNeo, inBog } from './patterns/neo';
 import { emitNeoEncore, encoreBogTime } from './patterns/neo-encore';
 import { emitObsidia, sweepPosition, tags } from './patterns/obsidia';
@@ -172,7 +172,7 @@ export class Game {
   readonly audio: AudioBank;
   readonly bgm: BgmPlayer;
   readonly keys = new Set<string>();
-  readonly images: Record<string, HTMLImageElement> = {};
+  readonly images: Record<string, HTMLImageElement>;
   private readonly pressed = new Set<string>();
   private lastBossShotFrame = -1;
   private readonly params = new URLSearchParams(location.search);
@@ -181,6 +181,7 @@ export class Game {
 
   // 道中の単体テストは題字と暗幕を省略し、waveの時計を直接検証できる。
   constructor(private readonly presentation = true, readonly media?: GameMedia) {
+    this.images = (media?.images ?? new GameImages()).elements;
     this.audio = new AudioBank(media?.assets);
     this.movies = new MoviePlayer(this.params.get('bgm') === '0', media?.assets);
     this.optionVolume = safeLoad('owlery-volume', 50, (s) => Math.max(0, Math.min(100, Number(s) || 0)));
@@ -189,41 +190,10 @@ export class Game {
     this.movies.setVolume(this.optionBgmVolume);
     this.bgm = new BgmPlayer(this.params.get('bgm') === '0', this.optionBgmVolume, media?.assets);
     media?.attach(this.bgm, this.movies, this.audio);
-    for (const id of new Set([...PLAYERS, ...Object.keys(NAMES)])) {
-      for (const form of ['face', 'stand']) {
-        const image = new Image();
-        image.src = `${import.meta.env.BASE_URL}assets/members/${id}-${form}.webp`;
-        this.images[`${id}-${form}`] = image;
-      }
-      const sprite = new Image();
-      sprite.src = `${import.meta.env.BASE_URL}assets/sprites/${id}.webp`;
-      this.images[`${id}-sprite`] = sprite;
-    }
-    for (const id of [...MOTION_SPRITES, ...MINERVA_SOLO_SPRITES, ...MINERVA_OWL_SPRITES, 'claudine-bloom-closed']) {
-      const sprite = new Image();
-      sprite.src = `${import.meta.env.BASE_URL}assets/sprites/${id}.webp`;
-      this.images[`${id}-sprite`] = sprite;
-    }
-    const prayerSprite = new Image();
-    prayerSprite.src = `${import.meta.env.BASE_URL}assets/sprites/minerva-prayer.webp`;
-    this.images['minerva-prayer-sprite'] = prayerSprite;
-    const sealSprite = new Image();
-    sealSprite.src = `${import.meta.env.BASE_URL}assets/sprites/jinrai-seal.webp`;
-    this.images['jinrai-seal-sprite'] = sealSprite;
-    const kissSprite = new Image();
-    kissSprite.src = `${import.meta.env.BASE_URL}assets/sprites/jinrai-kiss.webp`;
-    this.images['jinrai-kiss-sprite'] = kissSprite;
-    const sweepSprite = new Image();
-    sweepSprite.src = `${import.meta.env.BASE_URL}assets/sprites/obsidia-sweep.webp`;
-    this.images['obsidia-sweep-sprite'] = sweepSprite;
-    for (const room of ENEMY_ROOMS) {
-      const image = new Image();
-      image.src = `${import.meta.env.BASE_URL}assets/enemies/${room}.webp`;
-      this.images[`enemy-${room}`] = image;
-    }
     this.initQuery();
     if (this.scene === 'title') media?.enterTitle();
     else if (media && media.stage === undefined) media.enterStage(this.scene === 'ending' || this.scene === 'credits' ? 5 : this.stage);
+    if (this.scene === 'ending' || this.scene === 'credits') media?.enterEnding();
     if (this.scene === 'title') this.movies.preload(['opening']);
     this.syncBgm();
     window.addEventListener('keydown', (event) => {
@@ -306,12 +276,13 @@ export class Game {
     if (this.media?.loading) {
       this.audio.stopEnergy();
       if (this.media.failed) {
-        if (this.just('ArrowDown')) this.media.menu = (this.media.menu + 1) % 3;
-        if (this.just('ArrowUp')) this.media.menu = (this.media.menu + 2) % 3;
+        const choices = this.media.failureChoices;
+        if (this.just('ArrowDown')) this.media.menu = (this.media.menu + 1) % choices.length;
+        if (this.just('ArrowUp')) this.media.menu = (this.media.menu + choices.length - 1) % choices.length;
         if (this.accept()) {
-          if (this.media.menu === 0) this.media.retry();
-          else if (this.media.menu === 1) this.media.skip();
-          else this.returnToTitle();
+          if (choices[this.media.menu] === 'retry') this.media.retry();
+          else if (choices[this.media.menu] === 'skip') this.media.skip();
+          else if (choices[this.media.menu] === 'title') this.returnToTitle();
         }
       }
       this.pressed.clear();
@@ -465,6 +436,7 @@ export class Game {
       const movie = names[index];
       const mediaStage = movie === 'opening' ? 1 : movie === 'jinrai-gift' ? 4 : 5;
       if (this.media && (this.media.stage !== mediaStage || movie === 'opening')) this.media.enterStage(mediaStage, movie === 'opening');
+      if (movie === 'ending') this.media?.enterEnding();
       const cue = this.syncBgm();
       const play = () => { this.syncBgm(); this.movies.play(movie, () => next(index + 1), movie === 'lastboss' || movie === 'jinrai-gift' || movie === 'minerva-finale'); };
       if (!this.media || this.media.ensure(cue, movie, play)) play();
@@ -592,7 +564,7 @@ export class Game {
     if (++this.arrivalFrame >= (this.arrivalFromWhite ? 120 : 80)) this.scene = 'dialogue';
   }
 
-  private startEnding(): void { this.scene = 'ending'; this.endingFrame = 0; this.endingReadFrame = 0; }
+  private startEnding(): void { this.media?.enterEnding(); this.scene = 'ending'; this.endingFrame = 0; this.endingReadFrame = 0; }
   private startIntroduction(): void {
     this.startStage(1); this.stageIntroFrame = 180; this.scene = 'letter';
   }
@@ -616,10 +588,6 @@ export class Game {
     const boss = STAGES[stage - 1].boss;
     const ultimate = ULTIMATE_CUTINS[boss as keyof typeof ULTIMATE_CUTINS];
     if (ultimate) this.audio.prepareUltimate();
-    if (ultimate && !this.images[`${boss}-ultimate`]) {
-      const image = new Image(); image.src = `${import.meta.env.BASE_URL}assets/cutins/${ultimate.id}.webp`;
-      this.images[`${boss}-ultimate`] = image;
-    }
     if (stage === 5) this.movies.preload(['lastboss', 'minerva-finale', ...ENDING_MOVIES]);
     if (stage === 4) {
       this.audio.prepareJinraiWarp();
@@ -1724,7 +1692,7 @@ export class Game {
   }
 
   get debugState(): Record<string, string | number | null> {
-    const audio = { bgmVolume: this.bgm.effectiveVolume, mediaLoading: Number(!!this.media?.loading), mediaFailed: Number(!!this.media?.failed), mediaFiles: this.media?.assets.diagnostics.files ?? 0, mediaBytes: this.media?.assets.diagnostics.bytes ?? 0, bgmBuffers: this.bgm.diagnostics.tracks, bgmBytes: this.bgm.diagnostics.bytes };
+    const audio = { bgmVolume: this.bgm.effectiveVolume, mediaLoading: Number(!!this.media?.loading), mediaFailed: Number(!!this.media?.failed), mediaFiles: this.media?.assets.diagnostics.files ?? 0, mediaBytes: this.media?.assets.diagnostics.bytes ?? 0, imageCount: this.media?.images.count ?? 0, bgmBuffers: this.bgm.diagnostics.tracks, bgmBytes: this.bgm.diagnostics.bytes };
     const effects = { ...audio, bgmMultiplier: this.bgm.sceneVolumeMultiplier, movie: this.movieName ?? null, stageFrame: this.stageFrame, stageIntroFrame: this.stageIntroFrame, arrivalFrame: this.arrivalFrame, transition: this.transition ?? null, transitionFrame: this.transitionFrame, whiteAlpha: this.whiteAlpha, departureFrame: this.departureFrame, items: this.items.count, giftFrame: this.giftFrame, giftItems: this.items.objects.filter((item) => item.active && item.gift).length, phaseFrame: this.phaseFrame, endingFrame: this.endingFrame, creditsFrame: this.creditsFrame };
     return { ...effects, scene: this.scene, stage: this.stage, boss: this.boss ? NAMES[this.boss] : null, bossRole: this.boss ? this.midboss ? 'midboss' : 'boss' : null, phase: this.phase ? this.phaseIndex : -1, spell: this.phase?.spell ? this.phase.name : null, phaseRemainingSeconds: this.phase ? Number.isFinite(this.phase.duration) ? Math.max(0, (this.phase.duration * 60 - this.phaseFrame) / 60) : '∞' : null, phaseHpRatio: this.phase ? Math.max(0, this.phaseHp / this.phaseMaxHp) : null, bullets: this.bullets.count, graphNodes: this.graphNodes.length, graphEdges: this.graphEdges.length, reprise: this.minervaReprise ? REPRISES[this.minervaReprise.index].phase.name : null, score: this.score, power: this.power, maxform: Number(this.awakened), lives: this.lives, bombs: this.bombs, fps: this.fps, bgm: this.bgm.cue };
   }

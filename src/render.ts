@@ -1,7 +1,7 @@
 import { bossSpriteId, createBossMotion, isCasting, updateBossMotion } from './boss-motion';
 import { drawChappyBullet } from './chappy-render';
 import { drawBloomBackdrop, drawBloomBullet } from './claudine-render';
-import { CREDITS_ART, CREDITS_STAFF, CREDITS_STAFF_FRAMES, creditsFade, creditsScene } from './ending';
+import { CREDITS_STAFF, CREDITS_STAFF_FRAMES, creditsFade, creditsScene } from './ending';
 import { ENEMY_ROOMS, enemyPose } from './enemy-design';
 import type { Bullet, Clone, Enemy, Game, Item } from './game';
 import { BATTLE_COMMENT_FADE_FRAMES, BATTLE_COMMENT_REVEAL_FRAMES, PLAYER_NAMES, PLAYERS, SAKURA_GUST, SAKURA_PERIOD, SAKURA_SWIRL, SAKURA_WARNING } from './game';
@@ -38,9 +38,7 @@ const PALETTE = ['#a674ff', '#6ddaf5', '#fbd768', '#ff9dbe'];
 export class Renderer {
   private readonly sprites = new Map<string, HTMLCanvasElement>();
   private readonly bossMotion = createBossMotion();
-  private readonly titleArt = Object.assign(new Image(), { src: `${import.meta.env.BASE_URL}assets/title/key-visual.webp` });
   private titleLayer?: HTMLCanvasElement;
-  private readonly creditsArt = new Map<string, HTMLImageElement>();
   private pixelRatio = 1;
   constructor(private readonly ctx: CanvasRenderingContext2D) {
     this.setPixelRatio(1);
@@ -83,8 +81,6 @@ export class Renderer {
 
   draw(game: Game): void {
     const c = this.ctx;
-    // 本編の初期ロードを増やさず、動画・本文を読んでいる間に背景を先読みする。
-    if (game.scene === 'ending' || game.scene === 'credits' || (game.scene === 'movie' && game.movieName === 'ending')) this.preloadCreditsArt();
     c.fillStyle = '#080817'; c.fillRect(0, 0, 640, 480);
     if (game.media?.loading) {
       if (!game.media.failed && game.whiteAlpha > 0 && game.media.elapsedMs < 150) this.fade(game.whiteAlpha, '#fff');
@@ -134,12 +130,13 @@ export class Renderer {
       this.text('読み込みできませんでした', 320, 134, 25, '#f0dfb1', 'center');
       const failures = state.failures.slice(0, 3);
       failures.forEach((label, index) => { this.uiText(label, 320, 179 + index * 21, 12, '#c0c6d2', 'center'); });
-      const entries = ['読み込み直す', '未取得の音声・映像を省略して続ける', 'タイトルへ戻る'];
+      const labels = { retry: '読み込み直す', skip: '失敗した音声・映像を省略して続ける', title: 'タイトルへ戻る' };
+      const entries = media.failureChoices.map(choice => labels[choice]);
       entries.forEach((label, index) => {
         const selected = index === media.menu;
         this.uiText(`${selected ? '▶  ' : '    '}${label}`, 320, 268 + index * 32, 14, selected ? '#ffe3a2' : '#9da5b9', 'center');
       });
-      this.uiText('タイトルへ戻ると、このプレイの途中から再開できません', 320, 375, 11, '#9da5b9', 'center');
+      if (media.failureChoices.includes('title')) this.uiText('タイトルへ戻ると、このプレイの途中から再開できません', 320, 375, 11, '#9da5b9', 'center');
     } else {
       // 戦闘時計は待機中に止まるため、準備開始からの実時間で羽ばたかせる。
       const elapsed = media.elapsedMs;
@@ -180,7 +177,7 @@ export class Renderer {
   private drawTitle(game: Game): void {
     const c = this.ctx;
     // 絵と題字は毎フレーム描くとフレームレートが半分に落ちるので、一度だけ描いて使い回す。
-    if (!this.titleLayer) this.titleLayer = this.renderTitleLayer();
+    if (!this.titleLayer) this.titleLayer = this.renderTitleLayer(game.images.title);
     if (this.titleLayer) c.drawImage(this.titleLayer, 0, 0, 640, 480);
     this.stars(game.frame, 640, 480, 0.16);
 
@@ -199,8 +196,7 @@ export class Renderer {
     });
   }
 
-  private renderTitleLayer(): HTMLCanvasElement | undefined {
-    const art = this.titleArt;
+  private renderTitleLayer(art: HTMLImageElement): HTMLCanvasElement | undefined {
     if (!art.complete || !art.naturalWidth) return undefined;
     const layer = document.createElement('canvas');
     layer.width = Math.ceil(640 * this.pixelRatio); layer.height = Math.ceil(480 * this.pixelRatio);
@@ -1685,20 +1681,14 @@ export class Renderer {
       game.endingLines.forEach((line, i) => { c.globalAlpha = game.endingLineAlpha(i); this.text(line, 266, 146 + i * 44, 14, ink, 'left', shadow); });
       c.globalAlpha = 1;
       this.fade(game.endingExitAlpha, '#f5efe1');
-    } else this.drawCredits(game.creditsFrame);
+    } else this.drawCredits(game);
   }
 
-  private preloadCreditsArt(): void {
-    for (const id of CREDITS_ART) {
-      if (this.creditsArt.has(id)) continue;
-      this.creditsArt.set(id, Object.assign(new Image(), { src: `${import.meta.env.BASE_URL}assets/credits/${id}.webp` }));
-    }
-  }
-
-  private drawCredits(frame: number): void {
+  private drawCredits(game: Game): void {
+    const frame = game.creditsFrame;
     const c = this.ctx, { scene, index, local, progress, alpha } = creditsScene(frame);
     c.save(); c.globalAlpha = 1; c.fillStyle = '#f5efe1'; c.fillRect(0, 0, 640, 480); c.globalAlpha = alpha;
-    const image = this.creditsArt.get(scene.art);
+    const image = game.images[`credits-${scene.art}`];
     if (image?.complete && image.naturalWidth) {
       const zoom = Math.max(640 / image.naturalWidth, 480 / image.naturalHeight) * (index < 11 ? 1 + progress * 0.025 : 1);
       const width = image.naturalWidth * zoom, height = image.naturalHeight * zoom;

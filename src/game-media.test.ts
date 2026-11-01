@@ -24,7 +24,8 @@ function press(game: Game, code: string): void {
   listeners.keydown({ code, repeat: false, preventDefault() {} }); game.update(); listeners.keyup({ code, repeat: false, preventDefault() {} });
 }
 function make(fetcher: typeof fetch): { game: Game; media: GameMedia } {
-  const media = new GameMedia(new MediaAssets(fetcher)); const game = new Game(true, media); game.audio.volume = 0;
+  const media = new GameMedia(new MediaAssets((input, init) => String(input).endsWith('.webp') ? Promise.resolve(response()) : fetcher(input, init)));
+  const game = new Game(true, media); game.audio.volume = 0;
   return { game, media };
 }
 beforeEach(() => {
@@ -32,7 +33,7 @@ beforeEach(() => {
   startSource.mockClear(); stopSource.mockClear();
   vi.stubGlobal('location', { search: '?stage=1&invincible=1' });
   vi.stubGlobal('window', { addEventListener(kind: string, callback: typeof listeners[string]) { listeners[kind] = callback; } });
-  vi.stubGlobal('Image', class { src = ''; });
+  vi.stubGlobal('Image', class { src = ''; complete = true; naturalWidth = 32; decode() { return Promise.resolve(); } });
   vi.stubGlobal('document', { createElement: () => new Video() });
   vi.stubGlobal('AudioContext', Context);
 });
@@ -91,7 +92,8 @@ it('読み込み失敗時もEscで選択を捨てず、タイトル復帰は選�
   press(game, 'ArrowDown'); expect(media.menu).toBe(1);
   press(game, 'Escape'); expect(game.scene).toBe('stage'); expect(media.failed).toBe(true); expect(media.menu).toBe(1);
   press(game, 'ArrowDown'); press(game, 'KeyZ');
-  expect(game.scene).toBe('title'); expect(media.loading).toBe(false);
+  expect(game.scene).toBe('title');
+  game.update(); await vi.waitFor(() => expect(media.loading).toBe(false));
 });
 
 it('次面の先読みはその先の面を取得せず、展開済みの曲を増やさない', async () => {
@@ -162,7 +164,8 @@ it('ボス登場では2曲の準備が済んでおり、全画面の読み込み
 
 it('サブメニューからタイトルへ戻っても、タイトル曲を頭から再生し直さない', async () => {
   vi.stubGlobal('location', { search: '' });
-  const { game } = make(vi.fn(async () => response())); press(game, 'Shift');
+  const { game, media } = make(vi.fn(async () => response())); press(game, 'Shift');
+  await vi.waitFor(() => expect(media.loading).toBe(false)); game.update();
   await vi.waitFor(() => expect(game.bgm.diagnostics.tracks).toBe(1)); game.update();
   const count = startSource.mock.calls.length; expect(count).toBeGreaterThan(0);
   for (const menu of [0, 1, 2, 3, 4]) {

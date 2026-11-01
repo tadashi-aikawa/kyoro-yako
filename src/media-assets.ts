@@ -1,10 +1,11 @@
 import type { BgmCue } from './bgm';
+import { IMAGE_FILES } from './game-images';
 import type { MovieName } from './movies';
 
-export type MediaKey = `bgm:${BgmCue}` | `movie:${MovieName}` | 'sound:jinrai-warp';
+export type MediaKey = `bgm:${BgmCue}` | `movie:${MovieName}` | 'sound:jinrai-warp' | `image:${string}`;
 interface Entry { controller: AbortController; promise: Promise<Blob>; blob?: Blob; url?: string; bytes: number; }
 
-// 圧縮データだけを保持する。展開と動画デコーダーの寿命は各プレイヤーが持つ。
+// 圧縮データだけを保持する。画像・音声のデコードと動画デコーダーの寿命は呼び出し側が持つ。
 export class MediaAssets {
   private readonly entries = new Map<MediaKey, Entry>();
   private allowed = new Set<MediaKey>();
@@ -74,15 +75,17 @@ export class MediaAssets {
 
   private async download(key: MediaKey, entry: Entry): Promise<Blob> {
     const [kind, name] = key.split(':');
+    if (kind === 'image' && !IMAGE_FILES[name]) throw new Error('Unknown image');
     const folder = kind === 'bgm' ? 'bgm' : kind === 'movie' ? 'movies' : 'audio';
     const extension = kind === 'movie' ? 'mp4' : 'mp3';
     let timer: ReturnType<typeof setTimeout>;
     const reset = () => { clearTimeout(timer); timer = setTimeout(() => entry.controller.abort(), this.idleMs); };
     try {
       reset();
-      const response = await this.fetcher(`${import.meta.env.BASE_URL}assets/${folder}/${name}.${extension}`, { signal: entry.controller.signal });
+      const path = kind === 'image' ? IMAGE_FILES[name] : `${folder}/${name}.${extension}`;
+      const response = await this.fetcher(`${import.meta.env.BASE_URL}assets/${path}`, { signal: entry.controller.signal });
       if (!response.ok) throw new Error(`Media HTTP ${response.status}`);
-      const type = kind === 'movie' ? 'video/mp4' : 'audio/mpeg';
+      const type = kind === 'image' ? 'image/webp' : kind === 'movie' ? 'video/mp4' : 'audio/mpeg';
       if (!response.body) {
         const blob = await response.blob();
         if (!blob.size) throw new Error('Empty media');
