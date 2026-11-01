@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BATTLE_COMMENTS, FINAL_COMMENTS } from './dialogue';
+import { AWAKENING_LINE } from './patterns/minerva-awakening';
 import { wrapBattleComment, wrapDialogue } from './text-layout';
 
 describe('会話の禁則処理', () => {
@@ -23,7 +24,7 @@ describe('会話の禁則処理', () => {
 
 it('吹き出しの全コメントを欠落なく2行以内へ収め、長い文は句読点で分ける', () => {
   const measure = (text: string) => text.length * 12;
-  for (const text of [...Object.values(BATTLE_COMMENTS), ...Object.values(FINAL_COMMENTS)]) {
+  for (const text of [...Object.values(BATTLE_COMMENTS), ...Object.values(FINAL_COMMENTS), AWAKENING_LINE]) {
     const width = text === FINAL_COMMENTS.minerva ? 192 : 156;
     const lines = wrapBattleComment(text, width, measure);
     expect(lines.join('')).toBe(text.replaceAll('\n', '')); expect(lines.length).toBeLessThanOrEqual(2);
