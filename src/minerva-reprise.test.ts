@@ -58,7 +58,7 @@ it.each(difficulties.flatMap(difficulty => REPRISES.map((source, index) => ({ di
   next(game);
   expect(game.minervaReprise?.cycle).toBe(1);
   expect(game.bullets.count).toBe(0); expect(game.graphNodes).toHaveLength(0); expect(game.jinraiLasers).toHaveLength(0);
-}, 10_000);
+});
 
 it('抽選はHP切替ごとに行い、ごく低確率の連続も選べる。時間やボムでは切り替えない', () => {
   const random = vi.spyOn(Math, 'random').mockReturnValue(0);
