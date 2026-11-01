@@ -18,6 +18,8 @@ const url = `http://127.0.0.1:${port}`;
 const reviewOnly = args.includes('--review-only');
 const verify = args.includes('--verify');
 const preflightOnly = args.includes('--preflight-only');
+const sourceRef = value('--source-ref', null);
+if (args.includes('--source-ref') && (!sourceRef || sourceRef.startsWith('-'))) throw new Error('--source-refにコミットを指定してください');
 const from = Math.round(Number(value('--from', '0')) * board.fps);
 const to = Math.round(Number(value('--to', String(board.duration))) * board.fps);
 const partial = from !== 0 || to !== Math.round(board.duration * board.fps);
@@ -42,8 +44,14 @@ function run(command, argv, options = {}) {
 }
 const exists = async file => access(file).then(() => true, () => false);
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
+const pinnedCommit = sourceRef ? (await run('git', ['rev-parse', '--verify', `${sourceRef}^{commit}`])).trim() : null;
 
 async function sourceVersion() {
+  if (pinnedCommit) return {
+    head: pinnedCommit,
+    srcCommit: (await run('git', ['log', '-1', '--format=%H', pinnedCommit, '--', 'src'])).trim(),
+    dirty: false, diffSha256: sha(''), pinned: true,
+  };
   return {
     head: (await run('git', ['rev-parse', 'HEAD'])).trim(),
     srcCommit: (await run('git', ['log', '-1', '--format=%H', '--', 'src'])).trim(),
@@ -65,20 +73,20 @@ async function cleanOld() {
     if (/^(characters\.|chorus\.|structure\.|edit-|issen-sequence|source-|preview-|acceptance-|source$|announcement$|fix1-preview$)/.test(name) && name !== filename) await rm(path.join(out, 'review', name), { recursive: true, force: true });
   }
   if (!partial && filename === 'kyoro-yako-pv') {
-    for (const id of ['gate', 'issen-cutin', 'issen', 'bloom-cutin', 'bloom', 'owl-cutin', 'owl', 'gold', 'defeat']) {
+    for (const id of ['genre', 'conversation', 'issen-cutin', 'issen', 'bloom-cutin', 'bloom', 'owl-cutin', 'owl', 'gold', 'defeat']) {
       await rm(path.join(out, 'review', `${id}.webp`), { force: true });
     }
   }
 }
 
-async function contactSheet(directory, ids) {
+async function contactSheet(directory, ids, name = 'contact', columns = 3) {
   if (!ids.length) return;
-  const list = path.join(directory, 'contact.txt');
+  const list = path.join(directory, `${name}.txt`);
   await writeFile(list, ids.map(id => `file '${id}.webp'`).join('\n'));
   await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', list,
-    '-vf', `scale=640:360,tile=3x${Math.ceil(ids.length / 3)}:color=0x080817`, '-frames:v', '1', path.join(directory, 'contact.png')]);
-  await run('cwebp', ['-quiet', '-q', '90', path.join(directory, 'contact.png'), '-o', path.join(directory, 'contact.webp')]);
-  await unlink(list); await unlink(path.join(directory, 'contact.png'));
+    '-vf', `scale=640:360,tile=${columns}x${Math.ceil(ids.length / columns)}:color=0x080817`, '-frames:v', '1', path.join(directory, `${name}.png`)]);
+  await run('cwebp', ['-quiet', '-q', '90', path.join(directory, `${name}.png`), '-o', path.join(directory, `${name}.webp`)]);
+  await unlink(list); await unlink(path.join(directory, `${name}.png`));
 }
 
 const warnings = audioAlignmentWarnings(audio, board.cuts);
@@ -114,10 +122,20 @@ const pageErrors = [];
 try {
   staging = await mkdtemp(path.join(out, '.work-'));
   const source = await sourceVersion();
+  let captureSource = '';
+  if (pinnedCommit) {
+    const archive = path.join(staging, 'source.tar'), directory = path.join(staging, 'source');
+    await mkdir(directory);
+    await run('git', ['archive', '--format=tar', `--output=${archive}`, pinnedCommit, 'src']);
+    await run('tar', ['-xf', archive, '-C', directory]);
+    await unlink(archive);
+    captureSource = path.join(directory, 'src');
+    console.log(`撮影本体を固定: ${pinnedCommit}`);
+  }
   // 自分で起動した専用ポートだけを管理する。既存サーバーには接続しない。
   const occupied = await run('lsof', ['-ti', `tcp:${port}`]).then(s => s.trim(), () => '');
   if (occupied) throw new Error(`ポート${port}は使用中です。--portで空きポートを指定してください`);
-  server = spawn(process.execPath, [path.join(root, 'node_modules/vite/bin/vite.js'), '--config', path.join(here, 'vite.config.mjs'), '--host', '127.0.0.1', '--port', String(port), '--strictPort'], { cwd: root, stdio: ['ignore', 'ignore', 'pipe'] });
+  server = spawn(process.execPath, [path.join(root, 'node_modules/vite/bin/vite.js'), '--config', path.join(here, 'vite.config.mjs'), '--host', '127.0.0.1', '--port', String(port), '--strictPort'], { cwd: root, env: { ...process.env, PV_CAPTURE_SOURCE: captureSource }, stdio: ['ignore', 'ignore', 'pipe'] });
   let serverLog = '';
   server.stderr.on('data', b => { serverLog += b; });
   server.on('error', e => { serverLog += e.message; });
@@ -143,7 +161,7 @@ try {
     await writeFile(path.join(out, 'preflight.json'), JSON.stringify(preflight, null, 2));
   } else if (verify) {
     const results = [];
-    for (const id of ['neo', 'chappy', 'trio', 'jinrai-ult', 'minerva-ult', 'announcement']) {
+    for (const id of ['neo', 'rush-1', 'trio', 'claudine-ult', 'minerva-ult', 'announcement']) {
       const cut = board.cuts.find(c => c.id === id);
       const frame = Math.round((cut.start + cut.review) * board.fps);
       const snapshot = async f => {
@@ -201,9 +219,10 @@ try {
         if (index > 0 && before.textBounds.length) throw new Error('3段カットインに文字が描かれています');
         const sample = () => Array.from(ctx.getImageData(960, index * 360 + 180, 1, 1).data).join(',');
         if (index > 0 && sample() !== '8,8,23,255') throw new Error('未登場の段がnight色ではありません');
-        const after = await window.pv.renderFrame(first + 15);
+        const settled = first + Math.ceil(window.pv.board.effects.trioSlide * window.pv.board.fps);
+        const after = await window.pv.renderFrame(settled);
         if (after.textBounds.length || sample() === '8,8,23,255') throw new Error('差し込み後の絵が表示されていません');
-        result.push({ start: member.start, settledFrame: first + 15 });
+        result.push({ start: member.start, settledFrame: settled });
       }
       return result;
     }, trio);
@@ -228,6 +247,27 @@ try {
       return results;
     });
     results.push({ continuity });
+    const transitions = await page.evaluate(async () => {
+      const result = [];
+      for (let i = 1; i < window.pv.board.cuts.length; i++) {
+        const cut = window.pv.board.cuts[i], boundary = Math.round(cut.start * window.pv.board.fps);
+        const duration = window.pv.incomingFrames(i);
+        const before = await window.pv.renderFrame(boundary - 1);
+        const on = await window.pv.renderFrame(boundary);
+        if (on.cut !== cut.id || on.transition) throw new Error(`${cut.id}: 小節頭で次のカットが確定していません`);
+        if (duration > 0) {
+          if (before.transition?.to !== cut.id || Math.abs(before.transition.alpha - (duration - 1) / duration) > 1e-8) throw new Error(`${cut.id}: クロスフェードの終端が不正です`);
+          const halfway = await window.pv.renderFrame(boundary - Math.round(duration / 2));
+          const seek = window.pv.snapshot();
+          await window.pv.renderFrame(boundary - duration);
+          for (let n = boundary - duration + 1; n <= boundary - Math.round(duration / 2); n++) await window.pv.renderFrame(n);
+          if (seek !== window.pv.snapshot()) throw new Error(`${cut.id}: クロスフェード途中を再現できません`);
+          result.push({ id: cut.id, frames: duration, fieldOnly: halfway.transition.fieldOnly });
+        } else if (before.transition) throw new Error(`${cut.id}: クロスフェード除外区間にフェードがあります`);
+      }
+      return result;
+    });
+    results.push({ transitions });
     await writeFile(path.join(out, 'verification.json'), JSON.stringify(results, null, 2));
     console.log(JSON.stringify(results, null, 2));
   } else if (reviewOnly) {
@@ -288,12 +328,31 @@ try {
     }
     const trio = board.cuts.find(c => c.kind === 'cutin-trio');
     if (trio) for (const [index, member] of trio.members.entries()) {
-      const at = (Math.round(member.start * board.fps) + 15 - from) / board.fps;
+      const at = (Math.round(member.start * board.fps) + Math.ceil(board.effects.trioSlide * board.fps) - from) / board.fps;
       if (at < 0 || at >= length) continue;
       const still = path.join(reviewStaging, `trio-${['top', 'middle', 'bottom'][index]}`);
       await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(at), '-i', temporaryVideo, '-frames:v', '1', `${still}.png`]);
       await run('cwebp', ['-quiet', '-q', '94', `${still}.png`, '-o', `${still}.webp`]);
       await unlink(`${still}.png`);
+    }
+    if (!partial && filename === 'kyoro-yako-pv') {
+      const extract = async (id, at) => {
+        const still = path.join(reviewStaging, id);
+        await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(at), '-i', temporaryVideo, '-frames:v', '1', `${still}.png`]);
+        await run('cwebp', ['-quiet', '-q', '94', `${still}.png`, '-o', `${still}.webp`]);
+        await unlink(`${still}.png`);
+      };
+      await extract('opening-genre', board.cuts.find(c => c.id === 'opening').review);
+      await contactSheet(reviewStaging, ['rush-1', 'rush-2', 'rush-3'], 'rush', 3);
+      const slide = board.cuts.find(c => c.id === 'neo');
+      const onset = (Math.round(slide.start * board.fps) - Math.round(board.effects.crossfade * board.fps)) / board.fps;
+      const ids = [];
+      for (let i = 0; i < 5; i++) {
+        const id = `slide-in-${i}`; ids.push(id);
+        await extract(id, onset + i * 0.1);
+      }
+      await contactSheet(reviewStaging, ids, 'slide-in', 5);
+      for (const id of ids) await unlink(path.join(reviewStaging, `${id}.webp`));
     }
     await contactSheet(reviewStaging, reviewIds);
     const elapsed = (performance.now() - started) / 1000;
@@ -303,7 +362,9 @@ try {
     }
     if (pageErrors.length) throw new Error(pageErrors.join('\n'));
     probe.format.filename = videoPath;
-    const report = { ...result, warnings, preflight, source, sourceAfter: await sourceVersion(), musicSha256: hasMusic ? sha(await readFile(music)) : null,
+    const sourceAfter = await sourceVersion();
+    if (source.srcCommit !== sourceAfter.srcCommit || source.diffSha256 !== sourceAfter.diffSha256) throw new Error('撮影中にsrcが変更されました。本編を置き換えず停止します。同じ本体で再実行してください');
+    const report = { ...result, warnings, preflight, source, sourceAfter, musicSha256: hasMusic ? sha(await readFile(music)) : null,
       ffmpeg: (await run('ffmpeg', ['-version'])).split('\n')[0], audio: hasMusic ? audio : null,
       board: boardPath, boardSha256: sha(await readFile(boardPath)), videoPath, elapsedSeconds: elapsed, hasMusic, chrome: browser.version(), probe };
     const reportStaging = path.join(staging, `${filename}.report.json`);

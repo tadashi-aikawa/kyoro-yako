@@ -3,7 +3,7 @@ import { randomGenerator } from './capture.js';
 
 const clamp = n => Math.max(0, Math.min(1, n));
 const ease = n => 1 - (1 - clamp(n)) ** 3;
-export const layouts = ['neo', 'obsidia', 'chappy', 'claudine', 'jinrai', 'etokichi', 'minerva', 'field-left', 'field-right'];
+export const layouts = ['neo', 'obsidia', 'chappy', 'claudine', 'jinrai', 'etokichi', 'minerva', 'field-left', 'field-right', 'field-center'];
 
 export class Composition {
   constructor(canvas, board) {
@@ -98,9 +98,9 @@ export class Composition {
     const c = this.ctx, color = cut.color;
     const right = ['obsidia', 'claudine', 'etokichi', 'field-right'].includes(cut.layout);
     capture.drawTo(c, right ? 994.285714 : 0);
-    const enter = ease(local / 0.45), drift = (1 - enter) * (right ? -36 : 36);
-    c.save(); c.translate(drift, 0); c.globalAlpha = enter;
-    // 動かすのは立ち絵だけ。文字の位置はカットを通して固定する。
+    const fx = this.board.effects;
+    const enter = ease(local / fx.portraitSlide), drift = (1 - enter) * fx.portraitDistance * (right ? -1 : 1);
+    c.save(); c.beginPath(); c.rect(right ? 0 : 926, 0, 994, 1080); c.clip(); c.translate(drift, 0);
     switch (cut.layout) {
       case 'obsidia': this.portrait(cut.portrait, 22, 110, 710, 1065); break;
       case 'chappy': this.portrait(cut.portrait, 1410, 240, 440, 710); break;
@@ -115,12 +115,9 @@ export class Composition {
     const shade = c.createLinearGradient(0, 720, 0, 1080);
     shade.addColorStop(0, '#08081700'); shade.addColorStop(0.7, '#080817eb'); shade.addColorStop(1, this.board.night);
     c.fillStyle = shade; c.fillRect(right ? 0 : 926, 720, 994, 360);
-    c.save(); c.globalAlpha = enter;
-    if (cut.kind === 'genre') {
-      this.paragraph(cut.text, 75, 825, 62, 830);
-      c.restore();
-      return;
-    }
+    const textEnter = ease((local - fx.textDelay) / fx.textSlide);
+    c.save(); c.globalAlpha = textEnter;
+    c.translate((1 - textEnter) * fx.textDistance * (right ? -1 : 1), 0);
     switch (cut.layout) {
       case 'obsidia':
         this.text(cut.name, 75, 835, 104, color, 830);
@@ -159,7 +156,7 @@ export class Composition {
       const elapsed = local - (Math.round(member.start * this.board.fps) - Math.round(cut.start * this.board.fps)) / this.board.fps;
       if (elapsed < 0) return;
       const image = this.images.get(member.image), y = i * 360;
-      const shift = (1 - ease(elapsed / 0.25)) * 1920 * (member.direction === 'left' ? -1 : 1);
+      const shift = (1 - ease(elapsed / this.board.effects.trioSlide)) * 1920 * (member.direction === 'left' ? -1 : 1);
       c.save(); c.beginPath(); c.rect(0, y, 1920, 360); c.clip();
       c.translate(shift, 0);
       c.fillStyle = member.background; c.fillRect(0, y, 1920, 360);
@@ -170,13 +167,15 @@ export class Composition {
     });
   }
 
-  async draw(cut, localFrame, durationFrames, capture) {
-    const c = this.ctx, b = this.board, local = localFrame / b.fps, time = cut.start + local;
+  async draw(cut, localFrame, durationFrames, capture, timelineTime = cut.start + localFrame / this.board.fps) {
+    const c = this.ctx, b = this.board, local = localFrame / b.fps, time = timelineTime;
     // Canvasの描画状態と前フレームの画素を残さず、seekでも同じ合成順にする。
     c.reset();
     this.textBounds = [];
     this.night(time, cut.color);
-    if (cut.capture) {
+    if (cut.kind === 'gameplay') {
+      capture.drawTo(c, (1920 - 1080 * 384 / 448) / 2);
+    } else if (cut.capture) {
       const presentation = local + (Math.round(cut.start * b.fps) - Math.round((cut.presentationStart ?? cut.start) * b.fps)) / b.fps;
       this.character(cut, presentation, capture);
       if (cut.kind === 'cutin') {
@@ -198,9 +197,12 @@ export class Composition {
       this.cutinTrio(cut, local);
     } else if (cut.kind === 'opening') {
       this.keyVisual(local, clamp(local / 4));
-      c.save(); c.globalAlpha = clamp((local - 3) / 3);
+      c.save(); c.globalAlpha = clamp((local - b.effects.titleAt) / b.effects.titleFade);
       this.text(b.title, 130, 505, 154, '#fff0cd', 800);
       this.text(b.reading, 145, 575, 34, b.gold, 750);
+      c.restore();
+      c.save(); c.globalAlpha = clamp((local - b.effects.titleAt - b.effects.genreDelay) / b.effects.genreFade);
+      b.genreText.replace('、', '、\n').split('\n').forEach((line, i) => this.text(line, 140, 835 + i * 65, 42, '#fff2da', 850));
       c.restore();
       c.fillStyle = `rgba(0,0,0,${1 - clamp(local / 2.5)})`; c.fillRect(0, 0, 1920, 1080);
     } else if (cut.kind === 'story') {
@@ -214,9 +216,7 @@ export class Composition {
       const index = cut.kind === 'announcement' ? count - 1 : Math.min(count - 1, localFrame);
       const sky = await this.image(`/_Unversioned/pv/ending/${String(index + 1).padStart(4, '0')}.webp`);
       c.drawImage(sky, 0, 0, 1920, 1080);
-      if (cut.kind === 'dawn') {
-        c.fillStyle = `rgba(255,255,255,${1 - clamp(local / 0.8)})`; c.fillRect(0, 0, 1920, 1080);
-      } else {
+      if (cut.kind === 'announcement') {
         c.save(); c.globalAlpha = clamp(local / 0.8);
         c.fillStyle = '#10142540'; c.fillRect(0, 0, 1920, 1080);
         const titleShadow = { color: '#160f25', blur: 20, offsetY: 4, passes: 2 };
@@ -229,8 +229,9 @@ export class Composition {
         c.fillStyle = `rgba(0,0,0,${1 - clamp((remain - 1 / b.fps) / 1.5)})`; c.fillRect(0, 0, 1920, 1080);
       }
     }
-    if (cut.flashIn) {
-      c.fillStyle = `rgba(255,255,255,${1 - clamp(local / cut.flashIn)})`;
+    const flash = cut.flashIn ?? (cut.transition === 'flash' ? (cut.kind === 'gameplay' ? b.effects.rushFlash : b.effects.chorusFlash) : 0);
+    if (flash) {
+      c.fillStyle = `rgba(255,255,255,${1 - clamp(local / flash)})`;
       c.fillRect(0, 0, 1920, 1080);
     }
   }

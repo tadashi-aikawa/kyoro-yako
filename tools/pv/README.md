@@ -19,6 +19,11 @@ node /Users/tadashi-aikawa/work/owlery-danmaku/tools/pv/export.mjs
 - H.264中間データは成功・失敗を問わず既定で削除する。
   - 保存: `--keep-intermediate`を付ける。
 - MP4は一時パスで生成・検証してから正式パスへリネームする。
+- `--source-ref <commit>`で撮影する本体のコミットを固定できる。
+  - 方法: 指定コミットの`src/`を一時ディレクトリへ展開し、撮影専用Viteの参照先を切り替える。作業中の`src/`は変更しない。
+  - 範囲: 固定するのは本体コード。絵コンテ・合成コード・画像・音楽は作業ディレクトリを使う。
+  - 再現性確認: 同じコミットを指定して2回実行する。レポートの`source.pinned`と`source.head`に記録する。
+  - 未指定時: 撮影中に`src/`の変更を検出したら、本編を置き換える前に停止する。
 - `--name`または部分書き出しの静止画は`review/<name>/`へ保存する。
   - 理由: 正式版の代表フレームを上書きしないため。
 
@@ -36,21 +41,31 @@ Viteを`127.0.0.1:5391`で自動起動する。終了時にはそのポートを
 
 既定の絵コンテは`storyboard.json`。
 
+- 冒頭の題字に`genreText`を重ねる。
+  - 時刻: 題字のフェード開始3秒から1.5秒遅れて、左下にジャンル紹介が現れる。
+- 13.74秒に手紙、16.93秒に上階への物語、20.12秒にみみこ付きのステージ1道中を置く。
 - 26.50〜52.02秒は、ネオ・エトキチ・オブシディア・チャッピーを各6.38秒紹介する。
-- 52.02〜58.39秒の`cutin-trio`は、上・中・下の360pxの3段に絵だけを表示する。
-  - 時刻: 迅雷52.02秒、クロディーヌ54.41秒、ミネルヴァ56.80秒。
-  - 動き: 左・右・左から0.25秒で滑り込み、止まったら静止する。
+- 52.02・53.61・55.21秒にステージ2・3・4の道中を中央へ大きく表示する。
+  - 表示: 立ち絵と合成文字なし。カット頭の3フレームを白フラッシュにする。
+- 56.80〜58.39秒の`cutin-trio`は、上・中・下の360pxの3段に絵だけを表示する。
+  - 時刻: クロディーヌ56.80秒、迅雷57.33秒、ミネルヴァ57.86秒。
+  - 動き: 左・右・左から0.18秒で滑り込み、止まったら静止する。
   - 切り出し: 各素材の顔を含む横長の領域を縦横比を保って段の高さへ縮める。
-- サビは迅雷・クロディーヌ・ミネルヴァの順で、各人の通常技と最終技を見せる。
+- サビはクロディーヌ・迅雷・ミネルヴァの順で、各人の通常技と最終技を見せる。
   - 表示: `presentationStart`を通常技の開始時刻にそろえ、技の切り替えで立ち絵と文字を再登場させない。
   - 接続: サビ頭に0.12秒の白フラッシュを入れる。
 - `kind: character`の合成文字は名前とセリフだけ。
   - 補足: `spell`はゲーム内のフェーズ照合にも使うため、データには残す。
-- `genre.text`が冒頭のジャンル紹介。
+- カット間は小節頭の0.3秒前からクロスフェードし、小節頭で次の絵へ切り替え終える。
+  - 撮影: 次のカットを18フレーム早く撮り始め、そのまま進行させる。末尾の静止画を引き延ばさない。
+  - 例外: 道中3連打と3段カットインの接続にはクロスフェードを掛けない。
+  - 通常技から最終技: プレイフィールドだけをクロスフェードし、人物側を維持する。
+- キャラの立ち絵は外側から0.4秒で入り、名前とセリフは0.15秒遅れて0.25秒でスライドしながら現れる。
+  - 基準: 登場演出もクロスフェードの開始時刻から進める。
 - ミネルヴァの最終技は`capture.prayer: { cycle: 12, frame: 0 }`で最後の祈りを撮る。
   - 準備: 離陸後までwarmupし、本体のHP境界を順に通して指定のサイクルへ入る。
   - 本気区間: 宣言と補給の演出がある場合は、本体の更新で終了するまで待ってから次のHP境界へ進める。
-  - 維持: 祈りの準備以降は自動ショットを止める。溜めから連射、休みへ進む287フレームを撮影する。
+  - 維持: 祈りの準備以降は自動ショットを止める。クロスフェード分の18フレームを含め、溜めから連射、休みへ進む305フレームを撮影する。
 - チャッピーは撮影中だけ`capture.holdHp`でHPを保持する。
   - 理由: 元のwarmupとショットを保ったまま6.38秒の尺を確保する。
 
@@ -61,16 +76,22 @@ caffeinate -dimsu node tools/pv/export.mjs --verify
 
 各段の差し込み完了フレームは`review/trio-top.webp`・`trio-middle.webp`・`trio-bottom.webp`、3段そろった代表フレームは`review/trio.webp`へ書き出す。
 
+- `review/opening-genre.webp`: ジャンル紹介が現れた題字画面。
+- `review/rush.webp`: 道中3カットを左からステージ2・3・4の順に並べる。
+- `review/slide-in.webp`: ネオの登場開始から0.0・0.1・0.2・0.3・0.4秒を左から並べる。
+
 | フィールド | 内容 |
 |---|---|
 | `duration` | 動画全体の秒数 |
-| `cuts[].start` | カット開始秒。次のカットの開始秒が終了秒になる |
+| `cuts[].start` | そのカットへの切り替えが完了する小節頭の秒数 |
 | `cuts[].review` | カット内の代表フレームを切り出す秒数 |
 | `cuts[].kind` | 導入、物語、キャラ、戦闘などのカット種別 |
 | `cuts[].layout` | キャラごとの組み方。下表参照 |
 | `text`, `name`, `quote` | 表示する文言 |
 | `spell` | 撮影フェーズの照合用。キャラ紹介には描かない |
-| `presentationStart`, `flashIn` | 立ち絵と文字の登場開始秒、カット頭の白フラッシュ秒数 |
+| `presentationStart`, `flashIn` | 通常技のstartを指定して人物の再登場を抑止、カット頭の白フラッシュ秒数 |
+| `effects` | 各演出の既定値。下表参照 |
+| `cuts[].transition`, `crossfade` | `flash`または`none`でクロスフェードを除外。`crossfade`で秒数を上書き |
 | `members[].start`, `direction`, `x`, `cropY`, `cropHeight` | 3段カットインの開始秒、入場方向、水平位置、素材の切り出し位置と高さ |
 | `portrait`, `keyVisual` | Viteの公開パスで指定する画像 |
 | `capture.stage`, `phase`, `midboss` | 面、0始まりのフェーズ、中ボス指定 |
@@ -88,6 +109,16 @@ caffeinate -dimsu node tools/pv/export.mjs --verify
 | `ending.path`, `offset`, `duration` | 朝空の動画素材、開始秒、切り出し秒数 |
 
 秒数は60fpsのフレーム境界へ丸める。カット開始は昇順で指定する。
+
+| effectsのフィールド | 既定値 |
+|---|---|
+| `crossfade` | 0.3秒 |
+| `portraitSlide`, `portraitDistance` | 0.4秒、1000px |
+| `textDelay`, `textSlide`, `textDistance` | 0.15秒遅延、0.25秒、48px |
+| `trioSlide` | 0.18秒 |
+| `rushFlash`, `chorusFlash` | 0.05秒、0.12秒 |
+| `titleAt`, `titleFade` | 3秒から、3秒でフェード |
+| `genreDelay`, `genreFade` | 題字から1.5秒遅延、1秒でフェード |
 
 - 音楽ファイルがあればAACとして合成する。
   - 初期パス: `_Unversioned/assets/pv/pv-theme.mp3`
@@ -121,6 +152,7 @@ caffeinate -dimsu node tools/pv/export.mjs --verify
 | `etokichi` | フィールド右、左側の上に名前、中央に丸い立ち絵、下にセリフ |
 | `minerva` | フィールド左、右に大きな立ち絵、右端に縦組みの名前、下端を暗幕に沈めてセリフ |
 | `field-left`, `field-right` | 物語とサビ用。フィールドの左右を指定し、余白に大きな立ち絵 |
+| `field-center` | 道中3連打用。高さ1080pxのフィールドを中央に置き、両脇を夜空にする |
 
 ## 短い試写と受入
 
@@ -155,7 +187,7 @@ node /Users/tadashi-aikawa/work/owlery-danmaku/tools/pv/export.mjs --board /abso
 - `audio-check.mjs`はNode専用の検証ファイル。本体のVitestが拾わない名前にする。
 - `--clean`は旧中間物に加え、`review/source/`、`review/announcement/`、`review/fix1-preview/`と告知・fix1試写を掃除する。
   - 例外: 今回指定した出力名と入力絵コンテは保護する。
-  - 本編: 削除されたgate・個別カットイン・旧battle・gold・defeatの代表画像も掃除する。
+  - 本編: 削除されたgenre・conversation・個別カットイン・旧battle・gold・defeatの代表画像も掃除する。
 - 実時間が15分を超えた場合は警告を出す。正常な動画は保存する。
 
 すべての書き出しで、先に全カットを実ゲームでシミュレーションする。
@@ -195,7 +227,7 @@ GameとRendererを直接importし、`game.update()`を60fpsで進める。フレ
 - エンコード: CanvasのRGBA画素をWebCodecsへ渡してH.264 Annex Bを生成し、ffmpegでBT.709・YUV420・limited rangeに統一してMP4へ保存する。
   - 入力: RGBAとfull rangeを明示し、描画内容による色レンジの変化を防ぐ。
   - 再現性: WebCodecsは`prefer-software`、仕上げのlibx264は1スレッドへ固定する。
-  - 監査: 各カット先頭12フレームと代表フレームのRGBA画素ハッシュをレポートの`rgbaSha256`へ記録する。
+  - 監査: 各カットの小節頭・クロスフェード開始から12フレームずつと、代表フレームのRGBA画素ハッシュをレポートの`rgbaSha256`へ記録する。
   - 仕上げ: libx264の`veryfast / CRF 18`を使用する。
   - 詳細: [W3C AVC WebCodecs Registration](https://www.w3.org/TR/webcodecs-avc-codec-registration/)
 - 朝空: ffmpegで固定時刻のフレームへデコードし、cwebpでWebPへ変換する。

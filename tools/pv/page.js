@@ -2,12 +2,22 @@ import initialBoard from './storyboard.json';
 import { Capture } from './capture.js';
 import { Composition, layouts } from './composition.js';
 
-let board = initialBoard, composition, capture, active = -1, last = -1;
+let board = initialBoard, composition, capture, last = -1;
+const states = new Map();
 const canvas = document.querySelector('#pv');
+
+function incomingFrames(index) {
+  if (index === 0) return 0;
+  const cut = board.cuts[index], previous = board.cuts[index - 1];
+  if (cut.transition === 'none' || cut.transition === 'flash' || previous.kind === 'gameplay' || previous.kind === 'cutin-trio') return 0;
+  return Math.round((cut.crossfade ?? board.effects.crossfade) * board.fps);
+}
 
 function validate(b) {
   if (b.width !== 1920 || b.height !== 1080 || b.fps !== 60) throw new Error('PVは1920×1080 / 60fps固定です');
   if (!Number.isFinite(b.duration) || b.duration <= 0) throw new Error('durationが不正です');
+  for (const [key, value] of Object.entries(b.effects ?? {})) if (!Number.isFinite(value) || value < 0) throw new Error(`effects.${key}が不正です`);
+  for (const key of ['portraitSlide', 'textSlide', 'trioSlide', 'titleFade', 'genreFade']) if (!(b.effects?.[key] > 0)) throw new Error(`effects.${key}には正の秒数を指定してください`);
   if (b.cuts[0]?.start !== 0) throw new Error('先頭カットは0秒にしてください');
   const ids = new Set();
   for (let i = 0; i < b.cuts.length; i++) {
@@ -25,31 +35,62 @@ async function configure(next = board) {
   canvas.width = board.width; canvas.height = board.height;
   composition = new Composition(canvas, board);
   await composition.prepare();
-  capture = undefined; active = -1; last = -1;
+  capture = undefined; states.clear(); last = -1;
+}
+
+async function renderCut(index, frame) {
+  const cut = board.cuts[index];
+  const first = Math.round(cut.start * board.fps) - incomingFrames(index);
+  const end = Math.round((board.cuts[index + 1]?.start ?? board.duration) * board.fps);
+  const local = frame - first;
+  let state = states.get(index);
+  if (!state) {
+    const layer = document.createElement('canvas'); layer.width = board.width; layer.height = board.height;
+    const renderer = new Composition(layer, board); renderer.images = composition.images;
+    const shot = cut.capture ? new Capture(board.pixelRatio) : undefined;
+    if (shot) await shot.begin(cut);
+    state = { canvas: layer, composition: renderer, capture: shot };
+    states.set(index, state);
+  }
+  if (state.capture) {
+    while (state.capture.frame < local) {
+      state.capture.step();
+      // 飛び先でも逐次書き出しと同じ姿勢履歴にする。
+      if (state.capture.frame < local) state.capture.drawTo(state.composition.ctx, 0);
+    }
+  }
+  await state.composition.draw(cut, local, end - first, state.capture, frame / board.fps);
+  return { ...state, cut, local };
 }
 
 async function renderFrame(frame) {
   if (!Number.isInteger(frame) || frame < 0 || frame >= Math.round(board.duration * board.fps)) throw new Error(`frameが範囲外: ${frame}`);
+  if (frame <= last) states.clear();
   const index = board.cuts.findLastIndex(cut => Math.round(cut.start * board.fps) <= frame);
-  const cut = board.cuts[index];
-  const first = Math.round(cut.start * board.fps);
-  const end = Math.round((board.cuts[index + 1]?.start ?? board.duration) * board.fps);
-  const local = frame - first;
-  if (active !== index || frame <= last) {
-    capture = cut.capture ? new Capture(board.pixelRatio) : undefined;
-    if (capture) await capture.begin(cut);
-    active = index;
-  }
-  if (capture) {
-    while (capture.frame < local) {
-      capture.step();
-      // 飛び先でも逐次書き出しと同じ姿勢履歴にする。
-      if (capture.frame < local) capture.drawTo(composition.ctx, 0);
+  for (const key of states.keys()) if (key < index || key > index + 1) states.delete(key);
+  const current = await renderCut(index, frame);
+  capture = current.capture;
+  const c = composition.ctx; c.reset(); c.drawImage(current.canvas, 0, 0);
+  composition.textBounds = current.composition.textBounds;
+  const captures = current.capture ? [{ id: current.cut.id, stats: current.capture.stats }] : [];
+  let transition = null;
+  if (index + 1 < board.cuts.length) {
+    const next = board.cuts[index + 1], boundary = Math.round(next.start * board.fps), duration = incomingFrames(index + 1);
+    if (duration > 0 && frame >= boundary - duration) {
+      const incoming = await renderCut(index + 1, frame);
+      const alpha = (frame - (boundary - duration)) / duration;
+      const fieldOnly = next.kind === 'character' && next.presentationStart === current.cut.start;
+      c.save();
+      if (fieldOnly) {
+        c.beginPath(); c.rect(next.layout === 'claudine' ? 994.285714 : 0, 0, 1080 * 384 / 448, 1080); c.clip();
+      }
+      c.globalAlpha = alpha; c.drawImage(incoming.canvas, 0, 0); c.restore();
+      if (incoming.capture) captures.push({ id: next.id, stats: incoming.capture.stats });
+      transition = { to: next.id, alpha, fieldOnly, boundary };
     }
   }
-  await composition.draw(cut, local, end - first, capture);
   last = frame;
-  return { cut: cut.id, frame, local, stats: capture?.stats, textBounds: composition.textBounds };
+  return { cut: current.cut.id, frame, local: current.local, stats: capture?.stats, captures, transition, textBounds: composition.textBounds };
 }
 
 function base64(bytes) {
@@ -63,7 +104,7 @@ async function preflight() {
   for (let i = 0; i < board.cuts.length; i++) {
     const cut = board.cuts[i];
     if (!cut.capture) continue;
-    const frames = Math.round((board.cuts[i + 1]?.start ?? board.duration) * board.fps) - Math.round(cut.start * board.fps);
+    const frames = Math.round((board.cuts[i + 1]?.start ?? board.duration) * board.fps) - Math.round(cut.start * board.fps) + incomingFrames(i);
     const candidate = new Capture(board.pixelRatio);
     await candidate.begin(cut);
     let available = 0, exhausted = false;
@@ -80,7 +121,7 @@ async function preflight() {
     }
     results.push({ id: cut.id, frames, availableFrames: available, marginFrames: available - frames, limitReached: exhausted });
   }
-  active = -1; last = -1; capture = undefined;
+  states.clear(); last = -1; capture = undefined;
   return results;
 }
 
@@ -98,7 +139,8 @@ async function encode(from = 0, to = Math.round(board.duration * board.fps)) {
   });
   encoder.configure(config);
   const stats = new Map();
-  const auditFrames = new Set(board.cuts.flatMap(cut => [
+  const auditFrames = new Set(board.cuts.flatMap((cut, index) => [
+    ...Array.from({ length: 12 }, (_, i) => Math.round(cut.start * board.fps) - incomingFrames(index) + i),
     ...Array.from({ length: 12 }, (_, i) => Math.round(cut.start * board.fps) + i),
     Math.round((cut.start + cut.review) * board.fps),
   ]));
@@ -106,7 +148,7 @@ async function encode(from = 0, to = Math.round(board.duration * board.fps)) {
   try {
     for (let frame = from; frame < to; frame++) {
       const result = await renderFrame(frame);
-      if (result.stats) stats.set(result.cut, structuredClone(result.stats));
+      for (const shot of result.captures) stats.set(shot.id, structuredClone(shot.stats));
       // Canvas由来のVideoFrameは描画内容によって色レンジが変わるため、RGBAへ固定する。
       const pixels = canvas.getContext('2d').getImageData(0, 0, board.width, board.height);
       if (auditFrames.has(frame)) {
@@ -136,7 +178,7 @@ async function encode(from = 0, to = Math.round(board.duration * board.fps)) {
 }
 
 window.pv = {
-  configure, renderFrame, encode, preflight,
+  configure, renderFrame, encode, preflight, incomingFrames,
   snapshot: () => canvas.toDataURL('image/webp', 0.94),
   get board() { return board; },
   get state() { return capture ? { px: capture.game.px, py: capture.game.py, phaseFrame: capture.game.phaseFrame, phaseHp: capture.game.phaseHp, cutin: capture.game.cutin, scene: capture.game.scene, bullets: capture.game.bullets.count, ...capture.stats } : null; },

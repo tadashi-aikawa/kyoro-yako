@@ -45,24 +45,8 @@
       "review": 10
     },
     {
-      "id": "genre",
-      "start": 13.74,
-      "kind": "genre",
-      "layout": "field-right",
-      "text": "owleryの仲間が待ち受ける、弾幕シューティング。",
-      "portrait": "/assets/members/mimiko-stand.webp",
-      "color": "#e8c974",
-      "capture": {
-        "stage": 1,
-        "difficulty": "hard",
-        "seed": 102,
-        "warmup": 640
-      },
-      "review": 1.5
-    },
-    {
       "id": "letter",
-      "start": 16.93,
+      "start": 13.74,
       "kind": "story",
       "text": [
         "名前がないの。",
@@ -72,7 +56,7 @@
     },
     {
       "id": "ascent",
-      "start": 20.12,
+      "start": 16.93,
       "kind": "story",
       "text": [
         "いちばん上まで行けば、会えるのかな。",
@@ -81,22 +65,19 @@
       "review": 2
     },
     {
-      "id": "conversation",
-      "start": 23.31,
-      "kind": "dialogue",
-      "layout": "field-left",
-      "name": "ネオ",
-      "portrait": "/assets/members/neo-stand.webp",
-      "color": "#8ed0b2",
+      "id": "gate",
+      "start": 20.12,
+      "kind": "gameplay-portrait",
+      "layout": "field-right",
+      "portrait": "/assets/members/mimiko-stand.webp",
+      "color": "#e8c974",
       "capture": {
         "stage": 1,
-        "mode": "dialogue",
-        "line": 2,
         "difficulty": "hard",
-        "seed": 101,
-        "warmup": 0
+        "seed": 102,
+        "warmup": 640
       },
-      "review": 1.5
+      "review": 2
     },
     {
       "id": "neo",
@@ -178,83 +159,86 @@
       "review": 2
     },
     {
-      "id": "trio",
+      "id": "rush-1",
       "start": 52.02,
+      "kind": "gameplay",
+      "layout": "field-center",
+      "transition": "flash",
+      "capture": {
+        "stage": 2,
+        "difficulty": "hard",
+        "seed": 2202,
+        "warmup": 1000
+      },
+      "review": 0.8
+    },
+    {
+      "id": "rush-2",
+      "start": 53.61,
+      "kind": "gameplay",
+      "layout": "field-center",
+      "transition": "flash",
+      "capture": {
+        "stage": 3,
+        "difficulty": "hard",
+        "seed": 3302,
+        "warmup": 1100
+      },
+      "review": 0.8
+    },
+    {
+      "id": "rush-3",
+      "start": 55.21,
+      "kind": "gameplay",
+      "layout": "field-center",
+      "transition": "flash",
+      "capture": {
+        "stage": 4,
+        "difficulty": "hard",
+        "seed": 4402,
+        "warmup": 1200
+      },
+      "review": 0.8
+    },
+    {
+      "id": "trio",
+      "start": 56.80,
       "kind": "cutin-trio",
-      "review": 5.1,
+      "review": 1.35,
       "members": [
         {
-          "image": "/assets/cutins/jinrai-issen.webp",
-          "start": 52.02,
-          "direction": "left",
-          "x": 120,
-          "cropY": 100,
-          "cropHeight": 480,
-          "background": "#211a11"
-        },
-        {
           "image": "/assets/cutins/claudine-bloom.webp",
-          "start": 54.41,
-          "direction": "right",
+          "start": 56.80,
+          "direction": "left",
           "x": 240,
           "cropY": 100,
           "cropHeight": 480,
           "background": "#291f23"
         },
         {
+          "image": "/assets/cutins/jinrai-issen.webp",
+          "start": 57.33,
+          "direction": "right",
+          "x": 120,
+          "cropY": 100,
+          "cropHeight": 480,
+          "background": "#211a11"
+        },
+        {
           "image": "/assets/cutins/minerva-oracle.webp",
-          "start": 56.80,
+          "start": 57.86,
           "direction": "left",
           "x": 175,
           "cropY": 100,
           "cropHeight": 480,
           "background": "#282017"
         }
-      ]
-    },
-    {
-      "id": "jinrai",
-      "start": 58.39,
-      "kind": "character",
-      "layout": "jinrai",
-      "name": "迅雷",
-      "quote": "……ここからは、手加減なしや。",
-      "spell": "夜桜の簪",
-      "portrait": "/assets/members/jinrai-stand.webp",
-      "color": "#f3a5bd",
-      "capture": {
-        "stage": 4,
-        "phase": 3,
-        "difficulty": "hard",
-        "seed": 4403,
-        "warmup": 340
-      },
-      "review": 2,
-      "flashIn": 0.12
-    },
-    {
-      "id": "jinrai-ult",
-      "start": 62.38,
-      "kind": "character",
-      "layout": "jinrai",
-      "name": "迅雷",
-      "quote": "……ここからは、手加減なしや。",
-      "spell": "迅雷一閃",
-      "portrait": "/assets/members/jinrai-stand.webp",
-      "color": "#f3a5bd",
-      "capture": {
-        "stage": 4,
-        "phase": 10,
-        "difficulty": "hard",
-        "seed": 4410,
-        "warmup": 400
-      },
-      "review": 2,
-      "presentationStart": 58.39
+      ],
+      "transition": "none"
     },
     {
       "id": "claudine",
-      "start": 66.37,
+      "start": 58.39,
       "kind": "character",
       "layout": "claudine",
       "name": "クロディーヌ",
@@ -269,11 +253,12 @@
         "seed": 3303,
         "warmup": 340
       },
-      "review": 2
+      "review": 2,
+      "transition": "flash"
     },
     {
       "id": "claudine-ult",
-      "start": 70.35,
+      "start": 62.38,
       "kind": "character",
       "layout": "claudine",
       "name": "クロディーヌ",
@@ -287,6 +272,45 @@
         "difficulty": "hard",
         "seed": 3309,
         "warmup": 650
+      },
+      "review": 2,
+      "presentationStart": 58.39
+    },
+    {
+      "id": "jinrai",
+      "start": 66.37,
+      "kind": "character",
+      "layout": "jinrai",
+      "name": "迅雷",
+      "quote": "……ここからは、手加減なしや。",
+      "spell": "夜桜の簪",
+      "portrait": "/assets/members/jinrai-stand.webp",
+      "color": "#f3a5bd",
+      "capture": {
+        "stage": 4,
+        "phase": 3,
+        "difficulty": "hard",
+        "seed": 4403,
+        "warmup": 340
+      },
+      "review": 2
+    },
+    {
+      "id": "jinrai-ult",
+      "start": 70.35,
+      "kind": "character",
+      "layout": "jinrai",
+      "name": "迅雷",
+      "quote": "……ここからは、手加減なしや。",
+      "spell": "迅雷一閃",
+      "portrait": "/assets/members/jinrai-stand.webp",
+      "color": "#f3a5bd",
+      "capture": {
+        "stage": 4,
+        "phase": 10,
+        "difficulty": "hard",
+        "seed": 4410,
+        "warmup": 400
       },
       "review": 2,
       "presentationStart": 66.37
@@ -346,5 +370,21 @@
       "kind": "announcement",
       "review": 3.5
     }
-  ]
+  ],
+  "effects": {
+    "crossfade": 0.3,
+    "portraitSlide": 0.4,
+    "portraitDistance": 1000,
+    "textDelay": 0.15,
+    "textSlide": 0.25,
+    "textDistance": 48,
+    "trioSlide": 0.18,
+    "rushFlash": 0.05,
+    "chorusFlash": 0.12,
+    "titleAt": 3,
+    "titleFade": 3,
+    "genreDelay": 1.5,
+    "genreFade": 1
+  },
+  "genreText": "owleryの仲間が待ち受ける、弾幕シューティング。"
 }
