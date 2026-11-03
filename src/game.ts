@@ -98,7 +98,7 @@ export class Game {
   frame = 0;
   menu = 0;
   optionVolume = 50;
-  optionBgmVolume = 60;
+  optionBgmVolume = 30;
   px = FIELD.w / 2;
   py = FIELD.h - 50;
   playerDx = 0;
@@ -186,7 +186,7 @@ export class Game {
     this.movies = new MoviePlayer(this.params.get('bgm') === '0', media?.assets);
     this.optionVolume = safeLoad('owlery-volume', 50, (s) => Math.max(0, Math.min(100, Number(s) || 0)));
     this.audio.volume = this.optionVolume / 100;
-    this.optionBgmVolume = safeLoad('owlery-bgm-volume', 60, (s) => Number.isFinite(Number(s)) ? Math.max(0, Math.min(100, Number(s))) : 60);
+    this.optionBgmVolume = safeLoad('owlery-bgm-volume', 30, (s) => Number.isFinite(Number(s)) ? Math.max(0, Math.min(100, Number(s))) : 30);
     this.movies.setVolume(this.optionBgmVolume);
     this.bgm = new BgmPlayer(this.params.get('bgm') === '0', this.optionBgmVolume, media?.assets);
     media?.attach(this.bgm, this.movies, this.audio);

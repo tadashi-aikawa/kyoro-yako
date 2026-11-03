@@ -16,7 +16,7 @@ export class MoviePlayer {
   private readonly videos = new Map<MovieName, HTMLVideoElement>();
   private readonly preparations = new Map<MovieName, () => void>();
   private cancel?: () => void;
-  private volume = 0.6;
+  private volume = 0.3;
   current?: HTMLVideoElement;
 
   onError?: (name: MovieName, retry: () => void, skip: () => void) => void;

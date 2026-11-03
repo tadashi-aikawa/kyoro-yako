@@ -71,7 +71,7 @@ it('startRunでも撃破後の状態とBGM倍率をリセットしてからopeni
 it('タイトルでopeningを先読みし、難易度決定後に動画の音を使って再生する', () => {
   const game = new Game();
   expect(videos).toHaveLength(1);
-  expect(video('opening')).toMatchObject({ muted: false, volume: 0.6, playsInline: true, preload: 'auto' });
+  expect(video('opening')).toMatchObject({ muted: false, volume: 0.3, playsInline: true, preload: 'auto' });
   press(game); game.menu = 3; press(game);
   expect(game.debugState).toMatchObject({ scene: 'movie', movie: 'opening', bgm: null });
   run(game, 20); expect(game.stageFrame).toBe(0);
@@ -93,11 +93,11 @@ it.each(MOVIES)('%sの音の設定とBGM音量を動画へ反映する', (name) 
 
 it('OptionのBGM音量を先読み済み・再生中の動画へ反映する', () => {
   const game = new Game(); game.scene = 'option'; game.menu = 1;
-  press(game, 'ArrowLeft'); expect(game.optionBgmVolume).toBe(50);
-  expect(video('opening').volume).toBe(0.5);
+  press(game, 'ArrowLeft'); expect(game.optionBgmVolume).toBe(20);
+  expect(video('opening').volume).toBe(0.2);
   game.scene = 'difficulty'; press(game);
-  expect(game.movies.current?.volume).toBe(0.5); expect(game.bgm.cue).toBeNull();
-  game.optionBgmVolume = 20; game.update(); expect(game.movies.current?.volume).toBe(0.2);
+  expect(game.movies.current?.volume).toBe(0.2); expect(game.bgm.cue).toBeNull();
+  game.optionBgmVolume = 10; game.update(); expect(game.movies.current?.volume).toBe(0.1);
   press(game, 'KeyX'); expect(game.scene).toBe('movie'); expect(game.bgm.cue).toBeNull();
   video('opening').emit('ended'); expect(game.bgm.cue).toBe('stage-gate');
 });
@@ -120,10 +120,10 @@ it('openingを音なし設定に変えると動画をミュートし、道中BGM
 it('lastbossは無音で再生し、登場開始まで道中曲を35%で保つ', () => {
   vi.stubGlobal('location', { search: '?movie=lastboss' }); const game = new Game();
   expect(video('lastboss').muted).toBe(true);
-  expect(game.debugState).toMatchObject({ bgm: 'stage-dawn', bgmVolume: 0.21 });
+  expect(game.debugState).toMatchObject({ bgm: 'stage-dawn', bgmVolume: 0.105 });
   video('lastboss').emit('ended');
   run(game, 209); expect(game.bgm.cue).toBe('stage-dawn');
-  game.update(); expect(game.debugState).toMatchObject({ bgm: 'boss-minerva', bgmVolume: 0.6 });
+  game.update(); expect(game.debugState).toMatchObject({ bgm: 'boss-minerva', bgmVolume: 0.3 });
 });
 
 it.each(['?stage=2', '?boss=3&phase=1', '?stage=5'])('直行%sでopeningを再生しない', (search) => {
@@ -143,9 +143,9 @@ it('5面開始で3本を先読みし、道中終了後にlastbossを挟んで会
   expect(videos).toHaveLength(4);
   game.stageIntroFrame = 180; game.stageFrame = 2899; game.midbossElapsedFrames = 6000;
   game.update();
-  expect(game.debugState).toMatchObject({ scene: 'transition', transition: 'lastboss-in', transitionFrame: 0, bgm: 'stage-dawn', bgmVolume: 0.21 });
-  run(game, 89); expect(game.bgm.effectiveVolume).toBe(0.21); game.update();
-  expect(game.debugState).toMatchObject({ scene: 'movie', movie: 'lastboss', bgm: 'stage-dawn', bgmVolume: 0.21 });
+  expect(game.debugState).toMatchObject({ scene: 'transition', transition: 'lastboss-in', transitionFrame: 0, bgm: 'stage-dawn', bgmVolume: 0.105 });
+  run(game, 89); expect(game.bgm.effectiveVolume).toBe(0.105); game.update();
+  expect(game.debugState).toMatchObject({ scene: 'movie', movie: 'lastboss', bgm: 'stage-dawn', bgmVolume: 0.105 });
   expect(video('lastboss').muted).toBe(true);
   expect(game.phase).toBeUndefined();
   run(game, 60); expect(game.bgm.cue).toBe('stage-dawn');
@@ -160,10 +160,10 @@ it('5面開始で3本を先読みし、道中終了後にlastbossを挟んで会
 
 it.each(['KeyZ', 'KeyX'])('lastboss中の%sでは飛ばず、動画終了後の白保持と登場で曲を切り替える', (key) => {
   vi.stubGlobal('location', { search: '?movie=lastboss' }); const game = new Game();
-  expect(game.debugState).toMatchObject({ scene: 'movie', bgm: 'stage-dawn', bgmVolume: 0.21 });
+  expect(game.debugState).toMatchObject({ scene: 'movie', bgm: 'stage-dawn', bgmVolume: 0.105 });
   press(game, key);
   expect(game.scene).toBe('movie'); video('lastboss').emit('ended');
-  expect(game.debugState).toMatchObject({ scene: 'transition', transition: 'lastboss-out', transitionFrame: 0, bgm: 'stage-dawn', bgmVolume: 0.21 });
+  expect(game.debugState).toMatchObject({ scene: 'transition', transition: 'lastboss-out', transitionFrame: 0, bgm: 'stage-dawn', bgmVolume: 0.105 });
   run(game, 209); expect(game.bgm.cue).toBe('stage-dawn'); game.update();
   expect(game.debugState).toMatchObject({ scene: 'arrival', arrivalFrame: 0, bgm: 'boss-minerva' });
 });
@@ -176,14 +176,14 @@ it.each(['ended', 'error', 'missing', 'rejected', 'timeout'] as const)('5面ボ�
   if (ending === 'rejected') entry.play.mockRejectedValue(new Error('decode failed'));
   if (ending === 'timeout') entry.play.mockImplementation(() => new Promise(() => {}));
   run(game, 120);
-  expect(game.debugState).toMatchObject({ scene: 'transition', transition: 'lastboss-in', transitionFrame: 0, bgm: 'stage-dawn', bgmVolume: 0.21 });
+  expect(game.debugState).toMatchObject({ scene: 'transition', transition: 'lastboss-in', transitionFrame: 0, bgm: 'stage-dawn', bgmVolume: 0.105 });
   run(game, 89); expect(game.bgm.cue).toBe('stage-dawn'); game.update();
-  if (ending !== 'missing') expect(game.debugState).toMatchObject({ scene: 'movie', movie: 'lastboss', bgm: 'stage-dawn', bgmVolume: 0.21 });
+  if (ending !== 'missing') expect(game.debugState).toMatchObject({ scene: 'movie', movie: 'lastboss', bgm: 'stage-dawn', bgmVolume: 0.105 });
   if (ending === 'ended' || ending === 'error') entry.emit(ending);
   await vi.advanceTimersByTimeAsync(0);
   if (ending === 'timeout') await vi.advanceTimersByTimeAsync(1000);
   for (let frame = 0; frame < 210; frame++) {
-    expect(game.debugState).toMatchObject({ scene: 'transition', bgm: 'stage-dawn', bgmVolume: 0.21 });
+    expect(game.debugState).toMatchObject({ scene: 'transition', bgm: 'stage-dawn', bgmVolume: 0.105 });
     if (frame >= 150) expect(game.whiteAlpha).toBe(1);
     game.update();
   }
@@ -194,10 +194,10 @@ it('白保持中のZ・X・Escを無視し、60フレームの時計だけを進
   vi.stubGlobal('location', { search: '?movie=lastboss' }); const game = new Game();
   video('lastboss').emit('ended'); run(game, 150);
   for (let frame = 0; frame < 60; frame++) {
-    expect(game.debugState).toMatchObject({ scene: 'transition', transition: 'lastboss-hold', transitionFrame: frame, whiteAlpha: 1, bgm: 'stage-dawn', bgmVolume: 0.21 });
+    expect(game.debugState).toMatchObject({ scene: 'transition', transition: 'lastboss-hold', transitionFrame: frame, whiteAlpha: 1, bgm: 'stage-dawn', bgmVolume: 0.105 });
     press(game, ['KeyZ', 'KeyX', 'Escape'][frame % 3]);
   }
-  expect(game.debugState).toMatchObject({ scene: 'arrival', arrivalFrame: 0, bgm: 'boss-minerva', bgmVolume: 0.6 });
+  expect(game.debugState).toMatchObject({ scene: 'arrival', arrivalFrame: 0, bgm: 'boss-minerva', bgmVolume: 0.3 });
 });
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの5面クリア後、編集済み動画を無音で流してエンディングへ進む', (difficulty) => {

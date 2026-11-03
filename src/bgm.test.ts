@@ -219,6 +219,6 @@ it.each(['pause', 'gameover'] as const)('%s中も演出倍率を保ち、その�
   for (let frame = 0; frame < 3; frame++) {
     game.update();
     expect(game.bgm.sceneVolumeMultiplier).toBe(0.35);
-    expect(game.bgm.effectiveVolume).toBeCloseTo(0.0735);
+    expect(game.bgm.effectiveVolume).toBeCloseTo(0.03675);
   }
 });
