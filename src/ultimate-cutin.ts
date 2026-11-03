@@ -52,12 +52,14 @@ export function drawUltimateCutin(c: CanvasRenderingContext2D, image: HTMLImageE
   const reveal = easeOut((age - 28) / 22);
   const exit = clamp((age - 120) / 30);
   const leave = exit * exit * (3 - 2 * exit);
+  const enterProgress = spec.pattern === 'owlDawn' ? clamp((presentationFrame >= 0 ? presentationFrame : spec.duration - remaining) / 24) : 1;
+  const enter = enterProgress * enterProgress * (3 - 2 * enterProgress);
   const secondStamp = ULTIMATE_SECOND_STAMP * ULTIMATE_CUTIN_FRAMES / spec.duration;
   const stamp = age >= secondStamp ? age - secondStamp : age;
   const shake = Math.max(0, 5 - stamp) * Math.sin(age * 2.7);
   c.save();
   c.beginPath(); c.rect(0, 0, 640, 480); c.clip();
-  c.globalAlpha = 1 - leave;
+  c.globalAlpha = enter * (1 - leave);
   c.fillStyle = '#080805'; c.fillRect(0, 0, 640, 480);
   c.translate(shake - leave * 36, 0);
 

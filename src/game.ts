@@ -60,6 +60,7 @@ export const BATTLE_COMMENT_HOLD_FRAMES = 120;
 export const BATTLE_COMMENT_FADE_FRAMES = 18;
 export const BATTLE_COMMENT_FRAMES = BATTLE_COMMENT_REVEAL_FRAMES + BATTLE_COMMENT_HOLD_FRAMES + BATTLE_COMMENT_FADE_FRAMES;
 export const PHASE_MOVE_FRAMES = 18;
+export const PHASE_BACKGROUND_FADE_FRAMES = 36;
 const makeShot = (): Shot => ({ active: false, x: 0, y: 0, vx: 0, vy: -9, damage: 1, radius: 2, homing: false });
 const makeEnemy = (): Enemy => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, hp: 5, age: 0, hitFrames: 0, color: 0, kind: 'return', originX: 0, originY: 0, side: 1, slot: 0 });
 const makeItem = (): Item => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, kind: 'point', auto: false, manual: false, gift: false, tossed: false, launchFrames: 0 });
@@ -1018,13 +1019,21 @@ export class Game {
     }
   }
 
+  get phaseBackgroundAlpha(): number {
+    if (this.phaseIntro) return 0;
+    const final = !this.midboss && this.phaseIndex === STAGES[this.stage - 1].phases.length - 1;
+    const progress = final ? Math.min(1, this.phaseFrame / PHASE_BACKGROUND_FADE_FRAMES) : 1;
+    return progress * progress * (3 - 2 * progress);
+  }
+
   private cutinStartFrame(): number {
     return this.phase?.pattern === 'jinraiDash' ? DASH_CUTIN : this.phase?.pattern === 'final' ? BLOOM_CUTIN : 0;
   }
 
   private startCutin(): void {
     const ultimate = ultimateCutin(this.boss, this.phase?.pattern);
-    this.cutin = ultimate?.duration ?? 100; this.flash = ultimate ? 0 : 12;
+    const final = !this.midboss && this.phaseIndex === STAGES[this.stage - 1].phases.length - 1;
+    this.cutin = ultimate?.duration ?? 100; this.flash = ultimate || final ? 0 : 12;
     this.ultimateFrame = ultimate ? 0 : -1;
     if (ultimate) this.audio.play('ultimateStamp');
     this.audio.play('declare');

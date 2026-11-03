@@ -41,6 +41,7 @@ export class Renderer {
   private readonly sprites = new Map<string, HTMLCanvasElement>();
   private readonly bossMotion = createBossMotion();
   private titleLayer?: HTMLCanvasElement;
+  private sceneryLayer?: HTMLCanvasElement;
   private pixelRatio = 1;
   constructor(private readonly ctx: CanvasRenderingContext2D) {
     this.setPixelRatio(1);
@@ -49,6 +50,7 @@ export class Renderer {
   setPixelRatio(pixelRatio: number): void {
     this.pixelRatio = pixelRatio;
     this.titleLayer = undefined;
+    this.sceneryLayer = undefined;
     this.sprites.clear();
     for (const kind of ['orb', 'needle', 'petal', 'star', 'heart', 'glyph', 'keycap']) for (let color = 0; color < (kind === 'petal' ? 6 : 4); color++) for (let variant = 0; variant < (kind === 'star' ? 16 : kind === 'glyph' ? 1 + RAIN_GLYPHS.length * RAIN_FONTS.length : 1); variant++) {
       const canvas = document.createElement('canvas'); canvas.width = Math.ceil(28 * pixelRatio); canvas.height = Math.ceil(28 * pixelRatio);
@@ -358,6 +360,19 @@ export class Renderer {
       this.magic(192, 80, game.frame, stage.colors[2], 130, 0.25);
     }
     if (!game.phaseIntro) { drawBloomBackdrop(c, game); drawCourse(c, game); drawRainbowBackdrop(c, game); drawMinervaAura(c, game); this.minervaEcho(game); }
+    // 技の背景へ通常の床を重ね、内部でglobalAlphaを変える描画もまとめてフェードする。
+    if (!game.phaseIntro && game.phaseBackgroundAlpha < 1) {
+      if (!this.sceneryLayer) {
+        this.sceneryLayer = document.createElement('canvas');
+        this.sceneryLayer.width = Math.ceil(FIELD.w * this.pixelRatio);
+        this.sceneryLayer.height = Math.ceil(FIELD.h * this.pixelRatio);
+      }
+      const scenery = this.sceneryLayer.getContext('2d')!;
+      scenery.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
+      drawScenery(scenery, game);
+      c.save(); c.globalAlpha = 1 - game.phaseBackgroundAlpha;
+      c.drawImage(this.sceneryLayer, 0, 0, FIELD.w, FIELD.h); c.restore();
+    }
     if (game.phaseIntro && game.boss) {
       const [x, y] = game.bossXY;
       this.fieldCharacter(game, this.readySprite(game, bossSpriteId(game.boss, 'idle', game.frame)), x, y + Math.sin(game.frame * 0.045) * 2, 64, 0);
@@ -1463,7 +1478,7 @@ export class Renderer {
     const age = 100 - game.cutin;
     const enter = 1 - (1 - Math.min(1, age / 18)) ** 4;
     const leave = Math.max(0, (age - 72) / 28);
-    const alpha = Math.min(1, age / 6, game.cutin / 20);
+    const alpha = Math.min(1, age / 6, game.cutin / 20) * game.phaseBackgroundAlpha;
     const accent = STAGES[game.stage - 1].colors[2];
     c.save(); c.globalAlpha = alpha;
     c.beginPath(); c.rect(0, 32, FIELD.w, FIELD.h - 32); c.clip();
