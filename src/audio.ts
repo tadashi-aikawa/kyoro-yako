@@ -8,7 +8,8 @@ const ULTIMATE_SHINE_DURATION = 1.05;
 const tones: Record<Sound, [number, number, OscillatorType, number, number, number]> = {
   shot: [820, 0.035, 'triangle', 1107, 0.03, 0.07], hit: [95, 0.32, 'sawtooth', 40, 0.12, 0.025],
   ultimateStamp: [150, 0.28, 'triangle', 52, 1, 0.12], // 周波数・波形は専用バッファで合成し、ここでは秒数・音量・最短間隔だけ使う。
-  ultimateShine: [1046.5, ULTIMATE_SHINE_DURATION, 'sine', 1046.5, 1, 0.3], // 風切り・衝撃・広がる残響を専用ステレオバッファで重ねる。
+  // 風切り・衝撃・空気音を専用バッファで合成するため、周波数・波形は使わない。
+  ultimateShine: [1046.5, ULTIMATE_SHINE_DURATION, 'sine', 1046.5, 1, 0.3], // 秒数・音量・最短間隔だけ使う。
   graze: [1100, 0.045, 'sine', 1485, 0.12, 0.025], kill: [330, 0.12, 'triangle', 446, 0.12, 0.025],
   bomb: [125, 0.7, 'sawtooth', 40, 0.12, 0.025], declare: [220, 0.7, 'triangle', 880, 0.16, 0.3],
   capture: [880, 0.6, 'triangle', 1188, 0.12, 0.025], item: [950, 0.06, 'sine', 1283, 0.12, 0.025],
@@ -211,10 +212,9 @@ export class AudioBank {
         const rush = filtered * Math.min(1, t / 0.045) * Math.exp(-Math.max(0, t - 0.065) * 10) * 2.1;
         const age = Math.max(0, t - 0.065);
         const hit = (softNoise * 1.25 + Math.sin(Math.PI * 2 * (95 * age + 95 * 0.012 * (1 - Math.exp(-age / 0.012)))) * 0.45) * Math.min(1, age / 0.002) * Math.exp(-age * 32);
-        const phase = Math.PI * 2 * (1046.5 * age - 180 * 0.02 * (1 - Math.exp(-age / 0.02)));
-        const shimmer = (Math.sin(phase) + Math.sin(phase * 1.5 + 0.25 * Math.sin(age * 19)) * 0.55 + Math.sin(phase * 2.003) * 0.3) * Math.min(1, age / 0.008) * Math.exp(-age * 8) * 0.14;
         const air = (noise - softNoise) * Math.min(1, age / 0.015) * Math.exp(-age * 6) * 0.32;
-        dry[i] = Math.tanh((rush + hit + shimmer + air) * 1.4);
+        // 鐘らしい倍音や遅延反射を足さず、風切りの勢いを残す。
+        dry[i] = Math.tanh((rush + hit + air) * 1.4);
       }
       this.shineBuffer = context.createBuffer(2, length, context.sampleRate);
       for (let channel = 0; channel < 2; channel++) {
@@ -222,12 +222,7 @@ export class AudioBank {
         for (let i = 0; i < length; i++) {
           const t = i / context.sampleRate;
           const pan = Math.max(-1, Math.min(1, (t / 0.13) * 2 - 1));
-          let value = dry[i] * (0.8 + (channel === 0 ? -pan : pan) * 0.15);
-          // 異なる反射を左右へ散らし、単音の「チン」ではなく奥行きのある決め音にする。
-          for (let tap = 1; tap <= 9; tap++) {
-            const delay = Math.round((0.029 * tap + 0.006 * tap * tap + channel * 0.011) * context.sampleRate);
-            if (i >= delay) value += dry[i - delay] * Math.exp(-tap * 0.32) * 0.2 * (tap % 2 ? 1 : -1);
-          }
+          const value = dry[i] * (0.8 + (channel === 0 ? -pan : pan) * 0.15);
           samples[i] = Math.tanh(value * 1.2) * 0.72 * Math.min(1, t / 0.003, (duration - t) / 0.12);
         }
       }
