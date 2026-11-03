@@ -1598,7 +1598,7 @@ export class Renderer {
     const rows = wrapBattleComment(game.battleComment!.text, maxWidth - 16, text => c.measureText(text).width);
     const width = Math.max(124, Math.min(maxWidth, Math.ceil(Math.max(...rows.map(text => c.measureText(text).width))) + 16));
     const height = rows.length * 16 + 10;
-    const x = Math.max(6, Math.min(FIELD.w - width - 6, bx - width / 2)), y = Math.max(36, by - 48 - height) + (1 - ease) * 6;
+    const x = Math.max(6, Math.min(FIELD.w - width - 6, bx - width / 2)), y = Math.max(rows.length > 2 ? 20 : 36, by - 48 - height) + (1 - ease) * 6;
     const tailX = Math.max(x + 10, Math.min(x + width - 10, bx)), tipY = by - 36;
     c.fillStyle = '#120c28d9'; c.strokeStyle = '#d5ace699'; c.lineWidth = 1;
     c.beginPath(); c.moveTo(x + 4, y); c.lineTo(x + width - 4, y); c.quadraticCurveTo(x + width, y, x + width, y + 4);

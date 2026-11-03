@@ -6,7 +6,7 @@ export const ULTIMATE_HOLD = 72;
 
 export const ULTIMATE_CUTINS = {
   jinrai: { id: 'jinrai-issen', pattern: 'jinraiDash', declaration: '奥義', title: '迅雷一閃', duration: 150, fadeFrames: 24, ink: '#f5d994', light: '#9b6c1d', dark: '#16100a', end: '#292014', streak: '#f6ce65', brightStreak: '#fff2b9', edge: '#d5a946' },
-  claudine: { id: 'claudine-bloom', pattern: 'final', declaration: '開花', title: 'レスポンシブ・ブルーム', duration: 100, fadeFrames: 19, ink: '#f1d4be', light: '#92556c', dark: '#20121d', end: '#20121d', streak: '#f1d4be', brightStreak: '#f1d4be', edge: '#efb3bc' },
+  claudine: { id: 'claudine-bloom', pattern: 'final', declaration: '絢爛', title: 'レスポンシブ・ブルーム', duration: 100, fadeFrames: 19, ink: '#f1d4be', light: '#92556c', dark: '#20121d', end: '#20121d', streak: '#f1d4be', brightStreak: '#f1d4be', edge: '#efb3bc' },
   minerva: { id: 'minerva-oracle', pattern: 'owlDawn', declaration: '神託', title: 'オウル・オブ・ミネルヴァ', duration: 100, fadeFrames: 19, ink: '#ffe4ab', light: '#9c8a50', dark: '#191a32', end: '#191a32', streak: '#ffe4ab', brightStreak: '#ffe4ab', edge: '#e6cf84' },
 } as const;
 export type UltimateCutin = typeof ULTIMATE_CUTINS[keyof typeof ULTIMATE_CUTINS];
