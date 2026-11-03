@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { Game } from './game';
+import { type Bullet, Game } from './game';
 import { emitRainbow, RAINBOW_BURST_GAP, RAINBOW_COLORS, RAINBOW_INTERVAL, RAINBOW_LIMIT, RAINBOW_REVERSAL, rainbowCurvePosition, updateRainbowBullet } from './patterns/claudine-rainbow';
 import type { Difficulty } from './rules';
 
@@ -26,6 +26,18 @@ function selectedPattern(game: Game): number {
   const bullets = game.bullets.objects.filter(b => b.active);
   if (bullets.some(b => b.releaseAt > 0)) return 2;
   return rainbowCurvePosition(bullets[0], 40) ? 1 : 0;
+}
+
+function prepareBulletReuse(game: Game, target: Bullet): void {
+  // 導入でemit→clearした空きも埋め、対象の直前だけを再利用させる。
+  game.bullets.objects.forEach(b => { b.active = true; });
+  while (game.spawnBullet(192, 200, 0, 0, 0)) { /* プールを上限まで埋める。 */ }
+  const index = game.bullets.objects.indexOf(target);
+  expect(index).toBeGreaterThanOrEqual(0);
+  const previous = game.bullets.objects[(index + game.bullets.objects.length - 1) % game.bullets.objects.length];
+  previous.active = false;
+  expect(game.spawnBullet(192, 200, 0, 0, 0)).toBe(previous);
+  game.bullets.clear(); target.active = true;
 }
 
 it('最初は扇・渦巻き・蛇行を2連射ずつ出し、4回目から2連射ごとにランダムに選ぶ', () => {
@@ -105,8 +117,10 @@ it('渦巻きのスロットを扇が再利用しても、前の曲線を引き�
   const game = start('normal', 1); game.update();
   const old = game.bullets.objects.find(b => b.active)!;
   expect(rainbowCurvePosition(old, 40)).toBeDefined();
-  while (game.bullets.objects.length < 2600) game.spawnBullet(192, 200, 0, 0, 0);
+  prepareBulletReuse(game, old);
+  const spawn = vi.spyOn(game, 'spawnBullet');
   game.bullets.clear(); emitRainbow(game, 0);
+  expect(spawn.mock.results.map(result => result.value)).toContain(old);
   expect(old.active).toBe(true); expect(old.dashWave).toBe(0);
   expect(rainbowCurvePosition(old, 40)).toBeUndefined();
 });
@@ -178,11 +192,7 @@ it('技の開始前とボム中には虹を生成しない', () => {
 it('親のスロットを分離弾が再利用しても、宝石弾が再分裂しない', () => {
   const game = start('normal', 2); game.update();
   const parent = game.bullets.objects.find(b => b.active && b.releaseAt > 0)!;
-  while (game.bullets.objects.length < 2600) game.spawnBullet(192, 200, 0, 0, 0);
-  // 分離対象の直前のスロットを使い、次のacquireが親から探す状態にする。
-  game.bullets.objects[game.bullets.objects.indexOf(parent) - 1].active = false;
-  game.spawnBullet(192, 200, 0, 0, 0);
-  game.bullets.forEach(b => { if (b !== parent) b.active = false; });
+  prepareBulletReuse(game, parent);
   parent.age = 124;
   const spawn = vi.spyOn(game, 'spawnBullet'); game.update();
   const children = spawn.mock.results.map(result => result.value).filter(Boolean);
