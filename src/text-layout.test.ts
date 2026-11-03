@@ -22,15 +22,14 @@ describe('会話の禁則処理', () => {
   });
 });
 
-it('吹き出しを全文表示し、クロディーヌの最終宣言は3行、ほかは2行以内に収める', () => {
+it('吹き出しの全コメントを欠落なく2行以内へ収める', () => {
   const measure = (text: string) => text.length * 12;
   for (const text of [...Object.values(BATTLE_COMMENTS), ...Object.values(FINAL_COMMENTS), AWAKENING_LINE]) {
     const width = text.includes('\n') ? 192 : 156;
-    const maxLines = text === FINAL_COMMENTS.claudine ? 3 : 2;
     const lines = wrapBattleComment(text, width, measure);
-    expect(lines.join('')).toBe(text.replaceAll('\n', '')); expect(lines.length).toBeLessThanOrEqual(maxLines);
+    expect(lines.join('')).toBe(text.replaceAll('\n', '')); expect(lines.length).toBeLessThanOrEqual(2);
     expect(lines.every(line => measure(line) <= width)).toBe(true);
   }
   expect(wrapBattleComment(FINAL_COMMENTS.minerva!, 192, measure)).toEqual(['ここまで追い詰められるなんて……', '次が本当に最後の技よ。']);
-  expect(wrapBattleComment(FINAL_COMMENTS.claudine!, 192, measure)).toEqual(['素敵なひとときでしたね。', '最後は、一夜の', '想い出に残る一幕を。']);
+  expect(wrapBattleComment(FINAL_COMMENTS.claudine!, 192, measure)).toEqual(['素敵なひとときでしたね。', '最後は、想い出に残る一幕を。']);
 });

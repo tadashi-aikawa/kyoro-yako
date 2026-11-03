@@ -129,7 +129,7 @@ export const BATTLE_COMMENTS: Record<BossId, string> = {
 export const FINAL_COMMENTS: Partial<Record<BossId, string>> = {
   neo: '最後は、このキーに全部込めるよ！',
   obsidia: 'これで、終わりにいたしましょう。',
-  claudine: '素敵なひとときでしたね。\n最後は、一夜の\n想い出に残る一幕を。',
+  claudine: '素敵なひとときでしたね。\n最後は、想い出に残る一幕を。',
   jinrai: '……見せたるわ。ウチの本気を。',
   minerva: 'ここまで追い詰められるなんて……\n次が本当に最後の技よ。',
 };
