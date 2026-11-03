@@ -124,7 +124,7 @@ export function midDialogue(player: PlayerId, boss: BossId, stage = 1): Line[] {
 export const BATTLE_COMMENTS: Record<BossId, string> = {
   etokichi: 'ついてきてよー、キチ！', neo: 'まだまだ、ここからだよ！',
   obsidia: 'ふふ。よそ見は禁物ですわ。', chappy: '次も、よく見てください。',
-  claudine: '少し、変えてみますね。', jinrai: '……逃がさへんよ。', minerva: 'あなたの力、見せて。',
+  claudine: 'ふふ、ここからですね。', jinrai: '……逃がさへんよ。', minerva: 'あなたの力、見せて。',
 };
 export const FINAL_COMMENTS: Partial<Record<BossId, string>> = {
   neo: '最後は、このキーに全部込めるよ！',
