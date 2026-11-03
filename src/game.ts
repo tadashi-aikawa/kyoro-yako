@@ -1291,7 +1291,7 @@ export class Game {
     this.bullets.forEach((b) => {
       b.age++;
       const bloomMotion = updateBloomBullet(this, b);
-      const rainbowMotion = updateRainbowBullet(b);
+      const rainbowMotion = updateRainbowBullet(this, b);
       if (bloomMotion === 'harmless') {
         if (b.fadeAt > 0 && b.age >= b.fadeAt) b.active = false;
         return;

@@ -100,7 +100,7 @@ export function patternPosition(phase: Phase, frame: number, entry: Point, encor
   const time = Math.max(0, frame - 105) + (encoreCount > 0 ? encoreCount * (phase.duration * 60 - 105) : 0);
   // 標準の射撃位置へ届くコースを追い、弾の飛行時間ぶん遅れて射線へ入る。
   if (phase.pattern === 'trim') return [courseCenterAt(time - 28, 375, level), baseY];
-  if (phase.pattern === 'rainbow') return rainbowBossPosition(time, level);
+  if (phase.pattern === 'rainbow') return rainbowBossPosition(time);
   if (phase.pattern === 'chappyYoyo') return yoyoPosition(time, level);
   if (phase.pattern === 'chappySugar') {
     const step = time % SUGAR_PERIOD[level], snap = SUGAR_WARNING[level] - 1;
