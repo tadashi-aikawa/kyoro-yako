@@ -118,14 +118,15 @@ it('ヨーヨーはEasyの予告が長く、Normalは先に投げ始める', () 
   expect(easyYoyo.y).toBe(132); expect(yoyo.y).toBeGreaterThan(132);
 });
 
-it('削ぎ落としの壁は予告された列が消えてから降る', () => {
+it('余白のサーキットは弾を生成せず、入口が自機へ届くまで猶予がある', () => {
   const game = start(3, 1);
-  const cut = game.bullets.objects.find((b) => b.active && b.motion === 'trim')!;
-  const wall = game.bullets.objects.find((b) => b.active && b.motion === 'normal')!;
-  const y = wall.y;
+  game.invincible = false; game.invulnFrames = 0; game.px = 20;
   for (let i = 0; i < 80; i++) game.update();
-  expect(cut.active).toBe(false);
-  expect(wall.y).toBeGreaterThan(y);
+  expect(game.pendingHit).toBe(-1);
+  expect(game.bullets.count).toBe(0);
+  const lives = game.lives;
+  for (let i = 0; i < 150; i++) game.update();
+  expect(game.lives).toBeLessThan(lives);
 });
 
 it('グリッド弾は薄い配置予告の後に一斉に実体化して動く', () => {

@@ -1,4 +1,5 @@
 import { SUGAR_PERIOD, SUGAR_WARNING, yoyoPosition } from './patterns/chappy';
+import { courseCenterAt } from './patterns/claudine-course';
 import { bloomBossPosition } from './patterns/claudine-finale';
 import { thunderPosition } from './patterns/jinrai-thunder';
 import type { Phase } from './stages';
@@ -61,7 +62,6 @@ const MOVEMENTS: Record<string, Movement> = {
   chappySugar: () => CENTER,
   claudinePetalArc: curve(70, 12, 600, 'arc'),
   claudineQuietRings: curve(58, 12, 600, 'ellipse'),
-  trim: patrol([[128, -24], [256, -24], [256, 12], [128, 12]], 72, 120),
   type: curve(78, 18, 780, 'arc'),
   grid: patrol([[128, -22], [256, -22], [256, 18], [128, 18]], 72, 132),
   complement: curve(60, 16, 720, 'eight'),
@@ -89,7 +89,7 @@ const MOVEMENTS: Record<string, Movement> = {
 
 export function enterBossX(time: number): number { return MOVEMENTS.enter(time)[0]; }
 
-export function hasBossMovement(pattern: string): boolean { return pattern === 'final' || Object.hasOwn(MOVEMENTS, pattern); }
+export function hasBossMovement(pattern: string): boolean { return pattern === 'final' || pattern === 'trim' || Object.hasOwn(MOVEMENTS, pattern); }
 
 export function patternPosition(phase: Phase, frame: number, entry: Point, encoreCount = 0, level = 1): [number, number] | undefined {
   if (!hasBossMovement(phase.pattern)) return undefined;
@@ -98,6 +98,8 @@ export function patternPosition(phase: Phase, frame: number, entry: Point, encor
   if (frame < 105 && encoreCount === 0) return moveBetween(entry, [192, baseY], frame / 90);
   // ネオの延長では射撃時計だけが巻き戻る。移動時計は通算し、延長のたびに本体が飛ぶのを防ぐ。
   const time = Math.max(0, frame - 105) + (encoreCount > 0 ? encoreCount * (phase.duration * 60 - 105) : 0);
+  // 標準の射撃位置へ届くコースを追い、弾の飛行時間ぶん遅れて射線へ入る。
+  if (phase.pattern === 'trim') return [courseCenterAt(time - 28, 375, level), baseY];
   if (phase.pattern === 'chappyYoyo') return yoyoPosition(time, level);
   if (phase.pattern === 'chappySugar') {
     const step = time % SUGAR_PERIOD[level], snap = SUGAR_WARNING[level] - 1;

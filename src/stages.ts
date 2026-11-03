@@ -43,7 +43,7 @@ export const STAGES: Stage[] = [
     title: '梟楼の回廊 〜 Gallery of the Owlery', boss: 'claudine', mid: 'chappy', bgm: 'stage-top', colors: ['#3f3541', '#ac7a62', '#f9ddb0'],
     phases: [
       phase(3, '通常攻撃・整列', 'normal', 'claudinePetalArc'),
-      phase(3, '削ぎ落とされた美', 'spell', 'trim'),
+      phase(3, '余白のサーキット', 'spell', 'trim'),
       phase(3, '通常攻撃・黄金比', 'normal', 'claudineQuietRings'),
       phase(3, 'タイポグラフィの雨', 'spell', 'type'),
       phase(3, '通常攻撃・最終調整', 'normal', 'claudinePetalArc'),

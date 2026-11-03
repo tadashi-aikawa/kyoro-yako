@@ -1,4 +1,5 @@
 import type { Game } from '../game';
+import { updateCourse } from './claudine-course';
 import { emitClaudineFinale, finaleTime } from './claudine-finale';
 import { emitChangingGrid, emitTypographyRain } from './claudine-weather-grid';
 
@@ -23,21 +24,7 @@ export function emitClaudine(game: Game, pattern: string, t: number): void {
   const warning = warn[level];
   if (pattern === 'type') { emitTypographyRain(game, local); return; }
   if (pattern === 'grid') { emitChangingGrid(game, local); return; }
-  if (pattern === 'trim' && local % [190, 170, 150, 135][level] === 0) {
-    const wave = Math.floor(local / [190, 170, 150, 135][level]);
-    const columns = [23, 27, 30, 34][level];
-    const gap = 4 + wave * 7 % (columns - 9);
-    for (let row = 0; row < 3; row++) for (let col = 0; col < columns; col++) {
-      const bx = 8 + col * 368 / (columns - 1);
-      const by = 36 + row * 16;
-      const cut = col >= gap && col <= gap + 5 + (row === 1 ? 1 : 0);
-      const b = game.spawnBullet(bx, by, 0, [0.82, 1.03, 1.24, 1.45][level], cut ? 2 : 0, 'glyph');
-      if (!b) continue;
-      b.radius = 5;
-      if (cut) { b.motion = 'trim'; b.vy = 0; b.fadeAt = warning; }
-      else b.delay = warning + 8;
-    }
-  }
+  if (pattern === 'trim') { updateCourse(game, local); return; }
   if (pattern === 'complement' && local % [95, 78, 66, 56][level] === 0) {
     const n = [7, 9, 11, 13][level];
     for (let i = 0; i < n; i++) {
