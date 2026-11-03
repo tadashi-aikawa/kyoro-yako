@@ -2,13 +2,11 @@ import type { Bullet, Game } from '../game';
 import { FIELD } from '../rules';
 
 export const RAINBOW_COLORS = ['#ff809b', '#ffb674', '#ffe797', '#9de6ac', '#77ddeb', '#9cafff', '#dfa4f0'] as const;
-export const RAINBOW_SECTION = 480;
-export const RAINBOW_PERIOD = [8, 6, 6, 5] as const;
-export const RAINBOW_PHRASE = [160, 160, 120, 96] as const;
-export const RAINBOW_BURST = [32, 36, 30, 35] as const;
+export const RAINBOW_INTERVAL = [90, 72, 60, 48] as const;
+export const RAINBOW_BURST_GAP = [12, 10, 8, 6] as const;
+export const RAINBOW_REVERSAL = 1440;
 export const RAINBOW_SPEED = [0.86, 1, 1.12, 1.22] as const;
 export const RAINBOW_LIMIT = [1500, 1900, 2100, 2300] as const;
-const AIM_PERIOD = [210, 156, 144, 132] as const;
 const TAIL_POINTS = 14;
 interface Trail { points: Float32Array; head: number; count: number; }
 const trails = new WeakMap<Bullet, Trail>();
@@ -18,6 +16,8 @@ interface Curve {
 }
 const curves = new WeakMap<Bullet, Curve>();
 const curvePoint: [number, number] = [0, 0];
+interface Sequence { lastTime: number; patterns: number; kind?: number; startedAt?: number; }
+const sequences = new WeakMap<Game, Sequence>();
 
 export function rainbowCurvePosition(b: Bullet, age: number, out?: [number, number]): [number, number] | undefined {
   if (b.motion !== 'rainbowVeil' || b.dashWave !== 0) return;
@@ -32,7 +32,6 @@ export function rainbowCurvePosition(b: Bullet, age: number, out?: [number, numb
   return point;
 }
 
-export const rainbowSection = (t: number): number => Math.floor(Math.max(0, t) % (RAINBOW_SECTION * 3) / RAINBOW_SECTION);
 const levelOf = (game: Game) => ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
 
 export function rainbowBossPosition(t: number): [number, number] {
@@ -58,51 +57,48 @@ function spawnRainbow(game: Game, x: number, y: number, angle: number, speed: nu
 }
 
 export function emitRainbow(game: Game, t: number): void {
-  if (t < 0 || game.bombFrames > 0) return;
-  const level = levelOf(game), section = rainbowSection(t);
-  // 七色をまとめて放ち、次のフレーズまでの間隔を曲線の間の通路にする。
-  const local = t % RAINBOW_SECTION;
-  const phraseFrame = local % RAINBOW_PHRASE[level];
-  const ribbon = phraseFrame < RAINBOW_BURST[level] && phraseFrame % RAINBOW_PERIOD[level] === 0;
-  const aimed = section > 0 && t % AIM_PERIOD[level] === 0;
-  if (!ribbon && !aimed) return;
-  const cycle = Math.floor(t / (RAINBOW_SECTION * 3)), sign = cycle % 2 ? -1 : 1;
+  if (t < 0) return;
+  let sequence = sequences.get(game);
+  if (!sequence || t === 0 || t < sequence.lastTime) {
+    sequence = { lastTime: t, patterns: 0 }; sequences.set(game, sequence);
+  }
+  sequence.lastTime = t;
+  const level = levelOf(game);
+  const offset = t % RAINBOW_INTERVAL[level], startsPattern = offset === 0;
+  if (game.bombFrames > 0 || (!startsPattern && offset !== RAINBOW_BURST_GAP[level])) return;
+  if (!startsPattern && sequence.startedAt !== t - offset) return;
   const scale = RAINBOW_SPEED[level], layers = level === 0 ? 2 : 3;
-  let room = RAINBOW_LIMIT[level] - game.bullets.count, first = true;
+  if (RAINBOW_LIMIT[level] - game.bullets.count < layers * 14) return;
+  // 最初は全種類を順番に見せ、その後は2連射の先頭でだけ種類を抽選する。
+  const kind = startsPattern ? (sequence.patterns < 3 ? sequence.patterns : Math.floor(Math.random() * 3)) : sequence.kind;
+  if (kind === undefined) return;
+  const patternTime = startsPattern ? t : sequence.startedAt!;
+  const cycle = Math.floor(patternTime / RAINBOW_REVERSAL), sign = cycle % 2 ? -1 : 1;
+  let first = true;
   const [bx, by] = game.bossPosition();
-  if (ribbon && room >= layers * 14 + (aimed ? 21 : 0)) {
-    const phraseStart = t - local % RAINBOW_PHRASE[level];
-    const swing = Math.sin(phraseStart * 0.009 + cycle * 0.7) * 0.8;
-    for (const side of [-1, 1]) for (let layer = 0; layer < layers; layer++) for (let color = 0; color < 7; color++) {
-      const origin = section === 0 ? bx : section === 1 ? bx + side * (70 + Math.sin(t * 0.006) * 22) : bx + side * (30 + layer * 38);
-      const angle = section === 0 ? Math.PI / 2 + sign * (side * (0.22 + color * 0.022 + layer * 0.3) + swing) : Math.PI / 2;
-      const speed = ((section === 1 ? 1.25 : 1.5) + color * (section === 0 ? 0.018 : 0.012)) * scale;
-      const b = spawnRainbow(game, origin, by, angle, speed, color, level);
-      if (!b) continue;
-      b.spin = section === 0 ? side * sign * 0.0008 : 0; b.gridRow = layer;
-      if (section > 0) {
-        b.vx = section === 1 ? -side * 0.1 * scale : 0; b.vy = speed; b.sway = 0.0012 * scale;
-        curves.set(b, {
-          kind: section === 1 ? 'spiral' : 'snake', x: origin, y: by,
-          vx: b.vx, vy: b.vy,
-          amplitude: section === 1 ? 28 + layer * 7 : 20 + layer * 5,
-          phase: phraseStart * 0.004 + layer * 0.65 + color * 0.12 + (side < 0 ? Math.PI : 0),
-          rate: side * sign * (section === 1 ? 0.044 : 0.034) * scale,
-          gravity: b.sway,
-        });
-      }
-      b.releaseAt = section === 2 && layer === layers - 1 && phraseFrame === 0 ? 125 : 0;
-      b.launchSoundPending = first; first = false;
+  const swing = Math.sin(patternTime * 0.009 + cycle * 0.7) * 0.8;
+  for (const side of [-1, 1]) for (let layer = 0; layer < layers; layer++) for (let color = 0; color < 7; color++) {
+    const origin = kind === 0 ? bx : kind === 1 ? bx + side * (70 + Math.sin(patternTime * 0.006) * 22) : bx + side * (30 + layer * 38);
+    const angle = kind === 0 ? Math.PI / 2 + sign * (side * (0.22 + color * 0.022 + layer * 0.3) + swing) : Math.PI / 2;
+    const speed = ((kind === 1 ? 1.25 : 1.5) + color * (kind === 0 ? 0.018 : 0.012)) * scale;
+    const b = spawnRainbow(game, origin, by, angle, speed, color, level);
+    if (!b) continue;
+    b.spin = kind === 0 ? side * sign * 0.0008 : 0; b.gridRow = layer;
+    if (kind > 0) {
+      b.vx = kind === 1 ? -side * 0.1 * scale : 0; b.vy = speed; b.sway = 0.0012 * scale;
+      curves.set(b, {
+        kind: kind === 1 ? 'spiral' : 'snake', x: origin, y: by,
+        vx: b.vx, vy: b.vy,
+        amplitude: kind === 1 ? 28 + layer * 7 : 20 + layer * 5,
+        phase: patternTime * 0.004 + layer * 0.65 + color * 0.12 + (side < 0 ? Math.PI : 0),
+        rate: side * sign * (kind === 1 ? 0.044 : 0.034) * scale,
+        gravity: b.sway,
+      });
     }
-    room -= layers * 14;
+    b.releaseAt = kind === 2 && layer === layers - 1 ? 125 : 0;
+    b.launchSoundPending = first; first = false;
   }
-  if (aimed && room >= 21) {
-    const aim = Math.atan2(game.py - by, game.px - bx);
-    for (let color = 0; color < 7; color++) for (let j = -1; j <= 1; j++) {
-      const b = spawnRainbow(game, bx, by, aim + j * 0.2 + (color - 3) * 0.017, (1.7 + color * 0.055) * scale, color, level, true);
-      if (b) { b.launchSoundPending = first; first = false; }
-    }
-  }
+  if (!first && startsPattern) { sequence.kind = kind; sequence.startedAt = t; sequence.patterns++; }
 }
 
 export function updateRainbowBullet(game: Game, b: Bullet): boolean {
