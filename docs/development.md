@@ -13,13 +13,12 @@ pnpm dev
 
 公開先は https://tadashi-aikawa.github.io/kyoro-yako/ です。
 
-1. `public/assets/bgm/ending.mp3` を配置します。
-2. タイトルからエンディングまで通しで確認します。
-3. `pnpm check` を実行します。
-4. `main` をGitHubへpushします。
-5. GitHubの Settings → Pages → Build and deployment → Source で **GitHub Actions** を選びます。
-6. Actionsの **Deploy to GitHub Pages** を開き、`main` を選んで **Run workflow** を実行します。
-7. ワークフローの成功後、公開URLで画像・音楽・操作を確認します。
+1. タイトルからエンディングまで通しで確認します。
+2. `pnpm check` を実行します。
+3. `main` をGitHubへpushします。
+4. GitHubの Settings → Pages → Build and deployment → Source で **GitHub Actions** を選びます。
+5. Actionsの **Deploy to GitHub Pages** を開き、`main` を選んで **Run workflow** を実行します。
+6. ワークフローの成功後、公開URLで画像・音楽・操作を確認します。
 
 公開ワークフローは手動で実行します。push時には公開しません。
 
