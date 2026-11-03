@@ -28,7 +28,7 @@ it.each(['defeat', 'timeout'] as const)('エトキチは%s後にフラッシュ�
   expect(game.phase).toBe(ETOKICHI_FLASH);
   expect(game.phaseIndex).toBe(1); expect(game.remainingSpells).toBe(1);
   expect(game.collectionFrames).toBe(0);
-  expect(game.items.objects.filter((item) => item.active && item.manual && item.kind === 'small')).toHaveLength(10);
+  expect(game.items.objects.filter((item) => item.active && item.manual && item.kind === 'small')).toHaveLength(ending === 'defeat' ? 10 : 0);
   game.skipPhase();
   expect(game.phase).toBeUndefined(); expect(game.galaxyFlash).toBeUndefined();
   expect(game.remainingSpells).toBe(0); expect(game.collectionFrames).toBe(180);

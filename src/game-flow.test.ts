@@ -142,7 +142,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('5面中ボスの全技�
   }
   expect(game.phase).toBeUndefined();
   expect(game.collectionFrames).toBe(180);
-  expect(game.items.objects.some((item) => item.active && item.kind === 'small' && item.manual)).toBe(true);
+  expect(game.items.objects.some((item) => item.active && item.kind === 'small' && item.manual)).toBe(false);
   for (let frame = 0; frame < 179; frame++) game.update();
   expect(game.scene).toBe('stage');
   expect(game.collectionFrames).toBe(1);

@@ -106,15 +106,19 @@ it.each([0.05, 0.5, 0.95])('補充位置は乱数%sで変わり、フィール�
   expect(supplies(game).every((item) => item.x >= 12 && item.x <= 372)).toBe(true);
 });
 
-it('時間切れでも手動回収の補充品を出す', () => {
+it.each([0.01, 0.1, 0.33, 0.5])('時間切れでは抽選値%sでも補充品を出さず、弾だけ点へ変える', (roll) => {
   const game = start(1, 1);
+  game.power = 5;
   game.bombs = 0;
+  vi.mocked(Math.random).mockReturnValue(roll);
+  game.spawnBullet(192, 120, 0, 0, 0, 'orb');
   game.phaseFrame = game.phase!.duration * 60 - 1;
   game.update();
   expect(game.phaseIndex).toBe(2);
-  expect(supplies(game)).toHaveLength(10);
-  expect(supplies(game).every((item) => item.kind === 'small')).toBe(true);
-  expect(game.power).toBe(0);
+  expect(supplies(game)).toHaveLength(0);
+  expect(game.items.objects.filter((item) => item.active).every((item) => item.kind === 'point')).toBe(true);
+  expect(game.items.count).toBeGreaterThan(0);
+  expect(game.power).toBe(5);
   expect(game.bombs).toBe(0);
 });
 
@@ -192,7 +196,7 @@ it('本ボスの白演出中もボスBGMを35%で維持し、対峙から通常�
   expect(game.bgm.cue).toBe('boss-jinrai');
 });
 
-it('5面エトキチは各技の時間切れで補充し、3技目だけ回収待ちへ進む', () => {
+it('5面エトキチは各技の時間切れで補充せず、3技目だけ回収待ちへ進む', () => {
   const game = start(5, 0, true);
   game.invincible = true;
   for (let i = 0; i < 3; i++) {
@@ -201,8 +205,9 @@ it('5面エトキチは各技の時間切れで補充し、3技目だけ回収�
     game.items.clear();
     game.phaseFrame = game.phase!.duration * 60 - 1;
     game.update();
-    expect(supplies(game)).toHaveLength(10);
+    expect(supplies(game)).toHaveLength(0);
     expect(game.collectionFrames).toBe(i === 2 ? 180 : 0);
+    if (i === 2) expect(game.messageFrames).toBe(0);
   }
 });
 

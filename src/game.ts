@@ -1054,7 +1054,7 @@ export class Game {
       this.syncBgm();
       return;
     }
-    this.supplyPhaseItems();
+    if (defeated) this.supplyPhaseItems();
     this.bullets.forEach((b) => {
       // 画面外で戻り待ちの弾も、得点アイテムを回収できる位置へ寄せる。
       const returns = b.motion === 'jinraiHeart' || b.motion === 'recall';
@@ -1074,8 +1074,8 @@ export class Game {
       this.jinraiLasers.length = 0;
       this.jinraiBolts.length = 0; this.jinraiThunderstorm = undefined;
       this.enemies.clear(); this.shots.clear();
-      this.message = '補充品を回収しよう';
-      this.messageFrames = 180;
+      this.message = defeated ? '補充品を回収しよう' : '';
+      this.messageFrames = defeated ? 180 : 0;
     }
   }
 

@@ -29,7 +29,7 @@ it('新3技へ直行でき、合計HPはPower3の理論40秒未満に収まる',
   }
 });
 
-it('各技の時間切れで補充し、3→2→1→0のあとに回収・会話・道中へ進む', () => {
+it('各技の時間切れで補充せず、3→2→1→0のあとに回収・会話・道中へ進む', () => {
   vi.spyOn(Math, 'random').mockReturnValue(0.9);
   const game = start(); game.invincible = true;
   const stageFrame = game.stageFrame;
@@ -37,10 +37,11 @@ it('各技の時間切れで補充し、3→2→1→0のあとに回収・会話
     for (let frame = 0; game.phaseIntro && frame < 480; frame++) game.update();
     expect(game.phaseIntro).toBeUndefined(); game.items.clear();
     game.phaseFrame = game.phase!.duration * 60 - 1; game.update();
-    expect(game.items.objects.filter((i) => i.active && i.manual && i.kind === 'small')).toHaveLength(10);
+    expect(game.items.objects.filter((i) => i.active && i.manual && i.kind === 'small')).toHaveLength(0);
     expect(game.remainingSpells).toBe(2 - index); expect(game.bullets.count).toBe(0); expect(game.stageFrame).toBe(stageFrame);
   }
   expect(game.phase).toBeUndefined(); expect(game.collectionFrames).toBe(180);
+  expect(game.messageFrames).toBe(0);
   run(game, 180); expect(game.scene).toBe('dialogue');
   game.keys.add('ControlLeft'); run(game, 30);
   expect(game.scene).toBe('stage'); expect(game.boss).toBeUndefined();
