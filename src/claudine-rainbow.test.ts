@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
-import { emitRainbow, RAINBOW_COLORS, RAINBOW_LIMIT, RAINBOW_SECTION, rainbowSection } from './patterns/claudine-rainbow';
+import { emitRainbow, RAINBOW_BURST, RAINBOW_COLORS, RAINBOW_LIMIT, RAINBOW_PERIOD, RAINBOW_PHRASE, RAINBOW_SECTION, rainbowSection } from './patterns/claudine-rainbow';
 import { bulletContact, type Difficulty, FIELD } from './rules';
 
 beforeEach(() => {
@@ -43,7 +43,7 @@ it('場面を切り替えても飛んでいる虹を残し、交差する流れ�
 });
 
 it('第3区間のリボンが3粒の宝石弾へ分かれる', () => {
-  const game = start('normal', 972); game.update();
+  const game = start('normal', 960); game.update();
   const parent = game.bullets.objects.find(b => b.active && b.releaseAt > 0)!;
   expect(parent).toBeDefined(); expect(parent.split).toBe(false);
   parent.age = 124;
@@ -53,10 +53,84 @@ it('第3区間のリボンが3粒の宝石弾へ分かれる', () => {
   expect(children).toHaveLength(3);
   expect(children.every(b => b.dashWave === 1 && b.releaseAt === 0 && b.split === false && b.launchSoundPending === false)).toBe(true);
   expect(new Set(children.map(b => Math.atan2(b.vy, b.vx))).size).toBe(3);
+  expect(game.bullets.objects.filter(b => b.active && b.gridRow < 2).every(b => b.releaseAt === 0)).toBe(true);
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sは七色をまとめて放ち、次のまとまりまで移動する間隔を空ける', difficulty => {
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty), game = start(difficulty);
+  const spawn = vi.spyOn(game, 'spawnBullet');
+  emitRainbow(game, 0); expect(spawn).toHaveBeenCalledTimes(level === 0 ? 28 : 42);
+  spawn.mockClear();
+  for (let t = RAINBOW_BURST[level]; t < RAINBOW_PHRASE[level]; t++) emitRainbow(game, t);
+  expect(spawn).not.toHaveBeenCalled();
+  emitRainbow(game, RAINBOW_PHRASE[level]); expect(spawn).toHaveBeenCalledTimes(level === 0 ? 28 : 42);
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sは区間と左右反転の境目でも連射の間隔を保つ', difficulty => {
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty), game = start(difficulty);
+  const spawn = vi.spyOn(game, 'spawnBullet'), times: number[] = [];
+  for (let t = 0; t <= RAINBOW_SECTION * 6; t++) {
+    spawn.mockClear(); emitRainbow(game, t);
+    if (spawn.mock.results.some(result => result.value?.dashWave === 0)) times.push(t);
+    game.bullets.clear();
+  }
+  const period = RAINBOW_PERIOD[level];
+  const gap = RAINBOW_PHRASE[level] - (Math.ceil(RAINBOW_BURST[level] / period) - 1) * period;
+  expect(times.filter(t => t < RAINBOW_SECTION)).toHaveLength([12, 18, 20, 35][level]);
+  for (let i = 1; i < times.length; i++) {
+    const distance = times[i] - times[i - 1];
+    expect([period, gap]).toContain(distance);
+    if (times[i] % RAINBOW_SECTION === 0) expect(distance).toBe(gap);
+  }
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sは第3区間のすべてのまとまりで最外層の先頭を分離する', difficulty => {
+  const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty), game = start(difficulty);
+  const outer = level === 0 ? 1 : 2, spawn = vi.spyOn(game, 'spawnBullet');
+  for (const sectionStart of [RAINBOW_SECTION * 2, RAINBOW_SECTION * 5]) {
+    for (let phrase = 0; phrase < RAINBOW_SECTION; phrase += RAINBOW_PHRASE[level]) {
+      game.bullets.clear(); spawn.mockClear(); emitRainbow(game, sectionStart + phrase);
+      const parents = spawn.mock.results.map(result => result.value).filter(b => b && b.releaseAt > 0);
+      expect(parents).toHaveLength(14);
+      expect(parents.every(b => b!.gridRow === outer)).toBe(true);
+      expect(new Set(parents.map(b => b!.color)).size).toBe(7);
+      game.bullets.clear(); spawn.mockClear(); emitRainbow(game, sectionStart + phrase + RAINBOW_PERIOD[level]);
+      expect(spawn.mock.results.every(result => result.value?.releaseAt === 0)).toBe(true);
+    }
+  }
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sは異なる自機狙いの位置でも下側の射線近くに通れる幅を残す', difficulty => {
+  for (const targetX of [120, 192, 260]) {
+    const game = start(difficulty); game.px = targetX;
+    let minimum = Infinity;
+    for (let frame = 0; frame < 3450; frame++) {
+      game.update();
+      const [bx] = game.bossPosition(), left = bx - 96, right = bx + 96;
+      let widest = 0;
+      for (const y of [352, 390, 428]) {
+        const blocked: [number, number][] = [];
+        game.bullets.forEach(b => {
+          if (b.delay > 0) return;
+          const radius = 2.5 + b.radius + 2, dy = y - b.y;
+          if (Math.abs(dy) >= radius) return;
+          const dx = Math.sqrt(radius ** 2 - dy ** 2);
+          if (b.x + dx >= left && b.x - dx <= right) blocked.push([Math.max(left, b.x - dx), Math.min(right, b.x + dx)]);
+        });
+        blocked.sort((a, b) => a[0] - b[0]);
+        let x = left;
+        for (const [from, to] of blocked) { widest = Math.max(widest, from - x); x = Math.max(x, to); }
+        widest = Math.max(widest, right - x);
+      }
+      minimum = Math.min(minimum, widest);
+    }
+    // 幅の検査は撃破ボットと独立させる。移動できること自体は次の実入力テストで確かめる。
+    expect(minimum, `target x=${targetX}`).toBeGreaterThanOrEqual(24);
+  }
 });
 
 it('画面内の限度に近い分離では、同じ弾を宝石形へ変えて弾を消さない', () => {
-  const game = start('normal', 972); game.update();
+  const game = start('normal', 960); game.update();
   const parent = game.bullets.objects.find(b => b.active && b.releaseAt > 0)!;
   while (game.bullets.count < RAINBOW_LIMIT[1]) game.spawnBullet(192, 200, 0, 0, 0);
   parent.age = 124; game.update();
@@ -80,8 +154,8 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sで60秒近く進め�
     });
   }
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
-  expect(peak).toBeGreaterThan(500); expect(peak).toBeLessThanOrEqual(RAINBOW_LIMIT[level]);
-  expect(sections.every(count => count > 300)).toBe(true);
+  expect(peak).toBeGreaterThan(250); expect(peak).toBeLessThanOrEqual(RAINBOW_LIMIT[level]);
+  expect(sections.every(count => count > 150)).toBe(true);
   expect([...kinds].sort()).toEqual([0, 1]); expect(colors.size).toBe(7);
   expect(spawn.mock.results.every(result => result.value !== undefined)).toBe(true);
   expect(coverage.size).toBe(FIELD.w - 17);
@@ -93,8 +167,58 @@ it('中央で待つだけでは当たり、固定の安全な穴はない', () =
   expect(game.pendingHit).toBeGreaterThanOrEqual(0);
 });
 
+it.each([0, 1, 2, 3, 4])('射撃開始のフレーム差%dでもNormalを下側から無被弾・ボムなしで撃破できる', offset => {
+  const game = start(); game.invincible = false; game.power = 3; game.frame = offset;
+  const horizons = [6, 12, 20, 30, 44, 64];
+  let defeated = false;
+  for (let frame = 0; frame < 3495 && game.phaseIndex === 8; frame++) {
+    // 約0.13秒ごとに判断する。画面下側から出ず、移動・低速・射撃だけを入力する。
+    if (frame % 8 === 0) {
+      const nearby = game.bullets.objects.filter(b => b.active && b.motion === 'rainbowVeil' && Math.abs(b.x - game.px) < 200 && Math.abs(b.y - game.py) < 250)
+        .sort((a, b) => Math.hypot(a.x - game.px, a.y - game.py) - Math.hypot(b.x - game.px, b.y - game.py)).slice(0, 200);
+      const future: [number, number, number][][] = horizons.map(() => []);
+      for (const b of nearby) {
+        let x = b.x, y = b.y, vx = b.vx, vy = b.vy, index = 0;
+        const cs = Math.cos(b.spin), sn = Math.sin(b.spin);
+        for (let t = 1; t <= 64; t++) {
+          if (t > b.delay) { const next = vx * cs - vy * sn; vy = vx * sn + vy * cs + b.sway; vx = next; x += vx; y += vy; }
+          if (t === horizons[index]) { future[index].push([x, y, 2.5 + b.radius + 2]); index++; }
+        }
+      }
+      let best = Infinity, chosen = { dx: 0, dy: 0, focus: true };
+      const bx = game.bossPosition()[0];
+      for (const focus of [true, false]) for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+        const speed = (focus ? 1.65 : 3.65) / (Math.hypot(dx, dy) || 1);
+        if (dy < 0 && game.py + dy * speed * 8 < 320) continue;
+        let cost = (focus ? 0 : 0.15) + (dx * dx + dy * dy) * 0.08;
+        for (let i = 0; i < horizons.length; i++) {
+          const t = horizons[i], x = Math.max(9, Math.min(375, game.px + dx * speed * t)), y = Math.max(320, Math.min(439, game.py + dy * speed * t));
+          if (i === horizons.length - 1) cost += Math.abs(x - bx) * 0.15 + Math.abs(y - 380) * 0.025 + Math.max(0, 24 - Math.min(x, 384 - x)) * 0.2;
+          for (const [fx, fy, radius] of future[i]) {
+            const d = Math.hypot(x - fx, y - fy);
+            if (d < radius) cost += 80000 / (t + 4);
+            else if (d < 24) cost += (24 - d) ** 2 / (t + 10);
+          }
+        }
+        if (cost < best) { best = cost; chosen = { dx, dy, focus }; }
+      }
+      game.keys.clear(); game.keys.add('KeyZ');
+      if (chosen.focus) game.keys.add('ShiftLeft');
+      if (chosen.dx) game.keys.add(chosen.dx < 0 ? 'ArrowLeft' : 'ArrowRight');
+      if (chosen.dy) game.keys.add(chosen.dy < 0 ? 'ArrowUp' : 'ArrowDown');
+    }
+    const remaining = game.phase!.duration * 60 - game.phaseFrame;
+    game.update();
+    expect(game.py).toBeGreaterThanOrEqual(320);
+    expect(game.pendingHit).toBe(-1); expect(game.invulnFrames).toBe(0); expect(game.bombFrames).toBe(0);
+    if (game.phaseIndex !== 8) defeated = remaining > 1;
+  }
+  expect(defeated).toBe(true);
+  expect(game.phase?.pattern).toBe('final');
+});
+
 it('ボム中には追加射撃と分離を出さず、次の技へ虹を持ち越さない', () => {
-  const game = start('normal', 972);
+  const game = start('normal', 960);
   for (let frame = 0; frame < 200; frame++) game.update();
   expect(game.bullets.count).toBeGreaterThan(0);
   game.bombFrames = 150;
@@ -116,9 +240,12 @@ it('技の開始前とボム中には虹を生成しない', () => {
 });
 
 it('親のスロットを分離弾が再利用しても、宝石弾が再分裂しない', () => {
-  const game = start('normal', 972); game.update();
+  const game = start('normal', 960); game.update();
   const parent = game.bullets.objects.find(b => b.active && b.releaseAt > 0)!;
   while (game.bullets.objects.length < 2600) game.spawnBullet(192, 200, 0, 0, 0);
+  // 分離対象の直前のスロットを使い、次のacquireが親から探す状態にする。
+  game.bullets.objects[game.bullets.objects.indexOf(parent) - 1].active = false;
+  game.spawnBullet(192, 200, 0, 0, 0);
   game.bullets.forEach(b => { if (b !== parent) b.active = false; });
   parent.age = 124;
   const spawn = vi.spyOn(game, 'spawnBullet'); game.update();
@@ -128,7 +255,7 @@ it('親のスロットを分離弾が再利用しても、宝石弾が再分裂�
 });
 
 it('分離弾は生成フレームに当たらず、翌フレームから通常の当たり判定を持つ', () => {
-  const game = start('normal', 972); game.update();
+  const game = start('normal', 960); game.update();
   const parent = game.bullets.objects.find(b => b.active && b.releaseAt > 0)!;
   game.bullets.forEach(b => { if (b !== parent) b.active = false; });
   parent.x = game.px = 192; parent.y = game.py = 300;

@@ -4,11 +4,12 @@ import { FIELD } from '../rules';
 export const RAINBOW_COLORS = ['#ff809b', '#ffb674', '#ffe797', '#9de6ac', '#77ddeb', '#9cafff', '#dfa4f0'] as const;
 export const RAINBOW_SECTION = 480;
 export const RAINBOW_PERIOD = [8, 6, 6, 5] as const;
+export const RAINBOW_PHRASE = [160, 160, 120, 96] as const;
+export const RAINBOW_BURST = [32, 36, 30, 35] as const;
 export const RAINBOW_SPEED = [0.86, 1, 1.12, 1.22] as const;
 export const RAINBOW_LIMIT = [1500, 1900, 2100, 2300] as const;
 const AIM_PERIOD = [210, 156, 144, 132] as const;
-const UNRAVEL_PERIOD = [32, 18, 18, 15] as const;
-const TAIL_POINTS = 7;
+const TAIL_POINTS = 14;
 interface Trail { points: Float32Array; head: number; count: number; }
 const trails = new WeakMap<Bullet, Trail>();
 
@@ -39,21 +40,26 @@ function spawnRainbow(game: Game, x: number, y: number, angle: number, speed: nu
 export function emitRainbow(game: Game, t: number): void {
   if (t < 0 || game.bombFrames > 0) return;
   const level = levelOf(game), section = rainbowSection(t);
-  const ribbon = t % RAINBOW_PERIOD[level] === 0, aimed = section > 0 && t % AIM_PERIOD[level] === 0;
+  // 七色をまとめて放ち、次のフレーズまでの間隔を曲線の間の通路にする。
+  const local = t % RAINBOW_SECTION;
+  const phraseFrame = local % RAINBOW_PHRASE[level];
+  const ribbon = phraseFrame < RAINBOW_BURST[level] && phraseFrame % RAINBOW_PERIOD[level] === 0;
+  const aimed = section > 0 && t % AIM_PERIOD[level] === 0;
   if (!ribbon && !aimed) return;
   const cycle = Math.floor(t / (RAINBOW_SECTION * 3)), sign = cycle % 2 ? -1 : 1;
   const scale = RAINBOW_SPEED[level], layers = level === 0 ? 2 : 3;
   let room = RAINBOW_LIMIT[level] - game.bullets.count, first = true;
   const [bx, by] = game.bossPosition();
   if (ribbon && room >= layers * 14 + (aimed ? 21 : 0)) {
-    const swing = Math.sin(t * 0.009 + cycle * 0.7) * 0.8;
+    const phraseStart = t - local % RAINBOW_PHRASE[level];
+    const swing = Math.sin(phraseStart * 0.009 + cycle * 0.7) * 0.8;
     for (const side of [-1, 1]) for (let layer = 0; layer < layers; layer++) for (let color = 0; color < 7; color++) {
       const origin = section === 0 ? bx : bx + side * (70 + Math.sin(t * 0.006) * 22);
       const angle = Math.PI / 2 + sign * (side * (0.22 + color * 0.022 + layer * 0.3) + swing) * (section === 1 ? 1.3 : 1);
       const b = spawnRainbow(game, origin, by, angle, (1.5 + color * 0.018 + section * 0.08) * scale, color, level);
       if (!b) continue;
       b.spin = side * sign * (section === 1 ? 0.0018 : 0.0008); b.gridRow = layer;
-      b.releaseAt = section === 2 && t % UNRAVEL_PERIOD[level] === 0 ? 125 : 0;
+      b.releaseAt = section === 2 && layer === layers - 1 && phraseFrame === 0 ? 125 : 0;
       b.launchSoundPending = first; first = false;
     }
     room -= layers * 14;
