@@ -12,6 +12,25 @@ const AIM_PERIOD = [210, 156, 144, 132] as const;
 const TAIL_POINTS = 14;
 interface Trail { points: Float32Array; head: number; count: number; }
 const trails = new WeakMap<Bullet, Trail>();
+interface Curve {
+  kind: 'spiral' | 'snake'; x: number; y: number; vx: number; vy: number;
+  amplitude: number; phase: number; rate: number; gravity: number;
+}
+const curves = new WeakMap<Bullet, Curve>();
+const curvePoint: [number, number] = [0, 0];
+
+export function rainbowCurvePosition(b: Bullet, age: number, out?: [number, number]): [number, number] | undefined {
+  if (b.motion !== 'rainbowVeil' || b.dashWave !== 0) return;
+  const curve = curves.get(b);
+  if (!curve) return;
+  const ramp = Math.min(1, Math.max(0, age) / (curve.kind === 'spiral' ? 70 : 45));
+  const radius = curve.amplitude * ramp * ramp * (3 - 2 * ramp);
+  const angle = curve.phase + curve.rate * age;
+  const point: [number, number] = out ?? [0, 0];
+  point[0] = curve.x + curve.vx * age + radius * (curve.kind === 'spiral' ? Math.cos(angle) : Math.sin(angle));
+  point[1] = curve.y + curve.vy * age + curve.gravity * age * age / 2 + (curve.kind === 'spiral' ? radius * Math.sin(angle) : 0);
+  return point;
+}
 
 export const rainbowSection = (t: number): number => Math.floor(Math.max(0, t) % (RAINBOW_SECTION * 3) / RAINBOW_SECTION);
 const levelOf = (game: Game) => ['easy', 'normal', 'hard', 'lunatic'].indexOf(game.difficulty);
@@ -33,6 +52,7 @@ function spawnRainbow(game: Game, x: number, y: number, angle: number, speed: nu
   b.motion = 'rainbowVeil'; b.dashWave = jewel ? 1 : 0;
   b.radius = jewel ? 1.8 + level * 0.1 : [1.9, 2.1, 2.2, 2.3][level];
   b.sway = 0.0018 * RAINBOW_SPEED[level]; b.launchSoundPending = false;
+  curves.delete(b);
   resetTrail(b);
   return b;
 }
@@ -54,11 +74,23 @@ export function emitRainbow(game: Game, t: number): void {
     const phraseStart = t - local % RAINBOW_PHRASE[level];
     const swing = Math.sin(phraseStart * 0.009 + cycle * 0.7) * 0.8;
     for (const side of [-1, 1]) for (let layer = 0; layer < layers; layer++) for (let color = 0; color < 7; color++) {
-      const origin = section === 0 ? bx : bx + side * (70 + Math.sin(t * 0.006) * 22);
-      const angle = Math.PI / 2 + sign * (side * (0.22 + color * 0.022 + layer * 0.3) + swing) * (section === 1 ? 1.3 : 1);
-      const b = spawnRainbow(game, origin, by, angle, (1.5 + color * 0.018 + section * 0.08) * scale, color, level);
+      const origin = section === 0 ? bx : section === 1 ? bx + side * (70 + Math.sin(t * 0.006) * 22) : bx + side * (30 + layer * 38);
+      const angle = section === 0 ? Math.PI / 2 + sign * (side * (0.22 + color * 0.022 + layer * 0.3) + swing) : Math.PI / 2;
+      const speed = ((section === 1 ? 1.25 : 1.5) + color * (section === 0 ? 0.018 : 0.012)) * scale;
+      const b = spawnRainbow(game, origin, by, angle, speed, color, level);
       if (!b) continue;
-      b.spin = side * sign * (section === 1 ? 0.0018 : 0.0008); b.gridRow = layer;
+      b.spin = section === 0 ? side * sign * 0.0008 : 0; b.gridRow = layer;
+      if (section > 0) {
+        b.vx = section === 1 ? -side * 0.1 * scale : 0; b.vy = speed; b.sway = 0.0012 * scale;
+        curves.set(b, {
+          kind: section === 1 ? 'spiral' : 'snake', x: origin, y: by,
+          vx: b.vx, vy: b.vy,
+          amplitude: section === 1 ? 28 + layer * 7 : 20 + layer * 5,
+          phase: phraseStart * 0.004 + layer * 0.65 + color * 0.12 + (side < 0 ? Math.PI : 0),
+          rate: side * sign * (section === 1 ? 0.044 : 0.034) * scale,
+          gravity: b.sway,
+        });
+      }
       b.releaseAt = section === 2 && layer === layers - 1 && phraseFrame === 0 ? 125 : 0;
       b.launchSoundPending = first; first = false;
     }
@@ -81,13 +113,19 @@ export function updateRainbowBullet(game: Game, b: Bullet): boolean {
     trail.points[trail.head * 2] = b.x; trail.points[trail.head * 2 + 1] = b.y;
     trail.head = (trail.head + 1) % TAIL_POINTS; trail.count = Math.min(TAIL_POINTS, trail.count + 1);
   }
-  const vx = b.vx * Math.cos(b.spin) - b.vy * Math.sin(b.spin);
-  b.vy = b.vx * Math.sin(b.spin) + b.vy * Math.cos(b.spin) + b.sway; b.vx = vx;
-  b.x += b.vx; b.y += b.vy;
+  const position = rainbowCurvePosition(b, b.age, curvePoint);
+  if (position) {
+    b.vx = position[0] - b.x; b.vy = position[1] - b.y;
+    b.x = position[0]; b.y = position[1];
+  } else {
+    const vx = b.vx * Math.cos(b.spin) - b.vy * Math.sin(b.spin);
+    b.vy = b.vx * Math.sin(b.spin) + b.vy * Math.cos(b.spin) + b.sway; b.vx = vx;
+    b.x += b.vx; b.y += b.vy;
+  }
   if (b.releaseAt > 0 && b.age === b.releaseAt) {
     const level = levelOf(game);
     // 余裕がないときも弾は消さず、その場で宝石形へほどく。
-    if (game.bullets.count + 2 > RAINBOW_LIMIT[level]) { b.releaseAt = 0; b.dashWave = 1; b.spin = 0; b.radius = 1.8 + level * 0.1; resetTrail(b); }
+    if (game.bullets.count + 2 > RAINBOW_LIMIT[level]) { b.releaseAt = 0; b.dashWave = 1; b.spin = 0; b.radius = 1.8 + level * 0.1; curves.delete(b); resetTrail(b); }
     else {
       const { x, y, color, gridRow } = b, angle = Math.atan2(b.vy, b.vx);
       b.active = false;

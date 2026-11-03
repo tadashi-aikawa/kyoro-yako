@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
-import { emitRainbow, RAINBOW_BURST, RAINBOW_COLORS, RAINBOW_LIMIT, RAINBOW_PERIOD, RAINBOW_PHRASE, RAINBOW_SECTION, rainbowSection } from './patterns/claudine-rainbow';
+import { emitRainbow, RAINBOW_BURST, RAINBOW_COLORS, RAINBOW_LIMIT, RAINBOW_PERIOD, RAINBOW_PHRASE, RAINBOW_SECTION, rainbowCurvePosition, rainbowSection, updateRainbowBullet } from './patterns/claudine-rainbow';
 import { bulletContact, type Difficulty, FIELD } from './rules';
 
 beforeEach(() => {
@@ -17,7 +17,7 @@ function start(difficulty: Difficulty = 'normal', t = 0): Game {
   return game;
 }
 
-it('8秒ごとに扇・交差・分離へ進み、次の24秒では向きを反転する', () => {
+it('8秒ごとに扇・渦巻き・蛇行と分離へ進み、次の24秒では向きを反転する', () => {
   const fan = start(); fan.update();
   expect(fan.phase?.name).toBe('レインボー・ヴェール');
   const first = fan.bullets.objects.filter(b => b.active);
@@ -32,7 +32,7 @@ it('8秒ごとに扇・交差・分離へ進み、次の24秒では向きを反�
   expect([0, 479, 480, 959, 960, 1439, 1440].map(rainbowSection)).toEqual([0, 0, 1, 1, 2, 2, 0]);
 });
 
-it('場面を切り替えても飛んでいる虹を残し、交差する流れを重ねる', () => {
+it('場面を切り替えても飛んでいる虹を残し、別の軌道を重ねる', () => {
   const game = start();
   for (let frame = 0; frame < 480; frame++) game.update();
   const old = game.bullets.objects.filter(b => b.active);
@@ -40,6 +40,66 @@ it('場面を切り替えても飛んでいる虹を残し、交差する流れ�
   const spawn = vi.spyOn(game, 'spawnBullet'); game.update();
   expect(old.filter((b, i) => b.active && b.age > ages[i]).length).toBeGreaterThan(200);
   expect(spawn).toHaveBeenCalledTimes(42);
+});
+
+it('渦巻きは弾そのものが周回し、上下にも折り返す', () => {
+  const game = start('normal', RAINBOW_SECTION); game.update();
+  const b = game.bullets.objects.find(b => b.active && b.color === 0 && b.gridRow === 2)!;
+  let previous = Math.sign(b.vx), reversals = 0, upward = false;
+  for (let age = 2; age <= 210; age++) {
+    b.age = age; updateRainbowBullet(game, b);
+    const direction = Math.sign(b.vx);
+    if (direction !== previous) reversals++;
+    previous = direction; upward ||= b.vy < -0.1;
+    expect(b.active).toBe(true);
+  }
+  expect(reversals).toBeGreaterThanOrEqual(3); expect(upward).toBe(true);
+});
+
+it('蛇行は下降しながら左右へ繰り返し折り返し、扇とは別の軌道になる', () => {
+  const fan = start(); fan.update();
+  expect(rainbowCurvePosition(fan.bullets.objects.find(b => b.active)!, 40)).toBeUndefined();
+  const game = start('normal', RAINBOW_SECTION * 2); game.update();
+  const b = game.bullets.objects.find(b => b.active && b.color === 0 && b.gridRow === 0)!;
+  let previous = Math.sign(b.vx), reversals = 0, minX = b.x, maxX = b.x;
+  for (let age = 2; age <= 190; age++) {
+    b.age = age; updateRainbowBullet(game, b);
+    const direction = Math.sign(b.vx);
+    if (direction !== previous) reversals++;
+    previous = direction; minX = Math.min(minX, b.x); maxX = Math.max(maxX, b.x);
+    expect(b.vy).toBeGreaterThan(0); expect(b.active).toBe(true);
+  }
+  expect(reversals).toBeGreaterThanOrEqual(2); expect(maxX - minX).toBeGreaterThan(30);
+});
+
+it('渦巻きのスロットを扇が再利用しても、前の曲線を引き継がない', () => {
+  const game = start('normal', RAINBOW_SECTION); game.update();
+  const old = game.bullets.objects.find(b => b.active)!;
+  expect(rainbowCurvePosition(old, 40)).toBeDefined();
+  while (game.bullets.objects.length < 2600) game.spawnBullet(192, 200, 0, 0, 0);
+  game.bullets.clear(); emitRainbow(game, 0);
+  expect(old.active).toBe(true); expect(old.dashWave).toBe(0);
+  expect(rainbowCurvePosition(old, 40)).toBeUndefined();
+});
+
+it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sは次の24秒で渦巻きの周回と蛇行の折り返しを反転する', difficulty => {
+  function representative(section: number, cycle: number) {
+    const game = start(difficulty, RAINBOW_SECTION * (section + cycle * 3)); game.update();
+    return game.bullets.objects.find(b => b.active && b.color === 0 && b.gridRow === 0)!;
+  }
+  function winding(b: ReturnType<typeof representative>) {
+    const p = [90, 91, 92, 93].map(age => rainbowCurvePosition(b, age)!);
+    const ax = p[2][0] - 2 * p[1][0] + p[0][0], ay = p[2][1] - 2 * p[1][1] + p[0][1];
+    const bx = p[3][0] - 2 * p[2][0] + p[1][0], by = p[3][1] - 2 * p[2][1] + p[1][1];
+    return ax * by - ay * bx;
+  }
+  // 中心の直線移動を除いた加速度の回転から、実際の周回方向を確かめる。
+  expect(winding(representative(1, 0))).toBeLessThan(0);
+  expect(winding(representative(1, 1))).toBeGreaterThan(0);
+  const first = representative(2, 0), next = representative(2, 1);
+  // 両周期の代表弾が同じ飛翔時間で左右逆向きに進むことを、座標から確認する。
+  expect(rainbowCurvePosition(first, 91)![0] - rainbowCurvePosition(first, 90)![0]).toBeGreaterThan(0);
+  expect(rainbowCurvePosition(next, 91)![0] - rainbowCurvePosition(next, 90)![0]).toBeLessThan(0);
 });
 
 it('第3区間のリボンが3粒の宝石弾へ分かれる', () => {
@@ -193,7 +253,7 @@ it.each([0, 1, 2, 3, 4])('射撃開始のフレーム差%dでもNormalを下側�
         let cost = (focus ? 0 : 0.15) + (dx * dx + dy * dy) * 0.08;
         for (let i = 0; i < horizons.length; i++) {
           const t = horizons[i], x = Math.max(9, Math.min(375, game.px + dx * speed * t)), y = Math.max(320, Math.min(439, game.py + dy * speed * t));
-          if (i === horizons.length - 1) cost += Math.abs(x - bx) * 0.15 + Math.abs(y - 380) * 0.025 + Math.max(0, 24 - Math.min(x, 384 - x)) * 0.2;
+          if (i === horizons.length - 1) cost += Math.abs(x - bx) * 0.1 + Math.abs(y - 380) * 0.025 + Math.max(0, 24 - Math.min(x, 384 - x)) * 0.2;
           for (const [fx, fy, radius] of future[i]) {
             const d = Math.hypot(x - fx, y - fy);
             if (d < radius) cost += 80000 / (t + 4);
@@ -252,14 +312,15 @@ it('親のスロットを分離弾が再利用しても、宝石弾が再分裂�
   const children = spawn.mock.results.map(result => result.value).filter(Boolean);
   expect(children).toHaveLength(3); expect(children).toContain(parent);
   expect(children.every(b => b.active && b.dashWave === 1 && b.releaseAt === 0 && b.split === false)).toBe(true);
+  expect(children.every(b => rainbowCurvePosition(b, b.age + 40) === undefined)).toBe(true);
 });
 
 it('分離弾は生成フレームに当たらず、翌フレームから通常の当たり判定を持つ', () => {
   const game = start('normal', 960); game.update();
   const parent = game.bullets.objects.find(b => b.active && b.releaseAt > 0)!;
   game.bullets.forEach(b => { if (b !== parent) b.active = false; });
-  parent.x = game.px = 192; parent.y = game.py = 300;
-  parent.vx = 0; parent.vy = 0; parent.spin = 0; parent.sway = 0; parent.age = 124;
+  const position = rainbowCurvePosition(parent, 125)!;
+  game.px = position[0]; game.py = position[1]; parent.age = 124;
   game.invincible = false; game.invulnFrames = 0;
   game.update(); expect(game.pendingHit).toBe(-1);
   game.update(); expect(game.pendingHit).toBeGreaterThanOrEqual(0);
