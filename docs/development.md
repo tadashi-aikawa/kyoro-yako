@@ -23,6 +23,14 @@ pnpm dev
 
 公開ワークフローは手動で実行します。push時には公開しません。
 
+共有用URLも `https://tadashi-aikawa.github.io/kyoro-yako/` です。
+リンクプレビューは `index.html` のOGP・Twitter Cardメタタグと、`public/assets/title/ogp.webp` のタイトル画面を使います。
+タイトル画面を変更したら、この画像も撮り直してください。
+共有先によって画像がトリミングされる場合があります。
+公開後も古いプレビューが残る場合は、共有先のキャッシュ更新を待ちます。
+
+- [Open Graphの仕様](https://ogp.me/)
+
 ローカルで公開用の配信パスを確認する場合は、次を実行します。
 
 ```sh
