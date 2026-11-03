@@ -169,7 +169,7 @@ it('レーザーは予告中に鳴らさず、危険になるフレームで鳴�
 it('格子は行数によらず一斉移動のSEを1回だけ鳴らす', () => {
   for (const difficulty of ['easy', 'normal', 'hard', 'lunatic'] as const) {
     const game = new Game(); game.invincible = true; game.difficulty = difficulty;
-    game.startStage(3); game.startBoss(false, 5);
+    game.startStage(3); game.startBoss(false, 3);
     const play = vi.spyOn(game.audio, 'play').mockImplementation(() => {});
     game.phaseFrame = 104; game.update();
     const grid = game.bullets.objects.filter((b) => b.active && b.motion === 'layoutGrid');

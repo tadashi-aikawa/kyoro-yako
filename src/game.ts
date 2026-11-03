@@ -11,8 +11,9 @@ import { ENDING_MOVIES, MOVIES, type MovieName, MoviePlayer } from './movies';
 import { obsidiaPosition } from './obsidia-movement';
 import { emitBossNormal } from './patterns/boss-normal';
 import { emitChappy, hasSugarWave, updateChappyBullet } from './patterns/chappy';
-import { claudineScene, complementBoundary, emitClaudine, whiteSpaceCircle } from './patterns/claudine';
+import { complementBoundary, emitClaudine } from './patterns/claudine';
 import { BLOOM_ATTACK, BLOOM_CUTIN, reflowPlayer, updateBloomBullet } from './patterns/claudine-finale';
+import { updateRainbowBullet } from './patterns/claudine-rainbow';
 import { reflectEnterShot } from './patterns/enter-reflect';
 import { emitEtokichi, emitGalaxyFlash, type GalaxyFlash, updateGalaxyFlash } from './patterns/etokichi';
 import { emitEtokichiDawn } from './patterns/etokichi-dawn';
@@ -38,7 +39,7 @@ import { ULTIMATE_CUTINS, ULTIMATE_SECOND_STAMP, ULTIMATE_TITLE, ultimateCueFram
 
 export type Scene = 'title' | 'difficulty' | 'player' | 'practice' | 'option' | 'help' | 'notebook' | 'letter' | 'stage' | 'arrival' | 'transition' | 'dialogue' | 'gift' | 'departure' | 'clear' | 'pause' | 'gameover' | 'movie' | 'ending' | 'credits';
 type AfterBossMovie = 'jinrai-gift' | 'minerva-finale';
-export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'kunai' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'starOwl' | 'starTrail' | 'jinraiHeart' | 'jinraiSpark' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'enterLine' | 'bookshelf' | 'vanish' | 'tagPull' | 'sweepRadial' | 'chappyYoyo' | 'chappyStitch' | 'chappySugar' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'whiteSpace' | 'bloomRocket' | 'bloomSpark'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
+export interface Bullet { active: boolean; x: number; y: number; vx: number; vy: number; radius: number; kind: 'orb' | 'kunai' | 'needle' | 'petal' | 'star' | 'heart' | 'glyph' | 'keycap'; keyLabel?: string; color: number; grazed: boolean; age: number; split: boolean; delay: number; fadeAt: number; motion: 'normal' | 'recall' | 'wing' | 'minervaRing' | 'eyeFreeze' | 'starOwl' | 'starTrail' | 'jinraiHeart' | 'jinraiSpark' | 'jinraiSakura' | 'etoileOrbit' | 'etoileFall' | 'etokichiRing' | 'keyDrop' | 'enterLine' | 'bookshelf' | 'vanish' | 'tagPull' | 'sweepRadial' | 'chappyYoyo' | 'chappyStitch' | 'chappySugar' | 'gridSnap' | 'layoutGrid' | 'typographyRain' | 'complement' | 'rainbowVeil' | 'bloomRocket' | 'bloomSpark'; targetX: number; targetY: number; gridColumn: number; gridRow: number; dashWave: number; dashOrder: number; releaseAt: number; sway: number; swayRate: number; swayPhase: number; rotation: number; spin: number; launchSoundPending: boolean; }
 export interface JinraiLaser { x: number; y: number; angle: number; age: number; warning: number; life: number; speed: number; }
 export interface Shot { active: boolean; x: number; y: number; vx: number; vy: number; damage: number; radius: number; homing: boolean; }
 export type WaveKind = 'arc' | 'ring' | 'cross' | 'threeWay' | 'return' | 'sweep' | 'pincer' | 'serpent' | 'orbit' | 'chevron';
@@ -1290,6 +1291,7 @@ export class Game {
     this.bullets.forEach((b) => {
       b.age++;
       const bloomMotion = updateBloomBullet(this, b);
+      const rainbowMotion = updateRainbowBullet(b);
       if (bloomMotion === 'harmless') {
         if (b.fadeAt > 0 && b.age >= b.fadeAt) b.active = false;
         return;
@@ -1402,7 +1404,7 @@ export class Game {
           b.y += Math.sin(angle) * 0.9 + b.vy * 0.25;
           b.rotation += 0.1;
         } else b.y += b.vy;
-      } else if (b.motion !== 'etoileOrbit' && chappyMotion !== 'moving' && bloomMotion !== 'moving') {
+      } else if (b.motion !== 'etoileOrbit' && chappyMotion !== 'moving' && bloomMotion !== 'moving' && !rainbowMotion) {
         const bog = this.phase?.pattern === 'dotfiles' || (this.phase?.pattern === 'neoEncore' && this.encoreCount === 3);
         const bogTime = this.phase?.pattern === 'neoEncore' ? encoreBogTime(this) : this.phaseFrame - 105;
         const slow = bog && inBog(b.x, b.y, bogTime) ? 0.28 : 1;
@@ -1415,11 +1417,6 @@ export class Game {
           b.x += b.vx * slow; b.y += b.vy * slow;
         }
       }
-      if (b.motion === 'whiteSpace' && claudineScene(attack) === 'whiteSpace') {
-        const local = attackFrame - 105;
-        const [cx, cy, r] = whiteSpaceCircle(local);
-        if (Math.hypot(b.x - cx, b.y - cy) < r + b.radius + 5) { b.active = false; return; }
-      }
       if (b.split && b.age === 84) {
         for (let i = -3; i <= 3; i++) {
           const a = Math.atan2(b.vy, b.vx) + i * 0.21;
@@ -1429,7 +1426,7 @@ export class Game {
       }
       const margin = b.motion === 'wing' ? 130 : 25;
       // 宵の誘いは画面外から戻る。通常弾の画面外削除から外し、10秒の寿命で必ず回収する。
-      if (bloomMotion === 'none' && b.motion !== 'jinraiHeart' && b.motion !== 'recall' && (b.x < -margin || b.x > FIELD.w + margin || b.y < -30 || b.y > FIELD.h + 25)) { b.active = false; return; }
+      if (bloomMotion === 'none' && !rainbowMotion && b.motion !== 'jinraiHeart' && b.motion !== 'recall' && (b.x < -margin || b.x > FIELD.w + margin || b.y < -30 || b.y > FIELD.h + 25)) { b.active = false; return; }
       // 点滅中に見えない弾へ当たらないよう、消える最後の1秒は無害にする。
       if (b.motion === 'jinraiHeart' && b.age >= b.fadeAt - KISS_FADE) return;
       if (this.invulnFrames > 0 || this.invincible || this.pendingHit >= 0) return;

@@ -9,9 +9,10 @@ import { drawIssen } from './jinrai-issen-render';
 import { drawMinervaAura } from './minerva-aura-render';
 import { notebookBomb, notebookBookmark, notebookFeather, notebookOwl, notebookPage, notebookStar } from './notebook-icons';
 import { sugarCasting } from './patterns/chappy';
-import { claudineScene, complementBoundary, whiteSpaceCircle } from './patterns/claudine';
+import { claudineScene, complementBoundary } from './patterns/claudine';
 import { drawCourse } from './patterns/claudine-course';
 import { BLOOM_CUTIN, bloomPose } from './patterns/claudine-finale';
+import { drawRainbowBackdrop, drawRainbowBullets } from './patterns/claudine-rainbow';
 import { GRID_COLUMNS, GRID_DIRECTIONS, GRID_NAMES, GRID_PERIOD, gridLayoutAt, gridPoint, gridRows, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_NAMES, WEATHER_PERIOD, weatherAt } from './patterns/claudine-weather-grid';
 import { HOP_SHOWN, jinraiCloneScene } from './patterns/jinrai-clone';
 import { DASH_CHARGE, DASH_CUTIN, DASH_TRAIL_LIFE, issenScene } from './patterns/jinrai-issen';
@@ -356,7 +357,7 @@ export class Renderer {
       c.fillStyle = '#06031977'; c.fillRect(0, 0, FIELD.w, FIELD.h);
       this.magic(192, 80, game.frame, stage.colors[2], 130, 0.25);
     }
-    if (!game.phaseIntro) { drawBloomBackdrop(c, game); drawCourse(c, game); drawMinervaAura(c, game); this.minervaEcho(game); }
+    if (!game.phaseIntro) { drawBloomBackdrop(c, game); drawCourse(c, game); drawRainbowBackdrop(c, game); drawMinervaAura(c, game); this.minervaEcho(game); }
     if (game.phaseIntro && game.boss) {
       const [x, y] = game.bossXY;
       this.fieldCharacter(game, this.readySprite(game, bossSpriteId(game.boss, 'idle', game.frame)), x, y + Math.sin(game.frame * 0.045) * 2, 64, 0);
@@ -495,7 +496,8 @@ export class Renderer {
       this.minervaSummon(game);
       this.obsidiaGraph(game);
     }
-    game.bullets.forEach((b) => { if (!drawBloomBullet(c, game, b)) this.bullet(b); });
+    drawRainbowBullets(c, game);
+    game.bullets.forEach((b) => { if (b.motion !== 'rainbowVeil' && !drawBloomBullet(c, game, b)) this.bullet(b); });
     for (const ring of game.interviewRings) this.interviewRing(ring);
     game.shots.forEach((shot) => {
       c.save(); c.translate(shot.x, shot.y); c.rotate(Math.atan2(shot.vx, -shot.vy));
@@ -1072,13 +1074,6 @@ export class Renderer {
       c.fillStyle = '#378beb29'; c.fillRect(0, 0, boundary, FIELD.h);
       c.fillStyle = '#ff9a3a29'; c.fillRect(boundary, 0, FIELD.w - boundary, FIELD.h);
       c.strokeStyle = '#fff1ca99'; c.setLineDash([7, 7]); c.beginPath(); c.moveTo(boundary, 0); c.lineTo(boundary, FIELD.h); c.stroke(); c.setLineDash([]);
-    }
-    if (pattern === 'whiteSpace') {
-      const local = t;
-      const [x, y, r] = whiteSpaceCircle(local);
-      c.fillStyle = '#fff7d22a'; c.strokeStyle = '#fff7d2cc'; c.lineWidth = 2;
-      c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); c.stroke();
-      this.text('余白', x, y + 4, 14, '#fff6da', 'center');
     }
     if (pattern === 'tags' && t >= -[100, 80, 65, 50][level]) {
       tags(t).forEach(([x, y], i) => { this.magic(x, y, game.frame, ['#b286f5', '#75d7ff', '#ffe08e'][i], 29, 0.5); });

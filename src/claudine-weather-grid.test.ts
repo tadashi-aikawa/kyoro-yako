@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Game } from './game';
 import { emitChangingGrid, emitTypographyRain, GRID_PERIOD, gridPoint, gridVelocity, RAIN_FONTS, RAIN_GLYPHS, WEATHER_PERIOD } from './patterns/claudine-weather-grid';
 import { bulletContact, FIELD } from './rules';
+import { STAGES } from './stages';
 
 beforeEach(() => {
   vi.stubGlobal('location', { search: '' });
@@ -10,9 +11,9 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function start(index: number): Game {
+function start(pattern: 'type' | 'grid'): Game {
   const game = new Game(); game.audio.volume = 0; game.invincible = true;
-  game.startStage(3); game.startBoss(false, index);
+  game.startStage(3); game.startBoss(false, STAGES[2].phases.findIndex(phase => phase.pattern === pattern));
   return game;
 }
 
@@ -20,7 +21,7 @@ it('文字の雨は12文字と3種類の書体を混ぜ、小雨から豪雨・�
   const counts: number[] = [];
   const glyphs = new Set<number>(); const fonts = new Set<number>();
   for (let weather = 0; weather < 3; weather++) {
-    const game = start(3);
+    const game = start('type');
     for (let t = weather * WEATHER_PERIOD; t < (weather + 1) * WEATHER_PERIOD; t++) emitTypographyRain(game, t);
     const bullets = game.bullets.objects.filter((b) => b.active);
     counts.push(bullets.length);
@@ -35,7 +36,7 @@ it('文字の雨は12文字と3種類の書体を混ぜ、小雨から豪雨・�
 });
 
 it('台風は次の周回で逆向きに吹く', () => {
-  const right = start(3); const left = start(3);
+  const right = start('type'); const left = start('type');
   for (let t = 0; t < WEATHER_PERIOD; t++) {
     emitTypographyRain(right, WEATHER_PERIOD * 2 + t);
     emitTypographyRain(left, WEATHER_PERIOD * 5 + t);
@@ -48,7 +49,7 @@ it('台風は次の周回で逆向きに吹く', () => {
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの小雨を保ち、豪雨・台風の発射密度を段階的に上げる', difficulty => {
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
   const counts = [0, 1, 2].map(weather => {
-    const game = start(3); game.difficulty = difficulty;
+    const game = start('type'); game.difficulty = difficulty;
     for (let local = 0; local < WEATHER_PERIOD; local++) emitTypographyRain(game, weather * WEATHER_PERIOD + local);
     return game.bullets.count;
   });
@@ -61,7 +62,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの全切替で残弾
   for (let step = 1; step <= 6; step++) {
     const weather = step % 3;
     const boundary = WEATHER_PERIOD * step;
-    const game = start(3); game.difficulty = difficulty;
+    const game = start('type'); game.difficulty = difficulty;
     // 切替直前の実際の発射弾を、自然退出しない画面内へ置く。
     for (let t = boundary - 20; t < boundary; t++) emitTypographyRain(game, t);
     const old = game.bullets.objects.find(b => b.active)!;
@@ -94,7 +95,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの全切替で残弾
 });
 
 it('天候切替の最初のフレームで速度と位置が飛ばない', () => {
-  const game = start(3);
+  const game = start('type');
   const b = game.spawnBullet(192, 150, 0, 3.08, 0, 'glyph')!;
   b.motion = 'typographyRain'; b.radius = 3;
   game.phaseFrame = 104 + WEATHER_PERIOD * 2;
@@ -107,7 +108,7 @@ it('天候切替の最初のフレームで速度と位置が飛ばない', () =
 });
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sで2周連続して雨が途切れず、豪雨では画面内の密度も上がる', difficulty => {
-  const game = start(3); game.difficulty = difficulty; game.phaseFrame = 104;
+  const game = start('type'); game.difficulty = difficulty; game.phaseFrame = 104;
   const counts: number[][] = [[], [], []];
   for (let t = 0; t < WEATHER_PERIOD * 7; t++) {
     game.update();
@@ -127,7 +128,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sで2周連続して�
 it('グリッドは均等列・可変幅・可変行・千鳥配置へ切り替わる', () => {
   const layouts: string[] = [];
   for (let layout = 0; layout < 4; layout++) {
-    const game = start(5); emitChangingGrid(game, layout * GRID_PERIOD[1]);
+    const game = start('grid'); emitChangingGrid(game, layout * GRID_PERIOD[1]);
     const bullets = game.bullets.objects.filter((b) => b.active);
     expect(bullets).toHaveLength([60, 40, 55, 50][layout]);
     expect(bullets.every((b) => b.delay > 0 && b.motion === 'layoutGrid')).toBe(true);
@@ -139,7 +140,7 @@ it('グリッドは均等列・可変幅・可変行・千鳥配置へ切り替�
 
 it('グリッドは静止した位置を通り、待機だけでは終わらない', () => {
   for (const [x, y] of [[192, 398], [40, 390], [344, 390], [192, 20]]) {
-    const game = start(5); game.invincible = false; game.px = x; game.py = y;
+    const game = start('grid'); game.invincible = false; game.px = x; game.py = y;
     const lives = game.lives;
     game.phaseFrame = 104; game.update();
     for (let t = 0; t < 700 && game.lives === lives; t++) game.update();
@@ -149,7 +150,7 @@ it('グリッドは静止した位置を通り、待機だけでは終わらな�
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sでは初回の下向きグリッドの隙間で下端に居座って撃ち続けると、次の横向きグリッドに当たる', difficulty => {
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
-  const game = start(5); game.difficulty = difficulty; game.invincible = false;
+  const game = start('grid'); game.difficulty = difficulty; game.invincible = false;
   game.px = 192; game.py = FIELD.h - 9; game.keys.add('KeyZ'); game.phaseFrame = 104;
   const lives = game.lives;
   for (let frame = 0; frame < GRID_PERIOD[level]; frame++) game.update();
@@ -162,7 +163,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sでは初回の下向
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sでは最初の横向きグリッドが下端の全座標を通る', difficulty => {
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
-  const game = start(5); game.difficulty = difficulty;
+  const game = start('grid'); game.difficulty = difficulty;
   game.phaseFrame = 104 + GRID_PERIOD[level];
   const hit = new Set<number>();
   for (let frame = 0; frame < GRID_PERIOD[level]; frame++) {
@@ -179,7 +180,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sでは最初の横向
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sでは下端から35px以内の全座標を2周以内に通る', difficulty => {
   const level = ['easy', 'normal', 'hard', 'lunatic'].indexOf(difficulty);
-  const game = start(5); game.difficulty = difficulty; game.phaseFrame = 104;
+  const game = start('grid'); game.difficulty = difficulty; game.phaseFrame = 104;
   const width = FIELD.w - 17;
   const hit = new Uint8Array(width * 36);
   for (let frame = 0; frame < GRID_PERIOD[level] * 8; frame++) {
@@ -199,7 +200,7 @@ it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sでは下端から35p
 
 it('グリッドは予告位置から配置を保って上下左右へ流れ、自機の移動では向きを変えない', () => {
   for (let layout = 0; layout < 4; layout++) {
-    const game = start(5); game.phaseFrame = 104 + layout * GRID_PERIOD[1]; game.update();
+    const game = start('grid'); game.phaseFrame = 104 + layout * GRID_PERIOD[1]; game.update();
     const bullets = game.bullets.objects.filter((b) => b.active);
     const initial = bullets.map((b) => [b.x, b.y]);
     for (let frame = 0; frame < 69; frame++) game.update();
@@ -217,7 +218,7 @@ it('グリッドは予告位置から配置を保って上下左右へ流れ、�
 
 it.each(['easy', 'normal', 'hard', 'lunatic'] as const)('%sの台風は両方向とも風上側の壁から流れ込み、画面下部へ届く', difficulty => {
   for (const cycle of [0, 1]) {
-    const game = start(3); game.difficulty = difficulty;
+    const game = start('type'); game.difficulty = difficulty;
     game.phaseFrame = 104 + WEATHER_PERIOD * (cycle * 3 + 2);
     const spawn = vi.spyOn(game, 'spawnBullet');
     const sideBullets = new Set<ReturnType<Game['spawnBullet']>>();

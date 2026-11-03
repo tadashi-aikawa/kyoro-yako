@@ -105,7 +105,7 @@ it('書棚は背表紙の予告後に突き出し、リングの点滅弾は消�
 });
 
 it('3面のボスは通常4回とスペル6枚を順に出す', () => {
-  expect(STAGES[2].phases.map((phase) => phase.pattern)).toEqual(['claudinePetalArc', 'trim', 'claudineQuietRings', 'type', 'claudinePetalArc', 'grid', 'claudineQuietRings', 'complement', 'whiteSpace', 'final']);
+  expect(STAGES[2].phases.map((phase) => phase.pattern)).toEqual(['claudinePetalArc', 'trim', 'claudineQuietRings', 'grid', 'claudineQuietRings', 'complement', 'claudinePetalArc', 'type', 'rainbow', 'final']);
   expect(STAGES[2].phases.filter((phase) => phase.spell)).toHaveLength(6);
 });
 
@@ -130,7 +130,7 @@ it('余白のサーキットは弾を生成せず、入口が自機へ届くま�
 });
 
 it('グリッド弾は薄い配置予告の後に一斉に実体化して動く', () => {
-  const game = start(3, 5);
+  const game = start(3, 3);
   const bullets = game.bullets.objects.filter((b) => b.active && b.motion === 'layoutGrid');
   expect(new Set(bullets.map((b) => b.gridColumn)).size).toBe(12);
   expect(bullets.every((b) => b.delay > 0)).toBe(true);
@@ -140,19 +140,14 @@ it('グリッド弾は薄い配置予告の後に一斉に実体化して動く'
   expect(bullets.every((b) => b.motion === 'normal' && b.vx === 0 && b.vy > 0)).toBe(true);
 });
 
-it('補色の境界で弾の色と速さが変わり、余白の円から弾が消える', () => {
-  const color = start(3, 7);
+it('補色の境界で弾の色と速さが変わる', () => {
+  const color = start(3, 5);
   const orb = color.bullets.objects.find((b) => b.active && b.motion === 'complement' && b.x < 190)!;
   orb.delay = 0; orb.x = 200; orb.y = 220; orb.vx = -2;
   color.update();
   expect(orb.color).toBe(3);
   for (let i = 0; i < 20; i++) color.update();
   expect(orb.color).toBe(1);
-  const space = start(3, 8);
-  const bullet = space.spawnBullet(192, 302, 0, 0, 0)!;
-  bullet.motion = 'whiteSpace';
-  space.update();
-  expect(bullet.active).toBe(false);
 });
 
 it('最終技は再演を使わず、99秒の時間切れで取得失敗として戦闘後会話へ進む', () => {

@@ -1,6 +1,7 @@
 import { SUGAR_PERIOD, SUGAR_WARNING, yoyoPosition } from './patterns/chappy';
 import { courseCenterAt } from './patterns/claudine-course';
 import { bloomBossPosition } from './patterns/claudine-finale';
+import { rainbowBossPosition } from './patterns/claudine-rainbow';
 import { thunderPosition } from './patterns/jinrai-thunder';
 import type { Phase } from './stages';
 
@@ -65,7 +66,6 @@ const MOVEMENTS: Record<string, Movement> = {
   type: curve(78, 18, 780, 'arc'),
   grid: patrol([[128, -22], [256, -22], [256, 18], [128, 18]], 72, 132),
   complement: curve(60, 16, 720, 'eight'),
-  whiteSpace: curve(34, 8, 840, 'ellipse'),
   // 通常弾幕の高速性とは別に、本体の位置替えには停止と減速を残す。
   jinraiRapidFan: patrol([[108, 0], [276, 12]], 84, 46),
   jinraiRapidRings: curve(100, 18, 420, 'arc'),
@@ -89,7 +89,7 @@ const MOVEMENTS: Record<string, Movement> = {
 
 export function enterBossX(time: number): number { return MOVEMENTS.enter(time)[0]; }
 
-export function hasBossMovement(pattern: string): boolean { return pattern === 'final' || pattern === 'trim' || Object.hasOwn(MOVEMENTS, pattern); }
+export function hasBossMovement(pattern: string): boolean { return pattern === 'final' || pattern === 'trim' || pattern === 'rainbow' || Object.hasOwn(MOVEMENTS, pattern); }
 
 export function patternPosition(phase: Phase, frame: number, entry: Point, encoreCount = 0, level = 1): [number, number] | undefined {
   if (!hasBossMovement(phase.pattern)) return undefined;
@@ -100,6 +100,7 @@ export function patternPosition(phase: Phase, frame: number, entry: Point, encor
   const time = Math.max(0, frame - 105) + (encoreCount > 0 ? encoreCount * (phase.duration * 60 - 105) : 0);
   // 標準の射撃位置へ届くコースを追い、弾の飛行時間ぶん遅れて射線へ入る。
   if (phase.pattern === 'trim') return [courseCenterAt(time - 28, 375, level), baseY];
+  if (phase.pattern === 'rainbow') return rainbowBossPosition(time, level);
   if (phase.pattern === 'chappyYoyo') return yoyoPosition(time, level);
   if (phase.pattern === 'chappySugar') {
     const step = time % SUGAR_PERIOD[level], snap = SUGAR_WARNING[level] - 1;

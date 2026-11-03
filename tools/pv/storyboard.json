@@ -262,7 +262,7 @@
       "color": "#f9ddb0",
       "capture": {
         "stage": 3,
-        "phase": 3,
+        "phase": 7,
         "difficulty": "hard",
         "seed": 3303,
         "warmup": 473

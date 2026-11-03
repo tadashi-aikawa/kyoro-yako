@@ -17,7 +17,9 @@ export const REPRISE_LAST_CYCLE = 12;
 export const REPRISE_HP_STEP = 0.075;
 const PATTERNS = ['enter', 'link', 'sweep', 'type', 'grid', 'jinraiKiss', 'jinraiSakura', 'jinraiClone', 'jinraiPetal'];
 export const REPRISES = STAGES.slice(0, 4).flatMap(stage => stage.phases
-  .filter(phase => PATTERNS.includes(phase.pattern)).map(phase => ({ boss: stage.boss, phase })));
+  .filter(phase => PATTERNS.includes(phase.pattern))
+  .sort((a, b) => PATTERNS.indexOf(a.pattern) - PATTERNS.indexOf(b.pattern))
+  .map(phase => ({ boss: stage.boss, phase })));
 export interface Reprise { cycle: number; index: number; seen: number[]; entry: [number, number]; startFrame: number; prayer: boolean; supplied: boolean; difficulty: Difficulty; finale?: MinervaAwakening; }
 export function repriseIndex(seen: readonly number[], roll = Math.random()): number {
   // 祈りを挟んでも直前の再演を避け、未登場を優先する。全技は候補に残す。
