@@ -50,7 +50,7 @@ export const STAGES: Stage[] = [
       phase(3, '補色の対比', 'spell', 'complement'),
       phase(3, '通常攻撃・最終調整', 'normal', 'claudinePetalArc'),
       phase(3, 'タイポグラフィの雨', 'spell', 'type'),
-      phase(3, 'レインボー・ヴェール', 'spell', 'rainbow'),
+      phase(3, 'レインボー・ラプソディ', 'spell', 'rainbow'),
       phase(3, 'レスポンシブ・ブルーム', 'finale', 'final', 99),
     ],
   },
