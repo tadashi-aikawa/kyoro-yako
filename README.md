@@ -7,7 +7,7 @@ owleryのメンバーが登場する、ブラウザ向けの弾幕シューテ�
 
 ![梟楼夜航のタイトル画面](public/assets/title/ogp.webp)
 
-[ブラウザで遊ぶ](https://tadashi-aikawa.github.io/kyoro-yako/) · [PVを見る](https://www.youtube.com/watch?v=7sD5zUuMwQQ)
+[ブラウザで遊ぶ](https://tadashi-aikawa.github.io/kyoro-yako/) · [PVを見る](https://www.youtube.com/watch?v=UetaP4EYyM4)
 
 ## 遊び方
 
